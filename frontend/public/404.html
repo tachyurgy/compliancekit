@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ComplianceKit</title>
+    <script>
+      // GitHub Pages SPA redirect trick.
+      // Converts /foo/bar?baz=1 -> /?p=/foo/bar&q=baz=1 so index.html can restore the URL.
+      // Based on https://github.com/rafgraph/spa-github-pages (MIT).
+      (function () {
+        var pathSegmentsToKeep = 0;
+        var l = window.location;
+        l.replace(
+          l.protocol +
+            '//' +
+            l.hostname +
+            (l.port ? ':' + l.port : '') +
+            l.pathname
+              .split('/')
+              .slice(0, 1 + pathSegmentsToKeep)
+              .join('/') +
+            '/?p=/' +
+            l.pathname
+              .slice(1)
+              .split('/')
+              .slice(pathSegmentsToKeep)
+              .join('/')
+              .replace(/&/g, '~and~') +
+            (l.search
+              ? '&q=' + l.search.slice(1).replace(/&/g, '~and~')
+              : '') +
+            l.hash,
+        );
+      })();
+    </script>
+  </head>
+  <body>
+    Redirecting...
+  </body>
+</html>

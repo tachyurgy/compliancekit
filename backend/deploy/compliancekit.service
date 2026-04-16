@@ -1,0 +1,51 @@
+[Unit]
+Description=ComplianceKit API server (Go)
+Documentation=https://github.com/compliancekit/compliancekit
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=compliancekit
+Group=compliancekit
+WorkingDirectory=/opt/compliancekit
+ExecStart=/opt/compliancekit/bin/compliancekit serve
+EnvironmentFile=/etc/compliancekit/env
+
+# Restart policy: always restart with a short backoff.
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+# File descriptor limit: document uploads + S3 multipart + Postgres pool can
+# each hold fds; 65535 gives plenty of headroom.
+LimitNOFILE=65535
+
+# Hardening — the Go binary does not need any of these capabilities.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+
+# Writable paths the service actually needs:
+#   /var/log/compliancekit — application logs (fallback when stdout journal full)
+#   /opt/compliancekit/tmp  — local scratch for PDF rendering
+ReadWritePaths=/var/log/compliancekit /opt/compliancekit/tmp
+
+# stdout/stderr go to journald — `journalctl -u compliancekit -f`
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,93 @@
+# Backend CI: runs on every PR and push that touches backend/**.
+# Lints, vets, builds, and runs the full test suite with a real Postgres
+# service container so integration tests exercise migrations end-to-end.
+name: backend-ci
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ck
+          POSTGRES_PASSWORD: ck
+          POSTGRES_DB: compliancekit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ck"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DATABASE_URL: postgres://ck:ck@localhost:5432/compliancekit_test?sslmode=disable
+      CGO_ENABLED: "0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.7
+
+      - name: Setup Go
+        uses: actions/setup-go@v5.0.2
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Install golang-migrate
+        run: |
+          curl -sSL -o /tmp/migrate.tar.gz \
+            https://github.com/golang-migrate/migrate/releases/download/v4.17.1/migrate.linux-amd64.tar.gz
+          tar -xzf /tmp/migrate.tar.gz -C /tmp
+          sudo install -m 0755 /tmp/migrate /usr/local/bin/migrate
+          migrate -version
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U ck && exit 0
+            sleep 1
+          done
+          exit 1
+        env:
+          PGPASSWORD: ck
+
+      - name: Apply migrations
+        working-directory: backend
+        run: migrate -path ./migrations -database "$DATABASE_URL" up
+
+      - name: go vet
+        working-directory: backend
+        run: go vet ./...
+
+      - name: go build
+        working-directory: backend
+        run: go build ./...
+
+      - name: go test
+        working-directory: backend
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4.3.6
+        with:
+          name: coverage
+          path: backend/coverage.out
+          retention-days: 7

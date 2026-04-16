@@ -1,0 +1,46 @@
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+credentials.json
+secrets/
+
+# Build artifacts
+backend/bin/
+backend/tmp/
+backend/server
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/node_modules/
+node_modules/
+*.exe
+*.test
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# Logs / local data
+*.log
+logs/
+coverage/
+*.out
+*.lcov
+pgdata/
+.local/
+
+# Large data (leads CSVs) — keep out of repo
+*_leads.csv
+california_leads.csv
+texas_leads.csv
+florida_leads.csv
+
+# Existing marketing HTML stays; planning docs stay.

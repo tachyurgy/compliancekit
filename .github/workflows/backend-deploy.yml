@@ -1,0 +1,165 @@
+# Backend production deploy.
+#
+# Triggered on push to main that touches backend/**. Builds the Go binary
+# on GitHub-hosted runners, ships it to the droplet via SSH, and runs
+# migrations + the atomic swap.
+#
+# The `production` environment requires manual approval (configured in the
+# repo's Settings -> Environments) so a reviewer must click "approve" before
+# the binary actually ships.
+name: backend-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false  # never interrupt a deploy mid-flight
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    outputs:
+      release_id: ${{ steps.stamp.outputs.release_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.7
+
+      - name: Setup Go
+        uses: actions/setup-go@v5.0.2
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Compute release id
+        id: stamp
+        run: echo "release_id=$(date -u +%Y%m%dT%H%M%SZ)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build static binary
+        working-directory: backend
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          go build -trimpath \
+            -ldflags "-s -w -X main.Version=${{ steps.stamp.outputs.release_id }}" \
+            -o ../.artifacts/compliancekit \
+            ./cmd/compliancekit
+
+      - name: Package release artifact
+        run: |
+          mkdir -p .artifacts/release
+          mv .artifacts/compliancekit .artifacts/release/compliancekit
+          cp -r backend/migrations .artifacts/release/migrations
+          cp -r backend/deploy     .artifacts/release/deploy
+          tar -czf ck-${{ steps.stamp.outputs.release_id }}.tar.gz -C .artifacts/release .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4.3.6
+        with:
+          name: ck-release-${{ steps.stamp.outputs.release_id }}
+          path: ck-${{ steps.stamp.outputs.release_id }}.tar.gz
+          retention-days: 14
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    # Requires approval — configured in repo Settings -> Environments -> production.
+    environment:
+      name: production
+      url: https://api.compliancekit.com
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: ck-release-${{ needs.build.outputs.release_id }}
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Add known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Ship release to droplet
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          RELEASE_ID: ${{ needs.build.outputs.release_id }}
+        run: |
+          set -euo pipefail
+          REMOTE_DIR="/opt/compliancekit/releases/${RELEASE_ID}"
+          ssh "compliancekit@${DEPLOY_HOST}" "mkdir -p ${REMOTE_DIR}"
+          scp "ck-${RELEASE_ID}.tar.gz" "compliancekit@${DEPLOY_HOST}:/tmp/ck-release.tar.gz"
+          ssh "compliancekit@${DEPLOY_HOST}" bash -euo pipefail <<EOF
+            tar -xzf /tmp/ck-release.tar.gz -C ${REMOTE_DIR}
+            rm /tmp/ck-release.tar.gz
+            chmod 0755 ${REMOTE_DIR}/compliancekit
+            mkdir -p ${REMOTE_DIR}/bin
+            mv ${REMOTE_DIR}/compliancekit ${REMOTE_DIR}/bin/compliancekit
+
+            # Run migrations.
+            DATABASE_URL="\$(grep -E '^DATABASE_URL=' /etc/compliancekit/env | cut -d= -f2-)"
+            /usr/local/bin/migrate -path ${REMOTE_DIR}/migrations -database "\$DATABASE_URL" up
+
+            # Swap.
+            if [[ -L /opt/compliancekit/current ]]; then
+              ln -sfn "\$(readlink /opt/compliancekit/current)" /opt/compliancekit/previous
+            fi
+            ln -sfn ${REMOTE_DIR} /opt/compliancekit/current
+            ln -sfn /opt/compliancekit/current/bin/compliancekit /opt/compliancekit/bin/compliancekit
+
+            # Refresh systemd unit + nginx if changed.
+            if ! cmp -s ${REMOTE_DIR}/deploy/compliancekit.service /etc/systemd/system/compliancekit.service 2>/dev/null; then
+              sudo cp ${REMOTE_DIR}/deploy/compliancekit.service /etc/systemd/system/compliancekit.service
+              sudo systemctl daemon-reload
+            fi
+            if ! cmp -s ${REMOTE_DIR}/deploy/nginx.conf /etc/nginx/sites-available/compliancekit 2>/dev/null; then
+              sudo cp ${REMOTE_DIR}/deploy/nginx.conf /etc/nginx/sites-available/compliancekit
+              sudo nginx -t
+              sudo systemctl reload nginx
+            fi
+
+            sudo systemctl restart compliancekit
+
+            # Prune to last 5 releases.
+            cd /opt/compliancekit/releases
+            ls -1t | tail -n +6 | xargs -r rm -rf
+          EOF
+
+      - name: Health check with auto-rollback
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 90 ))
+          ok=0
+          while [[ $(date +%s) -lt $deadline ]]; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "https://${DEPLOY_HOST}/healthz" || echo 000)
+            if [[ "$code" == "200" ]]; then ok=1; break; fi
+            echo "health=$code — retrying"
+            sleep 3
+          done
+          if [[ $ok -ne 1 ]]; then
+            echo "::error::health check failed — rolling back"
+            ssh "compliancekit@${DEPLOY_HOST}" bash -euo pipefail <<'EOF'
+              if [[ -L /opt/compliancekit/previous ]]; then
+                ln -sfn "$(readlink /opt/compliancekit/previous)" /opt/compliancekit/current
+                ln -sfn /opt/compliancekit/current/bin/compliancekit /opt/compliancekit/bin/compliancekit
+                sudo systemctl restart compliancekit
+              else
+                echo "no previous release to roll back to"; exit 1
+              fi
+            EOF
+            exit 1
+          fi
+          echo "deploy ok"

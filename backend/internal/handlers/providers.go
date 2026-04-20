@@ -2,15 +2,13 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
@@ -21,7 +19,7 @@ import (
 )
 
 type ProviderHandler struct {
-	Pool         *pgxpool.Pool
+	Pool         *sql.DB
 	Magic        *magiclink.Service
 	Emailer      *notify.Emailer
 	FrontendBase string
@@ -49,21 +47,36 @@ func (h *ProviderHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.BadRequestf("name, owner_email, and state_code are required"))
 		return
 	}
+	switch strings.ToUpper(in.StateCode) {
+	case "CA", "TX", "FL":
+	default:
+		httpx.RenderError(w, r, httpx.BadRequestf("state_code must be one of CA, TX, FL (MVP scope)"))
+		return
+	}
 
-	// Upsert provider by owner_email. State code normalized.
+	// Upsert provider by owner_email. Populate both the legacy canonical
+	// columns (legal_name, state) from migration 000001 and the handler-era
+	// columns (name, state_code) added by migration 000012, so reads work from
+	// either schema view.
 	providerID := base62.NewID()[:22]
-	_, err := h.Pool.Exec(r.Context(), `
-		INSERT INTO providers (id, name, owner_email, state_code, capacity, timezone, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, 0, 'America/Los_Angeles', NOW(), NOW())
-		ON CONFLICT (owner_email) DO UPDATE SET name = EXCLUDED.name, state_code = EXCLUDED.state_code, updated_at = NOW()`,
-		providerID, in.Name, in.OwnerEmail, strings.ToUpper(in.StateCode))
+	stateUpper := strings.ToUpper(in.StateCode)
+	_, err := h.Pool.ExecContext(r.Context(), `
+		INSERT INTO providers (id, legal_name, name, owner_email, state, state_code, capacity, timezone, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, 0, 'America/Los_Angeles', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		ON CONFLICT (owner_email) DO UPDATE SET
+			name = EXCLUDED.name,
+			legal_name = EXCLUDED.legal_name,
+			state = EXCLUDED.state,
+			state_code = EXCLUDED.state_code,
+			updated_at = CURRENT_TIMESTAMP`,
+		providerID, in.Name, in.Name, in.OwnerEmail, stateUpper, stateUpper)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
 	// Re-read to get the canonical ID (may have been pre-existing).
 	var actualID string
-	_ = h.Pool.QueryRow(r.Context(), `SELECT id FROM providers WHERE owner_email = $1`, in.OwnerEmail).Scan(&actualID)
+	_ = h.Pool.QueryRowContext(r.Context(), `SELECT id FROM providers WHERE owner_email = ?`, in.OwnerEmail).Scan(&actualID)
 
 	token, path, err := h.Magic.Generate(r.Context(), magiclink.KindProviderSignup, actualID, actualID, 0)
 	if err != nil {
@@ -101,10 +114,10 @@ func (h *ProviderHandler) Signin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var providerID, name string
-	err := h.Pool.QueryRow(r.Context(),
-		`SELECT id, name FROM providers WHERE owner_email = $1 AND deleted_at IS NULL`, email).Scan(&providerID, &name)
+	err := h.Pool.QueryRowContext(r.Context(),
+		`SELECT id, name FROM providers WHERE owner_email = ? AND deleted_at IS NULL`, email).Scan(&providerID, &name)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			// Don't leak whether email exists; pretend success.
 			httpx.RenderJSON(w, http.StatusAccepted, map[string]string{"status": "sent"})
 			return
@@ -145,11 +158,11 @@ func (h *ProviderHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sessID := base62.NewID()
-	// Store session. Expect sessions table (provider_id, session_id, expires_at).
-	if _, err := h.Pool.Exec(r.Context(), `
+	// Store session. SQLite lacks INTERVAL literals; use datetime(...).
+	if _, err := h.Pool.ExecContext(r.Context(), `
 		INSERT INTO sessions (id, provider_id, user_id, expires_at, created_at)
-		VALUES ($1, $2, $2, NOW() + INTERVAL '14 days', NOW())`,
-		sessID, claim.ProviderID); err != nil {
+		VALUES (?, ?, ?, datetime('now', '+14 days'), CURRENT_TIMESTAMP)`,
+		sessID, claim.ProviderID, claim.ProviderID); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
@@ -174,11 +187,11 @@ func (h *ProviderHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var p models.Provider
-	err := h.Pool.QueryRow(r.Context(), `
+	err := h.Pool.QueryRowContext(r.Context(), `
 		SELECT id, name, COALESCE(legal_name, ''), state_code, COALESCE(license_number, ''),
 		       owner_email, COALESCE(owner_phone, ''), capacity, timezone,
 		       COALESCE(stripe_customer_id, ''), created_at, updated_at
-		FROM providers WHERE id = $1`, pid).
+		FROM providers WHERE id = ?`, pid).
 		Scan(&p.ID, &p.Name, &p.LegalName, &p.StateCode, &p.LicenseNumber, &p.OwnerEmail,
 			&p.OwnerPhone, &p.Capacity, &p.Timezone, &p.StripeCustID, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
@@ -207,17 +220,17 @@ func (h *ProviderHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, err)
 		return
 	}
-	_, err := h.Pool.Exec(r.Context(), `
+	_, err := h.Pool.ExecContext(r.Context(), `
 		UPDATE providers
-		SET name          = COALESCE($2, name),
-		    legal_name    = COALESCE($3, legal_name),
-		    license_number= COALESCE($4, license_number),
-		    owner_phone   = COALESCE($5, owner_phone),
-		    capacity      = COALESCE($6, capacity),
-		    timezone      = COALESCE($7, timezone),
-		    updated_at    = NOW()
-		WHERE id = $1`,
-		pid, in.Name, in.LegalName, in.LicenseNumber, in.OwnerPhone, in.Capacity, in.Timezone)
+		SET name          = COALESCE(?, name),
+		    legal_name    = COALESCE(?, legal_name),
+		    license_number= COALESCE(?, license_number),
+		    owner_phone   = COALESCE(?, owner_phone),
+		    capacity      = COALESCE(?, capacity),
+		    timezone      = COALESCE(?, timezone),
+		    updated_at    = CURRENT_TIMESTAMP
+		WHERE id = ?`,
+		in.Name, in.LegalName, in.LicenseNumber, in.OwnerPhone, in.Capacity, in.Timezone, pid)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, fmt.Errorf("update provider: %w", err)))
 		return
@@ -227,8 +240,8 @@ func (h *ProviderHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 
 // LookupSession implements middleware.SessionReader.
 func (h *ProviderHandler) LookupSession(ctx context.Context, token string) (providerID, userID string, err error) {
-	err = h.Pool.QueryRow(ctx, `
-		SELECT provider_id, user_id FROM sessions WHERE id = $1 AND expires_at > NOW()`, token).
+	err = h.Pool.QueryRowContext(ctx, `
+		SELECT provider_id, user_id FROM sessions WHERE id = ? AND expires_at > CURRENT_TIMESTAMP`, token).
 		Scan(&providerID, &userID)
 	if err != nil {
 		return "", "", err
@@ -239,7 +252,7 @@ func (h *ProviderHandler) LookupSession(ctx context.Context, token string) (prov
 // Logout clears the session cookie and deletes the session row.
 func (h *ProviderHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie("ck_sess"); err == nil && c.Value != "" {
-		_, _ = h.Pool.Exec(r.Context(), `DELETE FROM sessions WHERE id = $1`, c.Value)
+		_, _ = h.Pool.ExecContext(r.Context(), `DELETE FROM sessions WHERE id = ?`, c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: "ck_sess", Value: "", Domain: h.CookieDomain, Path: "/",

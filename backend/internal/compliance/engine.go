@@ -173,7 +173,19 @@ func rulesFor(state models.StateCode) []Rule {
 	case models.StateFL:
 		return RulesFL()
 	default:
-		return []Rule{}
+		// MVP only supports CA/TX/FL. Returning an empty rule pack would falsely
+		// report a 100 score for an unsupported state; instead, we surface a
+		// single "state not supported" violation so the dashboard makes it obvious.
+		return []Rule{{
+			ID:       "STATE-NOT-SUPPORTED",
+			Title:    "State not supported at MVP",
+			Severity: SeverityCritical,
+			Category: "configuration",
+			Check: func(_ ProviderFacts, _ time.Time) CheckResult {
+				return CheckResult{Violation: "ComplianceKit supports CA, TX, and FL at MVP. Your state is not yet configured.",
+					FixHint: "Contact support — additional states ship post-MVP."}
+			},
+		}}
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"database/sql"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
@@ -16,7 +16,7 @@ import (
 )
 
 type PortalHandler struct {
-	Pool    *pgxpool.Pool
+	Pool    *sql.DB
 	Storage *storage.Client
 	Magic   *magiclink.Service
 	Log     *slog.Logger
@@ -35,10 +35,10 @@ func (h *PortalHandler) ParentHome(w http.ResponseWriter, r *http.Request) {
 		firstName, lastName, classroom string
 		providerName                   string
 	)
-	err := h.Pool.QueryRow(r.Context(), `
+	err := h.Pool.QueryRowContext(r.Context(), `
 		SELECT c.first_name, c.last_name, COALESCE(c.classroom,''), p.name
 		FROM children c JOIN providers p ON p.id = c.provider_id
-		WHERE c.id = $1 AND c.provider_id = $2`,
+		WHERE c.id = ? AND c.provider_id = ?`,
 		claim.SubjectID, claim.ProviderID).Scan(&firstName, &lastName, &classroom, &providerName)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrNotFound, err))
@@ -54,7 +54,7 @@ func (h *PortalHandler) ParentHome(w http.ResponseWriter, r *http.Request) {
 		"child": map[string]string{
 			"id": claim.SubjectID, "first_name": firstName, "last_name": lastName, "classroom": classroom,
 		},
-		"provider":          map[string]string{"id": claim.ProviderID, "name": providerName},
+		"provider":           map[string]string{"id": claim.ProviderID, "name": providerName},
 		"existing_documents": docs,
 		"required_documents": []string{"immunization_record", "emergency_card", "physical_exam", "enrollment_form"},
 		"token_expires_at":   claim.ExpiresAt,
@@ -113,11 +113,11 @@ func (h *PortalHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	if subjectKind == "staff" {
 		uploadedVia = "staff_portal"
 	}
-	if _, err := h.Pool.Exec(r.Context(), `
+	if _, err := h.Pool.ExecContext(r.Context(), `
 		INSERT INTO documents (id, provider_id, subject_kind, subject_id, kind, title,
 		                      storage_bucket, storage_key, mime_type, size_bytes,
 		                      uploaded_by, uploaded_via, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,$10,$11,NOW(),NOW())`,
+		VALUES (?,?,?,?,?,?,?,?,?,0,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
 		docID, claim.ProviderID, subjectKind, claim.SubjectID, in.Kind, title,
 		bucket, key, in.MIMEType, claim.SubjectID, uploadedVia); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
@@ -136,10 +136,10 @@ func (h *PortalHandler) StaffHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var firstName, lastName, role, providerName string
-	err := h.Pool.QueryRow(r.Context(), `
+	err := h.Pool.QueryRowContext(r.Context(), `
 		SELECT s.first_name, s.last_name, s.role, p.name
 		FROM staff s JOIN providers p ON p.id = s.provider_id
-		WHERE s.id = $1 AND s.provider_id = $2`,
+		WHERE s.id = ? AND s.provider_id = ?`,
 		claim.SubjectID, claim.ProviderID).Scan(&firstName, &lastName, &role, &providerName)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrNotFound, err))
@@ -154,7 +154,7 @@ func (h *PortalHandler) StaffHome(w http.ResponseWriter, r *http.Request) {
 		"staff": map[string]string{
 			"id": claim.SubjectID, "first_name": firstName, "last_name": lastName, "role": role,
 		},
-		"provider":          map[string]string{"id": claim.ProviderID, "name": providerName},
+		"provider":           map[string]string{"id": claim.ProviderID, "name": providerName},
 		"existing_documents": docs,
 		"required_documents": []string{"tb_test", "cpr_cert", "first_aid_cert", "background_check"},
 		"token_expires_at":   claim.ExpiresAt,
@@ -170,10 +170,10 @@ type portalDoc struct {
 }
 
 func (h *PortalHandler) listDocsForSubject(r *http.Request, pid, subjectKind, subjectID string) ([]portalDoc, error) {
-	rows, err := h.Pool.Query(r.Context(), `
+	rows, err := h.Pool.QueryContext(r.Context(), `
 		SELECT id, kind, title, expires_at, created_at
 		FROM documents
-		WHERE provider_id = $1 AND subject_kind = $2 AND subject_id = $3 AND deleted_at IS NULL
+		WHERE provider_id = ? AND subject_kind = ? AND subject_id = ? AND deleted_at IS NULL
 		ORDER BY created_at DESC`, pid, subjectKind, subjectID)
 	if err != nil {
 		return nil, err

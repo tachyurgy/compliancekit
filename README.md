@@ -18,11 +18,11 @@ cd backend
 # Environment
 cp .env.example .env
 # Edit .env — fill in:
-#   CK_DB_URL (local Postgres)
-#   CK_S3_*_ACCESS_KEY / SECRET_KEY (per-bucket)
+#   DATABASE_URL  (defaults to ./ck.db — local SQLite file, ADR-017)
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY + S3_BUCKET=ck-files
 #   CK_SES_*, CK_TWILIO_*, CK_STRIPE_*, CK_MISTRAL_API_KEY, CK_GEMINI_API_KEY
 
-# Bring up local Postgres + a MinIO stand-in for S3
+# Optional: MinIO stand-in for S3 (the DB is just a file, no DB container needed)
 docker-compose up -d
 
 # Run migrations
@@ -49,7 +49,7 @@ npm run dev
 
 ## Architecture (one paragraph)
 
-Go backend running under systemd on a single DigitalOcean droplet, reverse-proxied by Caddy with auto-TLS. React (Vite + TypeScript) frontend hosted on GitHub Pages. PostgreSQL on DigitalOcean Managed. Four dedicated S3 buckets partition document storage by lifecycle and access pattern. Stripe for billing, SES for email, Twilio for SMS. Mistral OCR extracts text from uploaded documents with Gemini Flash as fallback; Gemini Flash is also used for structured metadata extraction and an onboarding chat. The compliance rules engine is a pure Go package — deterministic, fully unit-tested, no LLM at runtime. Authentication is magic-link only, two-part: owner login and per-parent/per-staff upload portals.
+Go backend running under systemd on a single DigitalOcean droplet, reverse-proxied by Caddy with auto-TLS. React (Vite + TypeScript) frontend hosted on GitHub Pages. SQLite (WAL mode, pure-Go `modernc.org/sqlite` driver) as the primary datastore — one file on the droplet, backed up nightly to S3 (see ADR-017). Four dedicated S3 buckets partition document storage by lifecycle and access pattern. Stripe for billing, SES for email, Twilio for SMS. Mistral OCR extracts text from uploaded documents with Gemini Flash as fallback; Gemini Flash is also used for structured metadata extraction and an onboarding chat. The compliance rules engine is a pure Go package — deterministic, fully unit-tested, no LLM at runtime. Authentication is magic-link only, two-part: owner login and per-parent/per-staff upload portals.
 
 ---
 

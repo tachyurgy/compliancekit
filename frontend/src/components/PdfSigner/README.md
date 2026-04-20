@@ -49,8 +49,8 @@ Provider UI                          Browser (Signer)                   Go Backe
     |                                         |------------------------------>|                              |
     |                                         |                               | recompute sha256             |
     |                                         |                               | verify %PDF header           |
-    |                                         |                               | PUT s3://ck-signed-pdfs/...  |
-    |                                         |                               | PUT s3://ck-audit-trail/...  |
+    |                                         |                               | PUT s3://ck-files/signed/... |
+    |                                         |                               | PUT s3://ck-files/audit/...  |
     |                                         |                               | INSERT signatures            |
     |                                         |                               |----------------------------->|
     |                                         |<-- SignatureRecord -----------|                              |
@@ -63,8 +63,8 @@ Two SHA-256 hashes are captured for every signature:
 - `sha256Before` — the unmodified PDF bytes the signer received from S3.
 - `sha256After` — the final bytes after field stamping + audit-certificate page.
 
-Both are recorded in (a) the Postgres `signatures` row, (b) the JSON stored in
-the `ck-audit-trail` bucket, and (c) the rendered certificate page on the last
+Both are recorded in (a) the Postgres `signatures` row, (b) the JSON stored
+under `audit/` in the `ck-files` bucket, and (c) the rendered certificate page on the last
 page of the signed PDF itself. Any future byte-level modification of the signed
 PDF that is not reflected in all three locations is detectable.
 

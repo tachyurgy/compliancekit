@@ -4,13 +4,11 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 )
@@ -73,11 +71,11 @@ type Claim struct {
 // Service issues and consumes magic link tokens.
 // Tokens are stored as HMAC-SHA256 hashes — plaintext never touches the DB.
 type Service struct {
-	pool       *pgxpool.Pool
+	pool       *sql.DB
 	signingKey []byte
 }
 
-func NewService(pool *pgxpool.Pool, signingKey string) *Service {
+func NewService(pool *sql.DB, signingKey string) *Service {
 	return &Service{pool: pool, signingKey: []byte(signingKey)}
 }
 
@@ -92,9 +90,9 @@ func (s *Service) Generate(ctx context.Context, kind Kind, providerID, subjectID
 	tokenID := base62.NewID()[:22] // short, base62-safe primary key
 	hash := s.hash(token)
 
-	_, err = s.pool.Exec(ctx, `
+	_, err = s.pool.ExecContext(ctx, `
 		INSERT INTO magic_link_tokens (id, kind, provider_id, subject_id, token_hash, expires_at, created_at)
-		VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, $6, NOW())`,
+		VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, CURRENT_TIMESTAMP)`,
 		tokenID, string(kind), providerID, subjectID, hash, time.Now().Add(ttl))
 	if err != nil {
 		return "", "", fmt.Errorf("magiclink: insert: %w", err)
@@ -118,12 +116,12 @@ func (s *Service) Consume(ctx context.Context, token string) (*Claim, error) {
 		expiresAt   time.Time
 		consumedAt  *time.Time
 	)
-	err := s.pool.QueryRow(ctx, `
+	err := s.pool.QueryRowContext(ctx, `
 		SELECT id, kind, provider_id, subject_id, expires_at, consumed_at
 		FROM magic_link_tokens
-		WHERE token_hash = $1`, hash).Scan(&id, &kindStr, &providerID, &subjectID, &expiresAt, &consumedAt)
+		WHERE token_hash = ?`, hash).Scan(&id, &kindStr, &providerID, &subjectID, &expiresAt, &consumedAt)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("magiclink: token not found")
 		}
 		return nil, fmt.Errorf("magiclink: select: %w", err)
@@ -140,18 +138,18 @@ func (s *Service) Consume(ctx context.Context, token string) (*Claim, error) {
 	kind := Kind(kindStr)
 	if IsSliding(kind) {
 		newExp := now.Add(TTLFor(kind))
-		if _, err := s.pool.Exec(ctx, `
+		if _, err := s.pool.ExecContext(ctx, `
 			UPDATE magic_link_tokens
-			SET last_used_at = NOW(), expires_at = $2
-			WHERE id = $1`, id, newExp); err != nil {
+			SET last_used_at = CURRENT_TIMESTAMP, expires_at = ?
+			WHERE id = ?`, newExp, id); err != nil {
 			return nil, fmt.Errorf("magiclink: slide: %w", err)
 		}
 		expiresAt = newExp
 	} else {
-		if _, err := s.pool.Exec(ctx, `
+		if _, err := s.pool.ExecContext(ctx, `
 			UPDATE magic_link_tokens
-			SET consumed_at = NOW(), last_used_at = NOW()
-			WHERE id = $1`, id); err != nil {
+			SET consumed_at = CURRENT_TIMESTAMP, last_used_at = CURRENT_TIMESTAMP
+			WHERE id = ?`, id); err != nil {
 			return nil, fmt.Errorf("magiclink: consume: %w", err)
 		}
 	}
@@ -168,10 +166,10 @@ func (s *Service) Consume(ctx context.Context, token string) (*Claim, error) {
 
 // Revoke marks every outstanding token for a subject as consumed.
 func (s *Service) Revoke(ctx context.Context, kind Kind, subjectID string) error {
-	_, err := s.pool.Exec(ctx, `
+	_, err := s.pool.ExecContext(ctx, `
 		UPDATE magic_link_tokens
-		SET consumed_at = NOW()
-		WHERE kind = $1 AND subject_id = $2 AND consumed_at IS NULL`,
+		SET consumed_at = CURRENT_TIMESTAMP
+		WHERE kind = ? AND subject_id = ? AND consumed_at IS NULL`,
 		string(kind), subjectID)
 	if err != nil {
 		return fmt.Errorf("magiclink: revoke: %w", err)

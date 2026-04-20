@@ -1,8 +1,7 @@
 -- 000006_compliance_and_notifications.up.sql
 -- Materialized compliance snapshots (for dashboard + history chart),
 -- the chase worker's outbound event log, and hard suppressions.
-
-BEGIN;
+-- SQLite dialect (see ADR-017).
 
 -- ---------------------------------------------------------------------------
 -- compliance_snapshots: periodic point-in-time compliance score. We recompute
@@ -10,20 +9,21 @@ BEGIN;
 -- transitions like certificates that aged into "expired" overnight).
 --
 -- payload is the full detail dump (per-child, per-staff, per-facility
--- findings) — cheap to store, expensive to recompute, so we keep them.
+-- findings) — stored as TEXT JSON, validated with json_valid().
 -- ---------------------------------------------------------------------------
 CREATE TABLE compliance_snapshots (
     id              TEXT PRIMARY KEY,
     provider_id     TEXT NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
-    score           SMALLINT NOT NULL,
+    score           INTEGER NOT NULL,
     violation_count INTEGER NOT NULL DEFAULT 0,
     critical_count  INTEGER NOT NULL DEFAULT 0,
-    payload         JSONB NOT NULL DEFAULT '{}'::jsonb,
-    computed_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT compliance_snapshots_score_chk CHECK (score BETWEEN 0 AND 100)
+    payload         TEXT NOT NULL DEFAULT '{}',
+    computed_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT compliance_snapshots_score_chk   CHECK (score BETWEEN 0 AND 100),
+    CONSTRAINT compliance_snapshots_payload_chk CHECK (json_valid(payload))
 );
 
-CREATE INDEX compliance_snapshots_provider_idx       ON compliance_snapshots (provider_id, computed_at DESC);
+CREATE INDEX compliance_snapshots_provider_idx ON compliance_snapshots (provider_id, computed_at DESC);
 
 -- ---------------------------------------------------------------------------
 -- chase_events: every time we fire a "your X is missing/expiring" to a
@@ -42,10 +42,10 @@ CREATE TABLE chase_events (
     trigger           TEXT NOT NULL,
     channel           TEXT NOT NULL,
     recipient_contact TEXT NOT NULL,
-    sent_at           TIMESTAMPTZ NULL,
-    failed_at         TIMESTAMPTZ NULL,
+    sent_at           TEXT NULL,
+    failed_at         TEXT NULL,
     failure_reason    TEXT,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chase_events_target_kind_chk CHECK (target_kind IN ('child','staff','facility')),
     CONSTRAINT chase_events_trigger_chk     CHECK (trigger IN ('6w','4w','2w','1w','3d','overdue')),
     CONSTRAINT chase_events_channel_chk     CHECK (channel IN ('email','sms','inapp')),
@@ -69,8 +69,6 @@ CREATE UNIQUE INDEX chase_events_dedupe_uidx ON chase_events
 CREATE TABLE notification_suppressions (
     email_or_phone TEXT PRIMARY KEY,
     reason         TEXT NOT NULL,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT notif_supp_reason_chk CHECK (reason IN ('unsubscribed','hard_bounce','complaint'))
 );
-
-COMMIT;

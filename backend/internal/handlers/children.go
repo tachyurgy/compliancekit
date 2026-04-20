@@ -1,12 +1,12 @@
 package handlers
 
 import (
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
@@ -15,18 +15,18 @@ import (
 )
 
 type ChildHandler struct {
-	Pool *pgxpool.Pool
+	Pool *sql.DB
 	Log  *slog.Logger
 }
 
 // GET /api/children
 func (h *ChildHandler) List(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
-	rows, err := h.Pool.Query(r.Context(), `
+	rows, err := h.Pool.QueryContext(r.Context(), `
 		SELECT id, provider_id, first_name, last_name, date_of_birth, enroll_date,
 		       COALESCE(parent_email, ''), COALESCE(parent_phone, ''), COALESCE(classroom, ''),
 		       status, created_at, updated_at
-		FROM children WHERE provider_id = $1 ORDER BY last_name, first_name`, pid)
+		FROM children WHERE provider_id = ? ORDER BY last_name, first_name`, pid)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
@@ -66,10 +66,10 @@ func (h *ChildHandler) Create(w http.ResponseWriter, r *http.Request) {
 	in.ID = base62.NewID()[:22]
 	in.ProviderID = pid
 
-	_, err := h.Pool.Exec(r.Context(), `
+	_, err := h.Pool.ExecContext(r.Context(), `
 		INSERT INTO children (id, provider_id, first_name, last_name, date_of_birth, enroll_date,
 		                     parent_email, parent_phone, classroom, status, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),NOW())`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
 		in.ID, in.ProviderID, in.FirstName, in.LastName, in.DOB, in.EnrollDate,
 		in.ParentEmail, in.ParentPhone, in.Classroom, in.Status)
 	if err != nil {
@@ -84,11 +84,11 @@ func (h *ChildHandler) Get(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
 	id := chi.URLParam(r, "id")
 	var c models.Child
-	err := h.Pool.QueryRow(r.Context(), `
+	err := h.Pool.QueryRowContext(r.Context(), `
 		SELECT id, provider_id, first_name, last_name, date_of_birth, enroll_date,
 		       COALESCE(parent_email,''), COALESCE(parent_phone,''), COALESCE(classroom,''),
 		       status, created_at, updated_at
-		FROM children WHERE id = $1 AND provider_id = $2`, id, pid).
+		FROM children WHERE id = ? AND provider_id = ?`, id, pid).
 		Scan(&c.ID, &c.ProviderID, &c.FirstName, &c.LastName, &c.DOB, &c.EnrollDate,
 			&c.ParentEmail, &c.ParentPhone, &c.Classroom, &c.Status, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
@@ -115,18 +115,19 @@ func (h *ChildHandler) Update(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, err)
 		return
 	}
-	_, err := h.Pool.Exec(r.Context(), `
+	_, err := h.Pool.ExecContext(r.Context(), `
 		UPDATE children SET
-		  first_name    = COALESCE($3, first_name),
-		  last_name     = COALESCE($4, last_name),
-		  date_of_birth = COALESCE($5, date_of_birth),
-		  parent_email  = COALESCE($6, parent_email),
-		  parent_phone  = COALESCE($7, parent_phone),
-		  classroom     = COALESCE($8, classroom),
-		  status        = COALESCE($9, status),
-		  updated_at    = NOW()
-		WHERE id = $1 AND provider_id = $2`,
-		id, pid, in.FirstName, in.LastName, in.DOB, in.ParentEmail, in.ParentPhone, in.Classroom, in.Status)
+		  first_name    = COALESCE(?, first_name),
+		  last_name     = COALESCE(?, last_name),
+		  date_of_birth = COALESCE(?, date_of_birth),
+		  parent_email  = COALESCE(?, parent_email),
+		  parent_phone  = COALESCE(?, parent_phone),
+		  classroom     = COALESCE(?, classroom),
+		  status        = COALESCE(?, status),
+		  updated_at    = CURRENT_TIMESTAMP
+		WHERE id = ? AND provider_id = ?`,
+		in.FirstName, in.LastName, in.DOB, in.ParentEmail, in.ParentPhone, in.Classroom, in.Status,
+		id, pid)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
@@ -138,8 +139,8 @@ func (h *ChildHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *ChildHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
 	id := chi.URLParam(r, "id")
-	if _, err := h.Pool.Exec(r.Context(),
-		`DELETE FROM children WHERE id = $1 AND provider_id = $2`, id, pid); err != nil {
+	if _, err := h.Pool.ExecContext(r.Context(),
+		`DELETE FROM children WHERE id = ? AND provider_id = ?`, id, pid); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
@@ -150,14 +151,14 @@ func (h *ChildHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *ChildHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
 	id := chi.URLParam(r, "id")
-	rows, err := h.Pool.Query(r.Context(), `
+	rows, err := h.Pool.QueryContext(r.Context(), `
 		SELECT id, provider_id, subject_kind, COALESCE(subject_id, ''), kind, title,
 		       storage_bucket, storage_key, mime_type, size_bytes,
 		       issued_at, expires_at, COALESCE(ocr_confidence,0), COALESCE(ocr_source,''),
 		       COALESCE(uploaded_by,''), COALESCE(uploaded_via,''), last_chase_sent_at,
 		       created_at, updated_at, deleted_at
 		FROM documents
-		WHERE provider_id = $1 AND subject_kind = 'child' AND subject_id = $2 AND deleted_at IS NULL
+		WHERE provider_id = ? AND subject_kind = 'child' AND subject_id = ? AND deleted_at IS NULL
 		ORDER BY created_at DESC`, pid, id)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))

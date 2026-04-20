@@ -2,13 +2,11 @@ package notify
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/magiclink"
 )
@@ -20,7 +18,7 @@ import (
 // Dedup: at most one send per threshold per document.
 // Quiet hours: never send between 21:00 and 08:00 in the recipient's TZ.
 type ChaseService struct {
-	pool     *pgxpool.Pool
+	pool     *sql.DB
 	emailer  *Emailer
 	sms      *SMSSender
 	magic    *magiclink.Service
@@ -29,7 +27,7 @@ type ChaseService struct {
 }
 
 type ChaseDeps struct {
-	Pool            *pgxpool.Pool
+	Pool            *sql.DB
 	Emailer         *Emailer
 	SMS             *SMSSender
 	Magic           *magiclink.Service
@@ -99,7 +97,10 @@ func (c *ChaseService) ProcessOnce(ctx context.Context, now time.Time) error {
 	// The query unions child docs and staff docs with their respective
 	// contacts, and filters by any document whose expiration falls within
 	// the widest threshold window that we haven't yet sent a chase for.
-	rows, err := c.pool.Query(ctx, `
+	// Pre-compute the upper bound in Go so the SQL stays portable (SQLite has
+	// no INTERVAL literal).
+	windowEnd := now.Add(45 * 24 * time.Hour)
+	rows, err := c.pool.QueryContext(ctx, `
 WITH candidates AS (
   SELECT d.id AS doc_id, d.provider_id, d.title AS doc_title,
          d.expires_at, d.subject_kind, d.subject_id,
@@ -126,10 +127,10 @@ WITH candidates AS (
     LEFT JOIN staff    st ON st.id = d.subject_id AND d.subject_kind = 'staff'
    WHERE d.deleted_at IS NULL
      AND d.expires_at IS NOT NULL
-     AND d.expires_at > $1
-     AND d.expires_at <= $1 + INTERVAL '45 days'
+     AND d.expires_at > ?
+     AND d.expires_at <= ?
 )
-SELECT * FROM candidates`, now)
+SELECT * FROM candidates`, now, windowEnd)
 	if err != nil {
 		return fmt.Errorf("chase: query candidates: %w", err)
 	}
@@ -207,27 +208,27 @@ func inBusinessHours(now time.Time, tz string) bool {
 
 func (c *ChaseService) alreadySent(ctx context.Context, docID string, threshold int) (bool, error) {
 	var exists bool
-	err := c.pool.QueryRow(ctx, `
+	err := c.pool.QueryRowContext(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM document_chase_sends
-			WHERE document_id = $1 AND threshold_days = $2
+			WHERE document_id = ? AND threshold_days = ?
 		)`, docID, threshold).Scan(&exists)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return false, err
 	}
 	return exists, nil
 }
 
 func (c *ChaseService) recordSent(ctx context.Context, docID string, threshold int, sentAt time.Time) error {
-	_, err := c.pool.Exec(ctx, `
+	_, err := c.pool.ExecContext(ctx, `
 		INSERT INTO document_chase_sends (document_id, threshold_days, sent_at)
-		VALUES ($1, $2, $3)
+		VALUES (?, ?, ?)
 		ON CONFLICT (document_id, threshold_days) DO NOTHING`,
 		docID, threshold, sentAt)
 	if err != nil {
 		return err
 	}
-	_, err = c.pool.Exec(ctx, `UPDATE documents SET last_chase_sent_at = $2 WHERE id = $1`, docID, sentAt)
+	_, err = c.pool.ExecContext(ctx, `UPDATE documents SET last_chase_sent_at = ? WHERE id = ?`, sentAt, docID)
 	return err
 }
 

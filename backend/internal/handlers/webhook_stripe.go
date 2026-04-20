@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"database/sql"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/billing"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
@@ -28,7 +28,7 @@ func (h *StripeWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 type BillingHandler struct {
-	Pool        *pgxpool.Pool
+	Pool        *sql.DB
 	Billing     *billing.Service
 	StripePrice string
 	Log         *slog.Logger
@@ -47,8 +47,8 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var email, name string
-	if err := h.Pool.QueryRow(r.Context(),
-		`SELECT owner_email, name FROM providers WHERE id = $1`, pid).Scan(&email, &name); err != nil {
+	if err := h.Pool.QueryRowContext(r.Context(),
+		`SELECT owner_email, name FROM providers WHERE id = ?`, pid).Scan(&email, &name); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}

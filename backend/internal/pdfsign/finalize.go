@@ -100,7 +100,7 @@ func (s *Service) Finalize(ctx context.Context, in FinalizeInput) (*SignatureRec
 	}
 
 	// 1. Upload signed PDF.
-	if err := s.blobs.Put(ctx, s.signedBucket, signedKey, bytes.NewReader(pdfBytes), "application/pdf"); err != nil {
+	if err := s.blobs.Put(ctx, s.bucket, signedKey, bytes.NewReader(pdfBytes), "application/pdf"); err != nil {
 		return nil, fmt.Errorf("put signed pdf: %w", err)
 	}
 
@@ -109,7 +109,7 @@ func (s *Service) Finalize(ctx context.Context, in FinalizeInput) (*SignatureRec
 	if err != nil {
 		return nil, err
 	}
-	if err := s.blobs.Put(ctx, s.auditBucket, auditKey, bytes.NewReader(auditJSON), "application/json"); err != nil {
+	if err := s.blobs.Put(ctx, s.bucket, auditKey, bytes.NewReader(auditJSON), "application/json"); err != nil {
 		// Best-effort: attempt to clean up the signed PDF so we don't leave an
 		// orphan without an audit trail. Ignore cleanup error (caller will retry).
 		return nil, fmt.Errorf("put audit json: %w", err)
@@ -141,11 +141,11 @@ func (s *Service) Finalize(ctx context.Context, in FinalizeInput) (*SignatureRec
 }
 
 func signedPdfKey(providerID, documentID, signatureID string) string {
-	return fmt.Sprintf("%s/%s/%s.pdf", providerID, documentID, signatureID)
+	return fmt.Sprintf("signed/%s/%s/%s.pdf", providerID, documentID, signatureID)
 }
 
 func auditTrailKey(providerID, signatureID string) string {
-	return fmt.Sprintf("%s/%s.json", providerID, signatureID)
+	return fmt.Sprintf("audit/%s/%s.json", providerID, signatureID)
 }
 
 // readAllCapped reads at most cap+1 bytes from r. If the reader returns more

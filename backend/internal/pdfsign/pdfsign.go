@@ -2,9 +2,9 @@
 //
 // The browser stamps the PDF, hashes it, and uploads the bytes + a JSON audit
 // record. This package validates the session, re-hashes the bytes, persists
-// the signed PDF and audit JSON to two separate S3 buckets, and records the
-// event in Postgres. See README.md for security properties and the full
-// sequence diagram.
+// the signed PDF under `signed/` and the audit JSON under `audit/` in the
+// single ck-files S3 bucket, and records the event in Postgres. See README.md
+// for security properties and the full sequence diagram.
 package pdfsign
 
 import (
@@ -138,24 +138,22 @@ var (
 // Service is the public interface of this package. Split into its own type so
 // the HTTP layer can be unit-tested with a mock.
 type Service struct {
-	store        Store
-	blobs        BlobStore
-	clock        func() time.Time
-	signedBucket string
-	auditBucket  string
-	signingBase  string // e.g. https://app.compliancekit.com
-	sessionTTL   time.Duration
+	store       Store
+	blobs       BlobStore
+	clock       func() time.Time
+	bucket      string
+	signingBase string // e.g. https://app.compliancekit.com
+	sessionTTL  time.Duration
 }
 
 // Config holds the dependencies needed to construct a Service.
 type Config struct {
-	Store        Store
-	Blobs        BlobStore
-	SignedBucket string
-	AuditBucket  string
-	SigningBase  string
-	SessionTTL   time.Duration
-	Clock        func() time.Time
+	Store       Store
+	Blobs       BlobStore
+	Bucket      string
+	SigningBase string
+	SessionTTL  time.Duration
+	Clock       func() time.Time
 }
 
 // NewService constructs a Service. Panics on missing required fields —
@@ -167,8 +165,8 @@ func NewService(cfg Config) *Service {
 	if cfg.Blobs == nil {
 		panic("pdfsign: Blobs is required")
 	}
-	if cfg.SignedBucket == "" || cfg.AuditBucket == "" {
-		panic("pdfsign: SignedBucket and AuditBucket are required")
+	if cfg.Bucket == "" {
+		panic("pdfsign: Bucket is required")
 	}
 	if cfg.SessionTTL == 0 {
 		cfg.SessionTTL = 14 * 24 * time.Hour
@@ -177,13 +175,12 @@ func NewService(cfg Config) *Service {
 		cfg.Clock = time.Now
 	}
 	return &Service{
-		store:        cfg.Store,
-		blobs:        cfg.Blobs,
-		clock:        cfg.Clock,
-		signedBucket: cfg.SignedBucket,
-		auditBucket:  cfg.AuditBucket,
-		signingBase:  cfg.SigningBase,
-		sessionTTL:   cfg.SessionTTL,
+		store:       cfg.Store,
+		blobs:       cfg.Blobs,
+		clock:       cfg.Clock,
+		bucket:      cfg.Bucket,
+		signingBase: cfg.SigningBase,
+		sessionTTL:  cfg.SessionTTL,
 	}
 }
 
@@ -275,7 +272,7 @@ func (s *Service) VerifyIntegrity(ctx context.Context, signatureID string) error
 	if err != nil {
 		return err
 	}
-	pdfBytes, err := s.blobs.Get(ctx, s.signedBucket, rec.SignedPDFS3Key)
+	pdfBytes, err := s.blobs.Get(ctx, s.bucket, rec.SignedPDFS3Key)
 	if err != nil {
 		return err
 	}
@@ -283,7 +280,7 @@ func (s *Service) VerifyIntegrity(ctx context.Context, signatureID string) error
 	if computed != rec.SHA256After {
 		return ErrIntegrityFailed
 	}
-	auditBytes, err := s.blobs.Get(ctx, s.auditBucket, rec.AuditTrailS3Key)
+	auditBytes, err := s.blobs.Get(ctx, s.bucket, rec.AuditTrailS3Key)
 	if err != nil {
 		return err
 	}

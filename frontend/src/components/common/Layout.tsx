@@ -11,6 +11,8 @@ import {
   Menu,
   X,
   ShieldCheck,
+  ClipboardCheck,
+  FlaskConical,
 } from 'lucide-react';
 
 import { useSession } from '@/hooks/useSession';
@@ -26,6 +28,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/children', label: 'Children', icon: Baby },
   { to: '/staff', label: 'Staff', icon: Users },
+  { to: '/operations', label: 'Operations', icon: ClipboardCheck },
+  { to: '/inspections', label: 'Inspections', icon: FlaskConical },
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/templates', label: 'Templates', icon: FileSignature },
   { to: '/settings', label: 'Settings', icon: Settings },

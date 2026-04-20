@@ -64,8 +64,8 @@ Beyond cost, we want:
 | T5 | **Malicious PDF upload** (template side). | Server enforces `%PDF-` header check + size cap (25 MB). v2: server-side render via pdfcpu to catch malformed PDFs early. |
 | T6 | **Content confusion** (upload HTML disguised as PDF). | Same header check. Content-Type is stamped server-side, never trusted from the client. |
 | T7 | **Client hash lying.** Browser submits a hash that does not match the bytes. | Server re-hashes on receipt; mismatch rejects the upload. Client hash is a helper, not a trust anchor. |
-| T8 | **Audit bucket corruption** (accidental delete / rewrite). | `ck-audit-trail` uses S3 versioning + object lock in compliance mode. DB row is the secondary record; either one alone is sufficient to identify the signature event. |
-| T9 | **PII leak via audit JSON.** | Audit JSON contains email + IP + UA. It does NOT contain the raw signature PNG (that is inside the PDF). Bucket is encrypted at rest (SSE-KMS, per-tenant key in v2). |
+| T8 | **Audit object corruption** (accidental delete / rewrite). | `ck-files` has S3 versioning on, so a delete or overwrite of an `audit/` object is recoverable from the prior version. The DB row is the secondary record; either one alone is sufficient to identify the signature event. |
+| T9 | **PII leak via audit JSON.** | Audit JSON contains email + IP + UA. It does NOT contain the raw signature PNG (that is inside the PDF). Bucket is encrypted at rest (SSE-S3 AES256). |
 | T10 | **Log4Shell-class deserialization on audit JSON.** | We `json.Unmarshal` into a typed `AuditRecord` struct — no interface{} soup — on every read. No template evaluation. |
 
 ## 4. Sign Session Lifecycle
@@ -162,72 +162,29 @@ Notable properties:
 
 ## 7. S3 Key Strategy
 
-| Bucket | Purpose | Key pattern | Lifecycle |
-|--------|---------|-------------|-----------|
-| `ck-templates` | Blank PDFs the provider uploaded | `{provider_id}/templates/{document_id}.pdf` | Deletable by provider |
-| `ck-signed-pdfs` | Final stamped PDFs | `{provider_id}/{document_id}/{signature_id}.pdf` | Never deleted; versioned |
-| `ck-audit-trail` | Audit JSON | `{provider_id}/{signature_id}.json` | Object-lock enabled (compliance mode) |
+All objects live in the single `ck-files` bucket. The canonical bucket policy
+is in `infra/s3-bucket-policies/ck-files.json`.
 
-### 7.1 Least-privilege IAM policy (signed bucket example)
+| Prefix | Purpose | Key pattern |
+|--------|---------|-------------|
+| `templates/` | Blank PDFs the provider uploaded | `templates/{provider_id}/{document_id}.pdf` |
+| `signed/` | Final stamped PDFs | `signed/{provider_id}/{document_id}/{signature_id}.pdf` |
+| `audit/` | Audit JSON | `audit/{provider_id}/{signature_id}.json` |
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "BackendWriteSigned",
-      "Effect": "Allow",
-      "Principal": { "AWS": "arn:aws:iam::ACCT:role/ck-backend" },
-      "Action": ["s3:PutObject"],
-      "Resource": "arn:aws:s3:::ck-signed-pdfs/*",
-      "Condition": {
-        "StringEquals": {
-          "s3:x-amz-server-side-encryption": "aws:kms"
-        }
-      }
-    },
-    {
-      "Sid": "BackendReadSigned",
-      "Effect": "Allow",
-      "Principal": { "AWS": "arn:aws:iam::ACCT:role/ck-backend" },
-      "Action": ["s3:GetObject"],
-      "Resource": "arn:aws:s3:::ck-signed-pdfs/*"
-    },
-    {
-      "Sid": "DenyNonSSE",
-      "Effect": "Deny",
-      "Principal": "*",
-      "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::ck-signed-pdfs/*",
-      "Condition": {
-        "StringNotEquals": {
-          "s3:x-amz-server-side-encryption": "aws:kms"
-        }
-      }
-    },
-    {
-      "Sid": "DenyUnencryptedTransport",
-      "Effect": "Deny",
-      "Principal": "*",
-      "Action": "s3:*",
-      "Resource": ["arn:aws:s3:::ck-signed-pdfs", "arn:aws:s3:::ck-signed-pdfs/*"],
-      "Condition": { "Bool": { "aws:SecureTransport": "false" } }
-    }
-  ]
-}
-```
+The bucket has versioning on, so an accidental delete or overwrite of any
+object (including an `audit/` record) is recoverable from the prior version.
+Application code never issues a delete on `audit/` keys.
 
-The audit bucket adds `s3:Object Lock` + denies `s3:DeleteObject` for the
-backend role, so an application bug cannot overwrite history.
+### 7.1 Key-naming rationale
 
-### 7.2 Key-naming rationale
-
-- Provider prefix first \u2192 enables per-tenant bucket policies and
-  straightforward lifecycle rules.
-- Signature ID last in `ck-signed-pdfs` so one provider can have many
-  documents with parallel uploads without contention.
-- Signature ID flat in `ck-audit-trail` because no further nesting is useful
-  there; the JSON is always small (< 10 KB).
+- Prefix first — enables straightforward per-purpose IAM conditions and
+  CloudTrail selection filters if we ever need them.
+- Provider segment next — one-tenant data is contiguous for deletion on
+  churn and for support operations.
+- Signature ID last in `signed/` so one provider can have many documents
+  with parallel uploads without contention.
+- Signature ID flat in `audit/{provider}/` because no further nesting is
+  useful there; the JSON is always small (< 10 KB).
 
 ## 8. DB Schema Summary
 
@@ -275,8 +232,8 @@ rewriting the client:
    - `/SubFilter /ETSI.CAdES.detached`
    - CAdES-BES signed attributes (signing-cert-v2, signing-time).
    - PKCS#7 blob signed by the platform's private key (kept in AWS KMS).
-3. Emit the augmented PDF as a new version in `ck-signed-pdfs` with suffix
-   `.pades.pdf`. Keep the original as the primary; the PAdES version is a
+3. Emit the augmented PDF as a new version in `ck-files` under `signed/`
+   with suffix `.pades.pdf`. Keep the original as the primary; the PAdES version is a
    bonus artifact for signers who ask for it.
 4. In the audit JSON, record the signing cert's SHA-256 and the signature
    value's SHA-256.

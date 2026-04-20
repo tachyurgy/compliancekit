@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"database/sql"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
@@ -15,17 +15,17 @@ import (
 )
 
 type StaffHandler struct {
-	Pool *pgxpool.Pool
+	Pool *sql.DB
 	Log  *slog.Logger
 }
 
 // GET /api/staff
 func (h *StaffHandler) List(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
-	rows, err := h.Pool.Query(r.Context(), `
+	rows, err := h.Pool.QueryContext(r.Context(), `
 		SELECT id, provider_id, first_name, last_name, role, email, COALESCE(phone, ''),
 		       hire_date, background_check_date, status, created_at, updated_at
-		FROM staff WHERE provider_id = $1 ORDER BY last_name, first_name`, pid)
+		FROM staff WHERE provider_id = ? ORDER BY last_name, first_name`, pid)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
@@ -65,10 +65,10 @@ func (h *StaffHandler) Create(w http.ResponseWriter, r *http.Request) {
 	in.ID = base62.NewID()[:22]
 	in.ProviderID = pid
 
-	_, err := h.Pool.Exec(r.Context(), `
+	_, err := h.Pool.ExecContext(r.Context(), `
 		INSERT INTO staff (id, provider_id, first_name, last_name, role, email, phone, hire_date,
 		                  background_check_date, status, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),NOW())`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
 		in.ID, in.ProviderID, in.FirstName, in.LastName, in.Role, in.Email, in.Phone, in.HireDate,
 		in.BackgroundCheck, in.Status)
 	if err != nil {
@@ -83,10 +83,10 @@ func (h *StaffHandler) Get(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
 	id := chi.URLParam(r, "id")
 	var s models.Staff
-	err := h.Pool.QueryRow(r.Context(), `
+	err := h.Pool.QueryRowContext(r.Context(), `
 		SELECT id, provider_id, first_name, last_name, role, email, COALESCE(phone,''),
 		       hire_date, background_check_date, status, created_at, updated_at
-		FROM staff WHERE id = $1 AND provider_id = $2`, id, pid).
+		FROM staff WHERE id = ? AND provider_id = ?`, id, pid).
 		Scan(&s.ID, &s.ProviderID, &s.FirstName, &s.LastName, &s.Role, &s.Email, &s.Phone,
 			&s.HireDate, &s.BackgroundCheck, &s.Status, &s.CreatedAt, &s.UpdatedAt)
 	if err != nil {
@@ -113,18 +113,19 @@ func (h *StaffHandler) Update(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, err)
 		return
 	}
-	_, err := h.Pool.Exec(r.Context(), `
+	_, err := h.Pool.ExecContext(r.Context(), `
 		UPDATE staff SET
-		  first_name            = COALESCE($3, first_name),
-		  last_name             = COALESCE($4, last_name),
-		  role                  = COALESCE($5, role),
-		  email                 = COALESCE($6, email),
-		  phone                 = COALESCE($7, phone),
-		  background_check_date = COALESCE($8, background_check_date),
-		  status                = COALESCE($9, status),
-		  updated_at            = NOW()
-		WHERE id = $1 AND provider_id = $2`,
-		id, pid, in.FirstName, in.LastName, in.Role, in.Email, in.Phone, in.BackgroundCheck, in.Status)
+		  first_name            = COALESCE(?, first_name),
+		  last_name             = COALESCE(?, last_name),
+		  role                  = COALESCE(?, role),
+		  email                 = COALESCE(?, email),
+		  phone                 = COALESCE(?, phone),
+		  background_check_date = COALESCE(?, background_check_date),
+		  status                = COALESCE(?, status),
+		  updated_at            = CURRENT_TIMESTAMP
+		WHERE id = ? AND provider_id = ?`,
+		in.FirstName, in.LastName, in.Role, in.Email, in.Phone, in.BackgroundCheck, in.Status,
+		id, pid)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
@@ -136,8 +137,8 @@ func (h *StaffHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *StaffHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
 	id := chi.URLParam(r, "id")
-	if _, err := h.Pool.Exec(r.Context(),
-		`UPDATE staff SET status = 'terminated', updated_at = NOW() WHERE id = $1 AND provider_id = $2`, id, pid); err != nil {
+	if _, err := h.Pool.ExecContext(r.Context(),
+		`UPDATE staff SET status = 'terminated', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND provider_id = ?`, id, pid); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
@@ -148,14 +149,14 @@ func (h *StaffHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *StaffHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
 	id := chi.URLParam(r, "id")
-	rows, err := h.Pool.Query(r.Context(), `
+	rows, err := h.Pool.QueryContext(r.Context(), `
 		SELECT id, provider_id, subject_kind, COALESCE(subject_id, ''), kind, title,
 		       storage_bucket, storage_key, mime_type, size_bytes,
 		       issued_at, expires_at, COALESCE(ocr_confidence,0), COALESCE(ocr_source,''),
 		       COALESCE(uploaded_by,''), COALESCE(uploaded_via,''), last_chase_sent_at,
 		       created_at, updated_at, deleted_at
 		FROM documents
-		WHERE provider_id = $1 AND subject_kind = 'staff' AND subject_id = $2 AND deleted_at IS NULL
+		WHERE provider_id = ? AND subject_kind = 'staff' AND subject_id = ? AND deleted_at IS NULL
 		ORDER BY created_at DESC`, pid, id)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))

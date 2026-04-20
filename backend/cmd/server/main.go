@@ -123,6 +123,10 @@ func run() error {
 	portal := &handlers.PortalHandler{Pool: pool, Storage: s3Client, Magic: magic, Log: log.With("component", "portal")}
 	billH := &handlers.BillingHandler{Pool: pool, Billing: bill, StripePrice: cfg.StripePricePro, Log: log.With("component", "billing")}
 	stripeWH := &handlers.StripeWebhookHandler{Billing: bill, Log: log.With("component", "stripe_wh")}
+	drills := &handlers.DrillHandler{Pool: pool, Log: log.With("component", "drills")}
+	postings := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
+	ratio := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}
+	inspections := &handlers.InspectionHandler{Pool: pool, Log: log.With("component", "inspections")}
 
 	// ---- chase service (background) ----
 	chase := notify.NewChaseService(notify.ChaseDeps{
@@ -146,6 +150,10 @@ func run() error {
 		Portal:          portal,
 		Billing:         billH,
 		StripeWebhook:   stripeWH,
+		Drills:          drills,
+		Postings:        postings,
+		Ratio:           ratio,
+		Inspections:     inspections,
 		Magic:           magic,
 		Session:         providers,
 		BillingChecker:  bill,

@@ -106,13 +106,19 @@ func TestEvaluate_RatioViolation(t *testing.T) {
 	}
 }
 
-func TestEvaluate_EmptyState(t *testing.T) {
+func TestEvaluate_UnsupportedState(t *testing.T) {
+	// MVP supports CA/TX/FL only. Unsupported states must not silently report
+	// a 100 score — they surface a single STATE-NOT-SUPPORTED violation so the
+	// dashboard makes the configuration gap obvious.
 	f := &ProviderFacts{Provider: models.Provider{ID: "p1"}}
-	r := Evaluate(models.StateCode("NY"), f) // unsupported state
-	if r.Score != 100 {
-		t.Fatalf("empty rule pack should yield score=100, got %d", r.Score)
+	r := Evaluate(models.StateCode("NY"), f)
+	if r.RulesEvaluated != 1 {
+		t.Fatalf("expected 1 (not-supported) rule evaluated, got %d", r.RulesEvaluated)
 	}
-	if r.RulesEvaluated != 0 {
-		t.Fatalf("expected 0 rules evaluated, got %d", r.RulesEvaluated)
+	if len(r.Violations) != 1 || r.Violations[0].RuleID != "STATE-NOT-SUPPORTED" {
+		t.Fatalf("expected STATE-NOT-SUPPORTED violation, got %+v", r.Violations)
+	}
+	if r.Score >= 100 {
+		t.Fatalf("score must be <100 for unsupported state, got %d", r.Score)
 	}
 }

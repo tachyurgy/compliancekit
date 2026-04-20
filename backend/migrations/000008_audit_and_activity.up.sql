@@ -1,7 +1,6 @@
 -- 000008_audit_and_activity.up.sql
 -- Immutable audit log. Written by every mutating handler.
-
-BEGIN;
+-- SQLite dialect (see ADR-017).
 
 -- ---------------------------------------------------------------------------
 -- audit_log: high-volume, append-only. We do NOT use a FK on provider_id
@@ -13,9 +12,11 @@ BEGIN;
 -- actor_id is polymorphic (user_id, magic_link_token_id, webhook id, etc);
 -- actor_kind disambiguates. No FK for the same reason.
 --
--- Partitioning by month was considered and deferred: Postgres 16 native
--- partitioning adds operational complexity we don't need at MVP scale
--- (<10M rows/yr). Revisit when the table exceeds ~50GB.
+-- metadata is TEXT JSON, validated. ip is TEXT (was INET under PG).
+--
+-- Partitioning by month was considered and deferred. At SQLite scale the
+-- write pattern is single-writer + WAL; we revisit if the file exceeds
+-- ~10 GB or INSERT latency degrades.
 -- ---------------------------------------------------------------------------
 CREATE TABLE audit_log (
     id           TEXT PRIMARY KEY,
@@ -25,13 +26,14 @@ CREATE TABLE audit_log (
     action       TEXT NOT NULL,
     target_kind  TEXT,
     target_id    TEXT,
-    metadata     JSONB NOT NULL DEFAULT '{}'::jsonb,
-    ip           INET,
+    metadata     TEXT NOT NULL DEFAULT '{}',
+    ip           TEXT,
     user_agent   TEXT,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT audit_log_actor_kind_chk CHECK (
         actor_kind IN ('system','provider_admin','staff','parent','webhook')
-    )
+    ),
+    CONSTRAINT audit_log_metadata_chk CHECK (json_valid(metadata))
 );
 
 -- Dashboard: "what happened at this provider lately?"
@@ -42,8 +44,6 @@ CREATE INDEX audit_log_action_created_idx   ON audit_log (action, created_at DES
 CREATE INDEX audit_log_target_idx           ON audit_log (target_kind, target_id)
     WHERE target_kind IS NOT NULL;
 
--- Belt-and-suspenders: revoke UPDATE/DELETE in application role at deploy
--- time (see infra/scripts/bootstrap-droplet.sh). The DB role the app uses
--- gets only INSERT and SELECT on this table.
-
-COMMIT;
+-- Belt-and-suspenders mutation protection cannot be done with GRANT under
+-- SQLite (no per-table roles). Writes to audit_log go through a helper in
+-- `internal/audit` that only exposes Insert; no UPDATE/DELETE is exported.

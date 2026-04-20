@@ -140,13 +140,12 @@ func newTestService(t *testing.T) (*Service, *memStore, *memBlobs) {
 	store := newMemStore()
 	blobs := newMemBlobs()
 	svc := NewService(Config{
-		Store:        store,
-		Blobs:        blobs,
-		SignedBucket: "ck-signed-pdfs",
-		AuditBucket:  "ck-audit-trail",
-		SigningBase:  "https://app.test",
-		SessionTTL:   24 * time.Hour,
-		Clock:        func() time.Time { return time.Date(2026, 4, 16, 12, 0, 0, 0, time.UTC) },
+		Store:       store,
+		Blobs:       blobs,
+		Bucket:      "ck-files",
+		SigningBase: "https://app.test",
+		SessionTTL:  24 * time.Hour,
+		Clock:       func() time.Time { return time.Date(2026, 4, 16, 12, 0, 0, 0, time.UTC) },
 	})
 	return svc, store, blobs
 }
@@ -260,15 +259,15 @@ func TestFinalizeHappyPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, rec.SignatureID)
 	assert.Equal(t, want, rec.SHA256After)
-	assert.Equal(t, "provX/docX/"+rec.SignatureID+".pdf", rec.SignedPDFS3Key)
-	assert.Equal(t, "provX/"+rec.SignatureID+".json", rec.AuditTrailS3Key)
+	assert.Equal(t, "signed/provX/docX/"+rec.SignatureID+".pdf", rec.SignedPDFS3Key)
+	assert.Equal(t, "audit/provX/"+rec.SignatureID+".json", rec.AuditTrailS3Key)
 
 	// S3 contents are present.
-	signed, err := blobs.Get(context.Background(), "ck-signed-pdfs", rec.SignedPDFS3Key)
+	signed, err := blobs.Get(context.Background(), "ck-files", rec.SignedPDFS3Key)
 	require.NoError(t, err)
 	assert.Equal(t, pdf, signed)
 
-	auditBytes, err := blobs.Get(context.Background(), "ck-audit-trail", rec.AuditTrailS3Key)
+	auditBytes, err := blobs.Get(context.Background(), "ck-files", rec.AuditTrailS3Key)
 	require.NoError(t, err)
 	var persistedAudit AuditRecord
 	require.NoError(t, json.Unmarshal(auditBytes, &persistedAudit))
@@ -419,7 +418,7 @@ func TestVerifyIntegrityDetectsTampering(t *testing.T) {
 	// Tamper: replace S3 object with altered bytes.
 	altered := append([]byte(nil), pdf...)
 	altered[len(altered)-1] ^= 0xFF
-	blobs.objects["ck-signed-pdfs/"+rec.SignedPDFS3Key] = altered
+	blobs.objects["ck-files/"+rec.SignedPDFS3Key] = altered
 
 	err = svc.VerifyIntegrity(context.Background(), rec.SignatureID)
 	assert.ErrorIs(t, err, ErrIntegrityFailed)

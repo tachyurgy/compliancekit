@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"database/sql"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/compliance"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
@@ -13,7 +13,7 @@ import (
 )
 
 type DashboardHandler struct {
-	Pool *pgxpool.Pool
+	Pool *sql.DB
 	Log  *slog.Logger
 }
 
@@ -33,11 +33,11 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	report := compliance.Evaluate(state, facts)
 
 	httpx.RenderJSON(w, http.StatusOK, map[string]any{
-		"score":                 report.Score,
-		"violations":            report.Violations,
-		"upcoming_deadlines":    report.UpcomingDeadlines90d,
-		"rules_evaluated":       report.RulesEvaluated,
-		"state":                 state,
+		"score":              report.Score,
+		"violations":         report.Violations,
+		"upcoming_deadlines": report.UpcomingDeadlines90d,
+		"rules_evaluated":    report.RulesEvaluated,
+		"state":              state,
 		"counts": map[string]int{
 			"children": len(facts.Children),
 			"staff":    len(facts.Staff),
@@ -48,10 +48,10 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *DashboardHandler) loadFacts(r *http.Request, pid string) (*compliance.ProviderFacts, models.StateCode, error) {
 	ctx := r.Context()
 	var p models.Provider
-	if err := h.Pool.QueryRow(ctx, `
+	if err := h.Pool.QueryRowContext(ctx, `
 		SELECT id, name, state_code, COALESCE(license_number,''), owner_email, capacity, timezone,
 		       created_at, updated_at
-		FROM providers WHERE id = $1`, pid).Scan(
+		FROM providers WHERE id = ?`, pid).Scan(
 		&p.ID, &p.Name, &p.StateCode, &p.LicenseNumber, &p.OwnerEmail, &p.Capacity, &p.Timezone,
 		&p.CreatedAt, &p.UpdatedAt,
 	); err != nil {
@@ -71,16 +71,19 @@ func (h *DashboardHandler) loadFacts(r *http.Request, pid string) (*compliance.P
 		return nil, "", err
 	}
 
-	// Drill count in last 90d
+	// Drill count in last 90d — exclude soft-deleted rows.
 	var drills int
-	_ = h.Pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM drill_logs WHERE provider_id = $1 AND drill_date > NOW() - INTERVAL '90 days'`, pid).
+	_ = h.Pool.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM drill_logs
+		 WHERE provider_id = ? AND deleted_at IS NULL
+		   AND drill_date > datetime('now', '-90 days')`, pid).
 		Scan(&drills)
 
-	// RatioOK + PostingsComplete — stored on providers table flags (populated elsewhere).
+	// RatioOK + PostingsComplete — stored on providers as 0/1 ints (SQLite has
+	// no native bool). COALESCE defaults match the column defaults in 000009.
 	var ratioOK, postingsOK bool
-	_ = h.Pool.QueryRow(ctx,
-		`SELECT COALESCE(ratio_ok, true), COALESCE(postings_complete, false) FROM providers WHERE id = $1`, pid).
+	_ = h.Pool.QueryRowContext(ctx,
+		`SELECT COALESCE(ratio_ok, 1), COALESCE(postings_complete, 0) FROM providers WHERE id = ?`, pid).
 		Scan(&ratioOK, &postingsOK)
 
 	facts := &compliance.ProviderFacts{
@@ -96,11 +99,11 @@ func (h *DashboardHandler) loadFacts(r *http.Request, pid string) (*compliance.P
 }
 
 func (h *DashboardHandler) loadChildren(r *http.Request, pid string) ([]models.Child, error) {
-	rows, err := h.Pool.Query(r.Context(), `
+	rows, err := h.Pool.QueryContext(r.Context(), `
 		SELECT id, provider_id, first_name, last_name, date_of_birth, enroll_date,
 		       COALESCE(parent_email,''), COALESCE(parent_phone,''), COALESCE(classroom,''),
 		       status, created_at, updated_at
-		FROM children WHERE provider_id = $1`, pid)
+		FROM children WHERE provider_id = ?`, pid)
 	if err != nil {
 		return nil, err
 	}
@@ -118,10 +121,10 @@ func (h *DashboardHandler) loadChildren(r *http.Request, pid string) ([]models.C
 }
 
 func (h *DashboardHandler) loadStaff(r *http.Request, pid string) ([]models.Staff, error) {
-	rows, err := h.Pool.Query(r.Context(), `
+	rows, err := h.Pool.QueryContext(r.Context(), `
 		SELECT id, provider_id, first_name, last_name, role, email, COALESCE(phone,''),
 		       hire_date, background_check_date, status, created_at, updated_at
-		FROM staff WHERE provider_id = $1`, pid)
+		FROM staff WHERE provider_id = ?`, pid)
 	if err != nil {
 		return nil, err
 	}
@@ -139,13 +142,13 @@ func (h *DashboardHandler) loadStaff(r *http.Request, pid string) ([]models.Staf
 }
 
 func (h *DashboardHandler) loadDocs(r *http.Request, pid string) (map[string][]models.Document, error) {
-	rows, err := h.Pool.Query(r.Context(), `
+	rows, err := h.Pool.QueryContext(r.Context(), `
 		SELECT id, provider_id, subject_kind, COALESCE(subject_id,''), kind, title,
 		       storage_bucket, storage_key, mime_type, size_bytes,
 		       issued_at, expires_at, COALESCE(ocr_confidence,0), COALESCE(ocr_source,''),
 		       COALESCE(uploaded_by,''), COALESCE(uploaded_via,''), last_chase_sent_at,
 		       created_at, updated_at, deleted_at
-		FROM documents WHERE provider_id = $1 AND deleted_at IS NULL`, pid)
+		FROM documents WHERE provider_id = ? AND deleted_at IS NULL`, pid)
 	if err != nil {
 		return nil, err
 	}

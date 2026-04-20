@@ -16,6 +16,9 @@ import Staff from '@/pages/Staff';
 import StaffDetail from '@/pages/StaffDetail';
 import Documents from '@/pages/Documents';
 import DocumentDetail from '@/pages/DocumentDetail';
+import Inspections from '@/pages/Inspections';
+import InspectionDetail from '@/pages/InspectionDetail';
+import Operations from '@/pages/Operations';
 import Settings from '@/pages/Settings';
 import SettingsBilling from '@/pages/SettingsBilling';
 import PortalParent from '@/pages/PortalParent';
@@ -121,6 +124,9 @@ export default function App(): JSX.Element {
             <Route path="/staff/:id" element={<StaffDetail />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/documents/:id" element={<DocumentDetail />} />
+            <Route path="/inspections" element={<Inspections />} />
+            <Route path="/inspections/:id" element={<InspectionDetail />} />
+            <Route path="/operations" element={<Operations />} />
             <Route path="/templates" element={<DocumentTemplates />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/billing" element={<SettingsBilling />} />

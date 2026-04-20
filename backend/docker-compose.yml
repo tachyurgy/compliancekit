@@ -1,5 +1,9 @@
 version: "3.9"
 
+# Local dev stack for ComplianceKit.
+# SQLite lives in a named volume under /var/lib/compliancekit/ck.db (ADR-017).
+# MinIO stands in for the four S3 buckets.
+
 services:
   api:
     build: .
@@ -7,36 +11,18 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://ck:ck@postgres:5432/compliancekit?sslmode=disable
+      DATABASE_URL: file:/var/lib/compliancekit/ck.db
       AWS_ENDPOINT_URL_S3: http://minio:9000
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
       AWS_REGION: us-east-1
     ports:
       - "8080:8080"
+    volumes:
+      - ckdata:/var/lib/compliancekit
     depends_on:
-      postgres:
-        condition: service_healthy
       minio:
         condition: service_started
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: ck_pg
-    environment:
-      POSTGRES_USER: ck
-      POSTGRES_PASSWORD: ck
-      POSTGRES_DB: compliancekit
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ck -d compliancekit"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
 
   minio:
     image: minio/minio:latest
@@ -52,5 +38,5 @@ services:
       - miniodata:/data
 
 volumes:
-  pgdata:
+  ckdata:
   miniodata:

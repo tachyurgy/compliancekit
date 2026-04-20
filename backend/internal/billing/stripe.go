@@ -2,6 +2,7 @@ package billing
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,16 +11,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stripe/stripe-go/v79"
 	billingportal "github.com/stripe/stripe-go/v79/billingportal/session"
 	"github.com/stripe/stripe-go/v79/checkout/session"
 	"github.com/stripe/stripe-go/v79/customer"
 	"github.com/stripe/stripe-go/v79/webhook"
+
+	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 )
 
 type Service struct {
-	pool            *pgxpool.Pool
+	pool            *sql.DB
 	secretKey       string
 	webhookSecret   string
 	frontendBaseURL string
@@ -30,7 +32,7 @@ type Config struct {
 	SecretKey       string
 	WebhookSecret   string
 	FrontendBaseURL string
-	Pool            *pgxpool.Pool
+	Pool            *sql.DB
 	Logger          *slog.Logger
 }
 
@@ -53,7 +55,7 @@ func New(cfg Config) *Service {
 // or creates one and persists it.
 func (s *Service) EnsureCustomer(ctx context.Context, providerID, email, name string) (string, error) {
 	var cid *string
-	if err := s.pool.QueryRow(ctx, `SELECT stripe_customer_id FROM providers WHERE id = $1`, providerID).Scan(&cid); err != nil {
+	if err := s.pool.QueryRowContext(ctx, `SELECT stripe_customer_id FROM providers WHERE id = ?`, providerID).Scan(&cid); err != nil {
 		return "", fmt.Errorf("billing: lookup provider: %w", err)
 	}
 	if cid != nil && *cid != "" {
@@ -68,7 +70,7 @@ func (s *Service) EnsureCustomer(ctx context.Context, providerID, email, name st
 	if err != nil {
 		return "", fmt.Errorf("billing: create customer: %w", err)
 	}
-	if _, err := s.pool.Exec(ctx, `UPDATE providers SET stripe_customer_id = $2 WHERE id = $1`, providerID, c.ID); err != nil {
+	if _, err := s.pool.ExecContext(ctx, `UPDATE providers SET stripe_customer_id = ? WHERE id = ?`, c.ID, providerID); err != nil {
 		return "", fmt.Errorf("billing: persist customer id: %w", err)
 	}
 	return c.ID, nil
@@ -105,7 +107,7 @@ func (s *Service) CreateCheckoutSession(ctx context.Context, providerID, priceID
 // CustomerPortalURL creates a one-time Stripe Billing Portal URL.
 func (s *Service) CustomerPortalURL(ctx context.Context, providerID string) (string, error) {
 	var custID *string
-	if err := s.pool.QueryRow(ctx, `SELECT stripe_customer_id FROM providers WHERE id = $1`, providerID).Scan(&custID); err != nil {
+	if err := s.pool.QueryRowContext(ctx, `SELECT stripe_customer_id FROM providers WHERE id = ?`, providerID).Scan(&custID); err != nil {
 		return "", fmt.Errorf("billing: lookup provider: %w", err)
 	}
 	if custID == nil || *custID == "" {
@@ -170,7 +172,7 @@ func (s *Service) onCheckoutCompleted(ctx context.Context, sess *stripe.Checkout
 	providerID := sess.Metadata["provider_id"]
 	if providerID == "" && sess.Customer != nil {
 		// fall back: look up provider by customer id
-		_ = s.pool.QueryRow(ctx, `SELECT id FROM providers WHERE stripe_customer_id = $1`, sess.Customer.ID).Scan(&providerID)
+		_ = s.pool.QueryRowContext(ctx, `SELECT id FROM providers WHERE stripe_customer_id = ?`, sess.Customer.ID).Scan(&providerID)
 	}
 	if providerID == "" {
 		return errors.New("billing: checkout missing provider_id")
@@ -184,22 +186,27 @@ func (s *Service) onSubscriptionChange(ctx context.Context, sub *stripe.Subscrip
 		return errors.New("billing: subscription missing customer")
 	}
 	var providerID string
-	if err := s.pool.QueryRow(ctx, `SELECT id FROM providers WHERE stripe_customer_id = $1`, sub.Customer.ID).Scan(&providerID); err != nil {
+	if err := s.pool.QueryRowContext(ctx, `SELECT id FROM providers WHERE stripe_customer_id = ?`, sub.Customer.ID).Scan(&providerID); err != nil {
 		return fmt.Errorf("billing: lookup provider from customer: %w", err)
 	}
 	priceID := ""
 	if len(sub.Items.Data) > 0 && sub.Items.Data[0].Price != nil {
 		priceID = sub.Items.Data[0].Price.ID
 	}
-	_, err := s.pool.Exec(ctx, `
+	// IDs generated in Go (base62) per ADR-004; period_end converted to a
+	// time.Time so the SQLite driver stores an ISO 8601 string matching the
+	// rest of the schema.
+	subID := base62.NewID()[:22]
+	periodEnd := time.Unix(sub.CurrentPeriodEnd, 0).UTC()
+	_, err := s.pool.ExecContext(ctx, `
 		INSERT INTO subscriptions (id, provider_id, stripe_subscription_id, stripe_price_id, status, current_period_end, created_at, updated_at)
-		VALUES (gen_random_uuid()::text, $1, $2, $3, $4, to_timestamp($5), NOW(), NOW())
+		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		ON CONFLICT (stripe_subscription_id) DO UPDATE
 		SET status = EXCLUDED.status,
 		    stripe_price_id = EXCLUDED.stripe_price_id,
 		    current_period_end = EXCLUDED.current_period_end,
-		    updated_at = NOW()`,
-		providerID, sub.ID, priceID, string(sub.Status), sub.CurrentPeriodEnd)
+		    updated_at = CURRENT_TIMESTAMP`,
+		subID, providerID, sub.ID, priceID, string(sub.Status), periodEnd)
 	if err != nil {
 		return fmt.Errorf("billing: upsert subscription: %w", err)
 	}
@@ -210,10 +217,10 @@ func (s *Service) onSubscriptionChange(ctx context.Context, sub *stripe.Subscrip
 func (s *Service) HasActiveSubscription(ctx context.Context, providerID string) (bool, error) {
 	var status string
 	var periodEnd time.Time
-	err := s.pool.QueryRow(ctx, `
+	err := s.pool.QueryRowContext(ctx, `
 		SELECT status, current_period_end
 		FROM subscriptions
-		WHERE provider_id = $1
+		WHERE provider_id = ?
 		ORDER BY updated_at DESC
 		LIMIT 1`, providerID).Scan(&status, &periodEnd)
 	if err != nil {

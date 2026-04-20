@@ -54,11 +54,13 @@ interfaces so tests can swap in the in-memory fakes in `pdfsign_test.go`.
 
 ## S3 key layout
 
-| Bucket | Key format | Content-Type | Access |
-|--------|------------|--------------|--------|
-| `ck-templates` | `{provider_id}/templates/{document_id}.pdf` | `application/pdf` | Provider-writable, signer-readable via pre-signed URL only |
-| `ck-signed-pdfs` | `{provider_id}/{document_id}/{signature_id}.pdf` | `application/pdf` | Write-once; owner-readable |
-| `ck-audit-trail` | `{provider_id}/{signature_id}.json` | `application/json` | Write-once; object-lock recommended |
+All objects live in the single `ck-files` bucket.
+
+| Prefix | Key format | Content-Type | Notes |
+|--------|------------|--------------|-------|
+| `templates/` | `templates/{provider_id}/{document_id}.pdf` | `application/pdf` | Provider-writable, signer-readable via pre-signed URL only |
+| `signed/` | `signed/{provider_id}/{document_id}/{signature_id}.pdf` | `application/pdf` | Write-once (app-enforced); owner-readable |
+| `audit/` | `audit/{provider_id}/{signature_id}.json` | `application/json` | Write-once (app-enforced) |
 
 ## DB schema (prose)
 

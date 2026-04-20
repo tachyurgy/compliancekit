@@ -24,6 +24,18 @@ package api
 //   DELETE /api/documents/{id}          documents.Delete
 //   POST  /api/billing/checkout         billing.CreateCheckout
 //   POST  /api/billing/portal           billing.Portal
+//   GET   /api/drills                   drills.List
+//   POST  /api/drills                   drills.Create
+//   DELETE /api/drills/{id}             drills.Delete (soft)
+//   GET   /api/facility/postings        postings.List
+//   PATCH /api/facility/postings/{key}  postings.Upsert
+//   POST  /api/facility/ratio-check     ratio.Check
+//   POST  /api/inspections              inspections.Start
+//   GET   /api/inspections              inspections.List
+//   GET   /api/inspections/{id}         inspections.Get
+//   PATCH /api/inspections/{id}/items/{item_id}  inspections.UpsertResponse
+//   POST  /api/inspections/{id}/finalize inspections.Finalize
+//   GET   /api/inspections/{id}/report.pdf inspections.Report
 //   POST  /api/sign/request             pdfsign.RequestSignature (external pkg)
 //   GET   /api/sign/status/{id}         pdfsign.Status           (external pkg)
 //
@@ -66,6 +78,10 @@ type Deps struct {
 	Portal          *handlers.PortalHandler
 	Billing         *handlers.BillingHandler
 	StripeWebhook   *handlers.StripeWebhookHandler
+	Drills          *handlers.DrillHandler
+	Postings        *handlers.PostingHandler
+	Ratio           *handlers.RatioHandler
+	Inspections     *handlers.InspectionHandler
 	Magic           *magiclink.Service
 	Session         mw.SessionReader
 	BillingChecker  mw.BillingChecker
@@ -148,6 +164,36 @@ func NewRouter(d Deps) http.Handler {
 			r.Post("/checkout", d.Billing.CreateCheckout)
 			r.Post("/portal", d.Billing.Portal)
 		})
+
+		// Facility & Operations: drills, wall postings, ratio checks.
+		if d.Drills != nil {
+			r.Route("/drills", func(r chi.Router) {
+				r.Get("/", d.Drills.List)
+				r.Post("/", d.Drills.Create)
+				r.Delete("/{id}", d.Drills.Delete)
+			})
+		}
+		if d.Postings != nil || d.Ratio != nil {
+			r.Route("/facility", func(r chi.Router) {
+				if d.Postings != nil {
+					r.Get("/postings", d.Postings.List)
+					r.Patch("/postings/{key}", d.Postings.Upsert)
+				}
+				if d.Ratio != nil {
+					r.Post("/ratio-check", d.Ratio.Check)
+				}
+			})
+		}
+		if d.Inspections != nil {
+			r.Route("/inspections", func(r chi.Router) {
+				r.Get("/", d.Inspections.List)
+				r.Post("/", d.Inspections.Start)
+				r.Get("/{id}", d.Inspections.Get)
+				r.Patch("/{id}/items/{item_id}", d.Inspections.UpsertResponse)
+				r.Post("/{id}/finalize", d.Inspections.Finalize)
+				r.Get("/{id}/report.pdf", d.Inspections.Report)
+			})
+		}
 
 		// Paywalled routes — require active subscription
 		r.Group(func(r chi.Router) {

@@ -153,6 +153,13 @@ func NewRouter(d Deps) http.Handler {
 	// Session-protected API.
 	r.Route("/api", func(r chi.Router) {
 		r.Use(mw.RequireProviderSession(d.Session))
+		// Apply a generous per-session rate limit to the whole /api surface so
+		// a compromised or buggy client cannot hammer CRUD endpoints without
+		// bound. The auth route group above already has its own stricter
+		// limiter. See middleware/ratelimit.go for the token-bucket logic.
+		if d.RateLimit != nil {
+			r.Use(d.RateLimit.Limit("api"))
+		}
 
 		r.Get("/me", d.Providers.Me)
 		r.Patch("/me", d.Providers.UpdateMe)

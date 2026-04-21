@@ -103,28 +103,28 @@ func (c *ChaseService) ProcessOnce(ctx context.Context, now time.Time) error {
 	rows, err := c.pool.QueryContext(ctx, `
 WITH candidates AS (
   SELECT d.id AS doc_id, d.provider_id, d.title AS doc_title,
-         d.expires_at, d.subject_kind, d.subject_id,
+         d.expires_at, d.owner_kind, d.owner_id,
          p.name AS provider_name, COALESCE(p.timezone,'America/Los_Angeles') AS provider_tz,
-         CASE d.subject_kind
+         CASE d.owner_kind
            WHEN 'child' THEN ch.parent_email
            WHEN 'staff' THEN st.email
            ELSE p.owner_email
          END AS recip_email,
-         CASE d.subject_kind
+         CASE d.owner_kind
            WHEN 'child' THEN ch.parent_phone
            WHEN 'staff' THEN st.phone
            ELSE p.owner_phone
          END AS recip_phone,
-         CASE d.subject_kind
+         CASE d.owner_kind
            WHEN 'child' THEN ch.first_name || ' ' || ch.last_name
            WHEN 'staff' THEN st.first_name || ' ' || st.last_name
            ELSE p.name
          END AS recip_name,
-         CASE d.subject_kind WHEN 'child' THEN ch.first_name ELSE '' END AS child_first_name
+         CASE d.owner_kind WHEN 'child' THEN ch.first_name ELSE '' END AS child_first_name
     FROM documents d
     JOIN providers p ON p.id = d.provider_id
-    LEFT JOIN children ch ON ch.id = d.subject_id AND d.subject_kind = 'child'
-    LEFT JOIN staff    st ON st.id = d.subject_id AND d.subject_kind = 'staff'
+    LEFT JOIN children ch ON ch.id = d.owner_id AND d.owner_kind = 'child'
+    LEFT JOIN staff    st ON st.id = d.owner_id AND d.owner_kind = 'staff'
    WHERE d.deleted_at IS NULL
      AND d.expires_at IS NOT NULL
      AND d.expires_at > ?

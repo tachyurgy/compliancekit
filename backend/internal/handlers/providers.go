@@ -224,6 +224,10 @@ func (h *ProviderHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var p models.Provider
+	// created_at / updated_at are stored as TEXT (see ADR-017); modernc's
+	// driver only auto-parses columns declared DATE/DATETIME/TIMESTAMP. Scan
+	// them as strings and parse below so callers still receive time.Time.
+	var createdStr, updatedStr string
 	err := h.Pool.QueryRowContext(r.Context(), `
 		SELECT id, COALESCE(name, legal_name, '') AS name,
 		       COALESCE(legal_name, '') AS legal_name,
@@ -236,11 +240,13 @@ func (h *ProviderHandler) Me(w http.ResponseWriter, r *http.Request) {
 		       created_at, updated_at
 		FROM providers WHERE id = ?`, pid).
 		Scan(&p.ID, &p.Name, &p.LegalName, &p.StateCode, &p.LicenseNumber, &p.OwnerEmail,
-			&p.OwnerPhone, &p.Capacity, &p.Timezone, &p.StripeCustID, &p.CreatedAt, &p.UpdatedAt)
+			&p.OwnerPhone, &p.Capacity, &p.Timezone, &p.StripeCustID, &createdStr, &updatedStr)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrNotFound, err))
 		return
 	}
+	p.CreatedAt = parseSQLiteTime(createdStr)
+	p.UpdatedAt = parseSQLiteTime(updatedStr)
 	httpx.RenderJSON(w, http.StatusOK, p)
 }
 

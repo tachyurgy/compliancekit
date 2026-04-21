@@ -67,11 +67,17 @@ func (h *ChildHandler) Create(w http.ResponseWriter, r *http.Request) {
 	in.ID = base62.NewID()[:22]
 	in.ProviderID = pid
 
+	// Populate both the handler-era (enroll_date) and canonical (enrollment_date,
+	// guardians) columns so rows satisfy the 000002 NOT NULL constraints while
+	// staying readable via the handler's preferred field names. See
+	// migrations 000015 + 000018 for the column reconcile.
 	_, err := h.Pool.ExecContext(r.Context(), `
-		INSERT INTO children (id, provider_id, first_name, last_name, date_of_birth, enroll_date,
+		INSERT INTO children (id, provider_id, first_name, last_name, date_of_birth,
+		                     enrollment_date, enroll_date, guardians,
 		                     parent_email, parent_phone, classroom, status, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
-		in.ID, in.ProviderID, in.FirstName, in.LastName, in.DOB, in.EnrollDate,
+		VALUES (?,?,?,?,?,?,?,'[]',?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+		in.ID, in.ProviderID, in.FirstName, in.LastName, in.DOB,
+		in.EnrollDate, in.EnrollDate,
 		in.ParentEmail, in.ParentPhone, in.Classroom, in.Status)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))

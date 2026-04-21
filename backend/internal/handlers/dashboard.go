@@ -48,15 +48,20 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *DashboardHandler) loadFacts(r *http.Request, pid string) (*compliance.ProviderFacts, models.StateCode, error) {
 	ctx := r.Context()
 	var p models.Provider
+	var createdStr, updatedStr string
 	if err := h.Pool.QueryRowContext(ctx, `
-		SELECT id, name, state_code, COALESCE(license_number,''), owner_email, capacity, timezone,
+		SELECT id, COALESCE(name, legal_name, '') AS name,
+		       COALESCE(state_code, state, '') AS state_code,
+		       COALESCE(license_number,''), COALESCE(owner_email,''), capacity, timezone,
 		       created_at, updated_at
 		FROM providers WHERE id = ?`, pid).Scan(
 		&p.ID, &p.Name, &p.StateCode, &p.LicenseNumber, &p.OwnerEmail, &p.Capacity, &p.Timezone,
-		&p.CreatedAt, &p.UpdatedAt,
+		&createdStr, &updatedStr,
 	); err != nil {
 		return nil, "", err
 	}
+	p.CreatedAt = parseSQLiteTime(createdStr)
+	p.UpdatedAt = parseSQLiteTime(updatedStr)
 
 	children, err := h.loadChildren(r, pid)
 	if err != nil {

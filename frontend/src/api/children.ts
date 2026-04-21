@@ -73,9 +73,19 @@ export const childrenApi = {
   async remove(id: string): Promise<void> {
     await apiFetch(`/api/children/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
-  async sendParentPortalLink(id: string): Promise<{ url: string }> {
-    return apiFetch<{ url: string }>(`/api/children/${encodeURIComponent(id)}/portal-link`, {
+  async sendParentPortalLink(
+    id: string,
+    opts: { send?: 'email' } = {},
+  ): Promise<{
+    url: string;
+    expires_at: string;
+    subject_id: string;
+    subject_kind: 'child';
+    emailed: boolean;
+  }> {
+    return apiFetch(`/api/children/${encodeURIComponent(id)}/portal-link`, {
       method: 'POST',
+      query: opts.send ? { send: opts.send } : undefined,
     });
   },
 };

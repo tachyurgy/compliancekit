@@ -47,6 +47,18 @@ func (h *DocumentHandler) Presign(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.BadRequestf("subject_kind, kind, mime_type required"))
 		return
 	}
+	// Refuse to mint a presigned URL the browser will PUT against a bucket
+	// we can't actually write to. Without AWS creds (or a MinIO endpoint) the
+	// upload will bounce with 403; surfacing 503 here gives the UI a clear
+	// signal to tell the user "document upload isn't configured yet."
+	if !h.Storage.IsConfigured() {
+		httpx.RenderError(w, r, &httpx.APIError{
+			Status:  http.StatusServiceUnavailable,
+			Code:    "storage_not_configured",
+			Message: "document upload is not configured; set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY (or AWS_ENDPOINT_URL_S3 for local MinIO)",
+		})
+		return
+	}
 
 	docID := base62.NewID()[:22]
 	bucket := h.Storage.Buckets().RawUploads

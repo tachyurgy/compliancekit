@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
@@ -386,6 +388,410 @@ func (h *ProviderHandler) DeleteMe(w http.ResponseWriter, r *http.Request) {
 		"status":             "scheduled_for_deletion",
 		"grace_period_days":  90,
 		"message":            "Your account is scheduled for deletion. All data will be permanently removed in 90 days unless you contact support to cancel.",
+	})
+}
+
+// POST /api/provider/onboarding
+//
+// Completes the onboarding wizard: persists all facility fields, bulk-inserts
+// any staff and children drafts the wizard collected, and flips
+// onboarding_complete = 1. Returns the provider in the frontend's expected
+// camelCase shape (see frontend/src/api/providers.ts ProviderSchema).
+//
+// The whole operation runs in a single transaction so a half-written row
+// can't leave the tenant in a partially-onboarded state on crash.
+func (h *ProviderHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Request) {
+	pid := mw.ProviderIDFrom(r.Context())
+	if pid == "" {
+		httpx.RenderError(w, r, httpx.ErrUnauthorized)
+		return
+	}
+
+	type staffDraft struct {
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
+		Email     string `json:"email"`
+		Role      string `json:"role"`
+	}
+	type childDraft struct {
+		FirstName   string `json:"firstName"`
+		LastName    string `json:"lastName"`
+		DateOfBirth string `json:"dateOfBirth"` // YYYY-MM-DD
+		ParentEmail string `json:"parentEmail"`
+	}
+	type agesServed struct {
+		MinMonths int `json:"minMonths"`
+		MaxMonths int `json:"maxMonths"`
+	}
+	var in struct {
+		StateCode        string       `json:"stateCode"`
+		LicenseType      string       `json:"licenseType"`
+		LicenseNumber    string       `json:"licenseNumber"`
+		Name             string       `json:"name"`
+		Address1         string       `json:"address1"`
+		Address2         string       `json:"address2"`
+		City             string       `json:"city"`
+		StateRegion      string       `json:"stateRegion"`
+		PostalCode       string       `json:"postalCode"`
+		Capacity         int          `json:"capacity"`
+		AgesServedMonths agesServed   `json:"agesServedMonths"`
+		Staff            []staffDraft `json:"staff"`
+		Children         []childDraft `json:"children"`
+	}
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.RenderError(w, r, err)
+		return
+	}
+
+	// Validate the tight invariants. Free-text fields (address, name) we
+	// trust to be non-empty; the frontend already enforces required-ness.
+	stateUpper := strings.ToUpper(strings.TrimSpace(in.StateCode))
+	switch stateUpper {
+	case "CA", "TX", "FL":
+	default:
+		httpx.RenderError(w, r, httpx.BadRequestf("stateCode must be CA, TX, or FL"))
+		return
+	}
+	switch in.LicenseType {
+	case "center", "family_home":
+	default:
+		httpx.RenderError(w, r, httpx.BadRequestf("licenseType must be center or family_home"))
+		return
+	}
+	if in.Name == "" || in.Address1 == "" || in.City == "" || in.PostalCode == "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("name, address1, city, postalCode are required"))
+		return
+	}
+	if in.Capacity <= 0 {
+		httpx.RenderError(w, r, httpx.BadRequestf("capacity must be > 0"))
+		return
+	}
+	// state_abbr constraint in 000001 requires exactly 2 chars when non-null.
+	stateRegion := strings.ToUpper(strings.TrimSpace(in.StateRegion))
+	if stateRegion == "" {
+		stateRegion = stateUpper
+	}
+	if len(stateRegion) != 2 {
+		httpx.RenderError(w, r, httpx.BadRequestf("stateRegion must be a 2-letter state abbreviation"))
+		return
+	}
+	if in.AgesServedMonths.MinMonths < 0 || in.AgesServedMonths.MaxMonths < 0 ||
+		in.AgesServedMonths.MinMonths > in.AgesServedMonths.MaxMonths {
+		httpx.RenderError(w, r, httpx.BadRequestf("agesServedMonths must be a non-negative range with min <= max"))
+		return
+	}
+
+	tx, err := h.Pool.BeginTx(r.Context(), nil)
+	if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	// On any early return below we rollback; the final Commit wins.
+	defer func() { _ = tx.Rollback() }()
+
+	// Update provider — mirror both legacy (state, legal_name, address_line1/2)
+	// and handler-era (state_code, name) columns so downstream readers find
+	// what they expect regardless of which spelling they use.
+	if _, err := tx.ExecContext(r.Context(), `
+		UPDATE providers
+		   SET name                 = ?,
+		       legal_name           = ?,
+		       state                = ?,
+		       state_code           = ?,
+		       license_type         = ?,
+		       license_number       = NULLIF(?, ''),
+		       address_line1        = ?,
+		       address_line2        = NULLIF(?, ''),
+		       city                 = ?,
+		       state_abbr           = ?,
+		       postal_code          = ?,
+		       capacity             = ?,
+		       min_age_months       = ?,
+		       max_age_months       = ?,
+		       onboarding_complete  = 1,
+		       updated_at           = CURRENT_TIMESTAMP
+		 WHERE id = ?`,
+		in.Name, in.Name, stateUpper, stateUpper,
+		in.LicenseType, in.LicenseNumber,
+		in.Address1, in.Address2, in.City, stateRegion, in.PostalCode,
+		in.Capacity, in.AgesServedMonths.MinMonths, in.AgesServedMonths.MaxMonths,
+		pid); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, fmt.Errorf("update provider: %w", err)))
+		return
+	}
+
+	// Bulk-insert staff drafts. role is TEXT with no DB-level CHECK, so the
+	// wizard's vocabulary (director/lead_teacher/assistant/aide/cook/other)
+	// flows through unchanged. Empty email stays NULL to avoid collisions
+	// with the email_idx and to preserve the "email is optional" contract.
+	for _, s := range in.Staff {
+		if strings.TrimSpace(s.FirstName) == "" || strings.TrimSpace(s.LastName) == "" {
+			continue
+		}
+		role := s.Role
+		if role == "" {
+			role = "lead_teacher"
+		}
+		id := base62.NewID()[:22]
+		if _, err := tx.ExecContext(r.Context(), `
+			INSERT INTO staff (id, provider_id, first_name, last_name, role, email, hired_on, hire_date, status, created_at, updated_at)
+			VALUES (?,?,?,?,?,NULLIF(?, ''),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+			id, pid, strings.TrimSpace(s.FirstName), strings.TrimSpace(s.LastName), role,
+			strings.TrimSpace(s.Email)); err != nil {
+			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, fmt.Errorf("insert staff: %w", err)))
+			return
+		}
+	}
+
+	// Bulk-insert children drafts. date_of_birth is required; we already gate
+	// on that client-side but double-check here so a malformed CSV import
+	// can't corrupt the batch.
+	for _, c := range in.Children {
+		fn := strings.TrimSpace(c.FirstName)
+		ln := strings.TrimSpace(c.LastName)
+		dobRaw := strings.TrimSpace(c.DateOfBirth)
+		if fn == "" || ln == "" || dobRaw == "" {
+			continue
+		}
+		if _, err := time.Parse("2006-01-02", dobRaw); err != nil {
+			httpx.RenderError(w, r, httpx.BadRequestf("child %s %s: invalid dateOfBirth (expected YYYY-MM-DD)", fn, ln))
+			return
+		}
+		id := base62.NewID()[:22]
+		if _, err := tx.ExecContext(r.Context(), `
+			INSERT INTO children (id, provider_id, first_name, last_name, date_of_birth,
+			                     enrollment_date, enroll_date, guardians, parent_email, status,
+			                     created_at, updated_at)
+			VALUES (?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'[]',NULLIF(?, ''),'enrolled',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+			id, pid, fn, ln, dobRaw, strings.TrimSpace(c.ParentEmail)); err != nil {
+			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, fmt.Errorf("insert child: %w", err)))
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+
+	auditlog.Emit(r.Context(), h.Pool, auditlog.Entry{
+		ProviderID: pid,
+		ActorKind:  auditlog.ActorKindProviderAdmin,
+		ActorID:    mw.UserIDFrom(r.Context()),
+		Action:     "provider.onboarding_complete",
+		TargetKind: auditlog.TargetKindProvider,
+		TargetID:   pid,
+		Metadata: map[string]any{
+			"state_code":    stateUpper,
+			"license_type":  in.LicenseType,
+			"capacity":      in.Capacity,
+			"staff_count":   len(in.Staff),
+			"children_count": len(in.Children),
+		},
+		IP:        auditlog.ClientIP(r),
+		UserAgent: r.UserAgent(),
+	})
+
+	// Re-read to emit a canonical response shape matching frontend
+	// ProviderSchema (camelCase, agesServedMonths nested).
+	var (
+		outID, outName, outStateCode, outLicenseType, outAddr1, outCity, outStateRegion, outPostal string
+		outLicenseNumber, outAddr2                                                                 sql.NullString
+		outCapacity, outMinMonths, outMaxMonths                                                    int
+		outOnboarded                                                                                bool
+		outCreatedStr                                                                               string
+	)
+	err = h.Pool.QueryRowContext(r.Context(), `
+		SELECT id,
+		       COALESCE(name, legal_name, '') AS name,
+		       COALESCE(state_code, state, '') AS state_code,
+		       COALESCE(license_type, '') AS license_type,
+		       license_number,
+		       COALESCE(address_line1, '') AS address1,
+		       address_line2,
+		       COALESCE(city, '') AS city,
+		       COALESCE(state_abbr, '') AS state_region,
+		       COALESCE(postal_code, '') AS postal_code,
+		       capacity,
+		       COALESCE(min_age_months, 0),
+		       COALESCE(max_age_months, 0),
+		       COALESCE(onboarding_complete, 0),
+		       created_at
+		  FROM providers WHERE id = ?`, pid).
+		Scan(&outID, &outName, &outStateCode, &outLicenseType, &outLicenseNumber,
+			&outAddr1, &outAddr2, &outCity, &outStateRegion, &outPostal,
+			&outCapacity, &outMinMonths, &outMaxMonths, &outOnboarded, &outCreatedStr)
+	if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+
+	var licenseNumOut, addr2Out any
+	if outLicenseNumber.Valid {
+		licenseNumOut = outLicenseNumber.String
+	} else {
+		licenseNumOut = nil
+	}
+	if outAddr2.Valid {
+		addr2Out = outAddr2.String
+	} else {
+		addr2Out = nil
+	}
+
+	httpx.RenderJSON(w, http.StatusOK, map[string]any{
+		"id":            outID,
+		"name":          outName,
+		"stateCode":     outStateCode,
+		"licenseType":   outLicenseType,
+		"licenseNumber": licenseNumOut,
+		"address1":      outAddr1,
+		"address2":      addr2Out,
+		"city":          outCity,
+		"stateRegion":   outStateRegion,
+		"postalCode":    outPostal,
+		"capacity":      outCapacity,
+		"agesServedMonths": map[string]int{
+			"minMonths": outMinMonths,
+			"maxMonths": outMaxMonths,
+		},
+		"onboardingComplete": outOnboarded,
+		"createdAt":          parseSQLiteTime(outCreatedStr).Format(time.RFC3339),
+	})
+}
+
+// POST /api/children/{id}/portal-link — mint a parent-upload magic link
+// for a child. Admin-only. Returns { url, expires_at } so the admin can copy
+// and send the link out-of-band (SMS, email from their own account, etc.).
+// If the child's parent_email is on file AND an Emailer is configured, we
+// also send the link via SES as a convenience — controlled by ?send=email
+// in the query string.
+func (h *ProviderHandler) MintParentPortalLink(w http.ResponseWriter, r *http.Request) {
+	h.mintPortalLink(w, r, magiclink.KindParentUpload, "child")
+}
+
+// POST /api/staff/{id}/portal-link — mint a staff-upload magic link. Mirror
+// of MintParentPortalLink for staff certifications.
+func (h *ProviderHandler) MintStaffPortalLink(w http.ResponseWriter, r *http.Request) {
+	h.mintPortalLink(w, r, magiclink.KindStaffUpload, "staff")
+}
+
+// mintPortalLink is the shared implementation for both child and staff
+// portal link generation. Validates subject belongs to the caller's provider,
+// mints a sliding-TTL magic link, and returns { url, expires_at }.
+func (h *ProviderHandler) mintPortalLink(w http.ResponseWriter, r *http.Request, kind magiclink.Kind, subjectKind string) {
+	pid := mw.ProviderIDFrom(r.Context())
+	if pid == "" {
+		httpx.RenderError(w, r, httpx.ErrUnauthorized)
+		return
+	}
+	subjectID := chi.URLParam(r, "id")
+	if subjectID == "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("subject id required"))
+		return
+	}
+
+	// Verify subject belongs to the caller's provider. Two different tables;
+	// pick the right one by subjectKind. Using a prepared query per kind is
+	// simpler than a UNION and keeps the FK semantics explicit.
+	var (
+		firstName, lastName, email string
+		found                       bool
+	)
+	switch subjectKind {
+	case "child":
+		var emailNull sql.NullString
+		err := h.Pool.QueryRowContext(r.Context(),
+			`SELECT first_name, last_name, parent_email FROM children WHERE id = ? AND provider_id = ? AND deleted_at IS NULL`,
+			subjectID, pid).Scan(&firstName, &lastName, &emailNull)
+		if errors.Is(err, sql.ErrNoRows) {
+			httpx.RenderError(w, r, httpx.ErrNotFound)
+			return
+		}
+		if err != nil {
+			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+			return
+		}
+		if emailNull.Valid {
+			email = emailNull.String
+		}
+		found = true
+	case "staff":
+		var emailNull sql.NullString
+		err := h.Pool.QueryRowContext(r.Context(),
+			`SELECT first_name, last_name, email FROM staff WHERE id = ? AND provider_id = ? AND deleted_at IS NULL`,
+			subjectID, pid).Scan(&firstName, &lastName, &emailNull)
+		if errors.Is(err, sql.ErrNoRows) {
+			httpx.RenderError(w, r, httpx.ErrNotFound)
+			return
+		}
+		if err != nil {
+			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+			return
+		}
+		if emailNull.Valid {
+			email = emailNull.String
+		}
+		found = true
+	}
+	if !found {
+		httpx.RenderError(w, r, httpx.ErrNotFound)
+		return
+	}
+
+	token, path, err := h.Magic.Generate(r.Context(), kind, pid, subjectID, 0)
+	if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	_ = token // the raw token is embedded in path via PathFor; we return the URL, not the token alone.
+	url := h.FrontendBase + path
+	expiresAt := time.Now().Add(magiclink.TTLFor(kind)).UTC()
+
+	// Optional: email the recipient if ?send=email AND we have an address AND
+	// an emailer is wired. This is a nice-to-have; the primary contract is
+	// returning the URL so the admin can send it themselves.
+	emailed := false
+	if r.URL.Query().Get("send") == "email" && email != "" && h.Emailer != nil {
+		actionText := "Upload your child's required forms"
+		if subjectKind == "staff" {
+			actionText = "Upload your required certifications"
+		}
+		sub, html, text := notify.RenderMagicLinkEmail(notify.MagicLinkEmailData{
+			RecipientName: firstName + " " + lastName,
+			ActionText:    actionText,
+			URL:           url,
+			ExpiresIn:     "7 days",
+		})
+		if err := h.Emailer.Send(r.Context(), notify.EmailMessage{
+			To: email, Subject: sub, HTMLBody: html, PlainBody: text,
+		}); err != nil {
+			h.Log.Warn("portal link: email send", "err", err, "subject", subjectKind, "id", subjectID)
+		} else {
+			emailed = true
+		}
+	}
+
+	auditlog.Emit(r.Context(), h.Pool, auditlog.Entry{
+		ProviderID: pid,
+		ActorKind:  auditlog.ActorKindProviderAdmin,
+		ActorID:    mw.UserIDFrom(r.Context()),
+		Action:     "portal.link_generated",
+		TargetKind: subjectKind,
+		TargetID:   subjectID,
+		Metadata: map[string]any{
+			"kind":    string(kind),
+			"emailed": emailed,
+		},
+		IP:        auditlog.ClientIP(r),
+		UserAgent: r.UserAgent(),
+	})
+
+	httpx.RenderJSON(w, http.StatusOK, map[string]any{
+		"url":         url,
+		"expires_at":  expiresAt.Format(time.RFC3339),
+		"subject_id":  subjectID,
+		"subject_kind": subjectKind,
+		"emailed":     emailed,
 	})
 }
 

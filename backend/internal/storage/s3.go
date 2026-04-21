@@ -27,6 +27,11 @@ type Client struct {
 	presign  *s3.PresignClient
 	buckets  Buckets
 	endpoint string // non-empty only for local MinIO/test
+	// hasCreds is true when the caller provided explicit AWS creds OR a custom
+	// endpoint (MinIO/LocalStack). When both are empty we're in a half-booted
+	// state where presign will happily mint URLs that return 403 on upload.
+	// Handlers check this via IsConfigured() and return 503 instead.
+	hasCreds bool
 }
 
 type Config struct {
@@ -64,10 +69,17 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 		presign:  s3.NewPresignClient(cli),
 		buckets:  cfg.Buckets,
 		endpoint: cfg.EndpointURL,
+		hasCreds: (cfg.AccessKeyID != "" && cfg.SecretAccessKey != "") || cfg.EndpointURL != "",
 	}, nil
 }
 
 func (c *Client) Buckets() Buckets { return c.buckets }
+
+// IsConfigured reports whether the client has credentials (or a custom
+// endpoint) that should let uploads actually succeed. Handlers consult this
+// before minting presigned URLs so a half-configured deploy surfaces a clear
+// 503 instead of returning URLs that silently 403 on upload.
+func (c *Client) IsConfigured() bool { return c != nil && c.hasCreds }
 
 // PutDocument uploads a blob to the documents bucket.
 func (c *Client) PutDocument(ctx context.Context, key, mimeType string, body io.Reader) error {

@@ -89,6 +89,18 @@ export const providersApi = {
     postalCode: string;
     capacity: number;
     agesServedMonths: { minMonths: number; maxMonths: number };
+    staff?: Array<{
+      firstName: string;
+      lastName: string;
+      email?: string;
+      role: 'director' | 'lead_teacher' | 'assistant' | 'aide' | 'cook' | 'other';
+    }>;
+    children?: Array<{
+      firstName: string;
+      lastName: string;
+      dateOfBirth: string;
+      parentEmail?: string;
+    }>;
   }): Promise<Provider> {
     const data = await apiFetch<unknown>('/api/provider/onboarding', {
       method: 'POST',

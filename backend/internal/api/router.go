@@ -12,11 +12,14 @@ package api
 //   SESSION-PROTECTED (/api/**)
 //   GET   /api/me                       providers.Me
 //   PATCH /api/me                       providers.UpdateMe
+//   POST  /api/provider/onboarding      providers.CompleteOnboarding (admin)
 //   GET   /api/dashboard                dashboard.Get
 //   GET/POST/PATCH/DELETE /api/children  children.CRUD
 //   GET   /api/children/{id}/documents  children.ListDocuments
+//   POST  /api/children/{id}/portal-link providers.MintParentPortalLink (admin)
 //   GET/POST/PATCH/DELETE /api/staff     staff.CRUD
 //   GET   /api/staff/{id}/documents     staff.ListDocuments
+//   POST  /api/staff/{id}/portal-link   providers.MintStaffPortalLink (admin)
 //   POST  /api/documents/presign        documents.Presign
 //   POST  /api/documents/{id}/finalize  documents.Finalize
 //   GET   /api/documents                documents.List
@@ -165,6 +168,13 @@ func NewRouter(d Deps) http.Handler {
 		r.Patch("/me", d.Providers.UpdateMe)
 		r.Get("/dashboard", d.Dashboard.Get)
 
+		// Onboarding wizard finalize — admin-only. Flipping onboarding_complete
+		// and seeding staff/children is a tenant-wide write; gate it the same
+		// way as other provider-level mutations.
+		r.Group(adminOnly(func(r chi.Router) {
+			r.Post("/provider/onboarding", d.Providers.CompleteOnboarding)
+		}))
+
 		// Children: reads are open to both roles; writes are admin-only.
 		r.Route("/children", func(r chi.Router) {
 			r.Get("/", d.Children.List)
@@ -174,6 +184,7 @@ func NewRouter(d Deps) http.Handler {
 				r.Post("/", d.Children.Create)
 				r.Patch("/{id}", d.Children.Update)
 				r.Delete("/{id}", d.Children.Delete)
+				r.Post("/{id}/portal-link", d.Providers.MintParentPortalLink)
 			}))
 		})
 
@@ -186,6 +197,7 @@ func NewRouter(d Deps) http.Handler {
 				r.Post("/", d.Staff.Create)
 				r.Patch("/{id}", d.Staff.Update)
 				r.Delete("/{id}", d.Staff.Delete)
+				r.Post("/{id}/portal-link", d.Providers.MintStaffPortalLink)
 			}))
 		})
 

@@ -77,10 +77,11 @@ func TestDocuments_Presign_MissingFields(t *testing.T) {
 	}
 }
 
-// TestDocuments_Presign_PanicsOnNilStorage: with a valid payload the handler
-// dereferences h.Storage (nil in the harness) — chi's Recoverer surfaces this
-// as 500. Asserts the panic is NOT caller-visible (no stacktrace leak).
-func TestDocuments_Presign_PanicsOnNilStorage(t *testing.T) {
+// TestDocuments_Presign_NilStorageReturns503: when the harness leaves the
+// Storage client nil (or runs without AWS creds), Presign must return 503
+// storage_not_configured BEFORE touching any S3 plumbing — so the UI gets
+// a clear signal instead of a phantom URL that silently 403s on upload.
+func TestDocuments_Presign_NilStorageReturns503(t *testing.T) {
 	h := NewHarness(t)
 	client, _, _ := h.AuthAs(t, "CA")
 
@@ -91,8 +92,8 @@ func TestDocuments_Presign_PanicsOnNilStorage(t *testing.T) {
 		"mime_type":    "application/pdf",
 	})
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("nil storage path: expected 500, got %d (body=%s)", resp.StatusCode, readAll(t, resp))
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("unconfigured storage: expected 503, got %d (body=%s)", resp.StatusCode, readAll(t, resp))
 	}
 }
 

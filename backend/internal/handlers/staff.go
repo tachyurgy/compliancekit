@@ -24,7 +24,7 @@ type StaffHandler struct {
 func (h *StaffHandler) List(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
 	rows, err := h.Pool.QueryContext(r.Context(), `
-		SELECT id, provider_id, first_name, last_name, role, email, COALESCE(phone, ''),
+		SELECT id, provider_id, first_name, last_name, role, COALESCE(email, ''), COALESCE(phone, ''),
 		       hire_date, background_check_date, status, created_at, updated_at
 		FROM staff WHERE provider_id = ? ORDER BY last_name, first_name`, pid)
 	if err != nil {
@@ -96,7 +96,7 @@ func (h *StaffHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var s models.Staff
 	err := h.Pool.QueryRowContext(r.Context(), `
-		SELECT id, provider_id, first_name, last_name, role, email, COALESCE(phone,''),
+		SELECT id, provider_id, first_name, last_name, role, COALESCE(email, ''), COALESCE(phone,''),
 		       hire_date, background_check_date, status, created_at, updated_at
 		FROM staff WHERE id = ? AND provider_id = ?`, id, pid).
 		Scan(&s.ID, &s.ProviderID, &s.FirstName, &s.LastName, &s.Role, &s.Email, &s.Phone,

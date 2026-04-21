@@ -48,6 +48,18 @@ export default function StepReview(): JSX.Element {
           minMonths: wizard.minAgeMonths ?? 0,
           maxMonths: wizard.maxAgeMonths ?? 72,
         },
+        staff: wizard.staff.map((s) => ({
+          firstName: s.firstName,
+          lastName: s.lastName,
+          email: s.email,
+          role: s.role,
+        })),
+        children: wizard.children.map((c) => ({
+          firstName: c.firstName,
+          lastName: c.lastName,
+          dateOfBirth: c.dateOfBirth,
+          parentEmail: c.parentEmail,
+        })),
       });
       markOnboardingComplete();
       reset();

@@ -68,9 +68,19 @@ export const staffApi = {
   async remove(id: string): Promise<void> {
     await apiFetch(`/api/staff/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
-  async sendStaffPortalLink(id: string): Promise<{ url: string }> {
-    return apiFetch<{ url: string }>(`/api/staff/${encodeURIComponent(id)}/portal-link`, {
+  async sendStaffPortalLink(
+    id: string,
+    opts: { send?: 'email' } = {},
+  ): Promise<{
+    url: string;
+    expires_at: string;
+    subject_id: string;
+    subject_kind: 'staff';
+    emailed: boolean;
+  }> {
+    return apiFetch(`/api/staff/${encodeURIComponent(id)}/portal-link`, {
       method: 'POST',
+      query: opts.send ? { send: opts.send } : undefined,
     });
   },
 };

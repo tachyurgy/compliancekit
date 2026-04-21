@@ -2,7 +2,10 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { AuditRecord } from "./types";
 
 export async function sha256(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  // Copy into a fresh ArrayBuffer-backed Uint8Array so subtle.digest accepts
+  // the BufferSource shape cleanly under TS 5.6+'s stricter typing.
+  const copy = new Uint8Array(bytes);
+  const digest = await crypto.subtle.digest("SHA-256", copy);
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -115,7 +118,7 @@ export async function appendAuditPage(
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
   const page = pdf.addPage([612, 792]); // US Letter
-  const { width, height } = page.getSize();
+  const { height } = page.getSize();
   const left = 54;
   let cursorY = height - 72;
 

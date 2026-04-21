@@ -229,16 +229,17 @@ func (h *ProviderHandler) Me(w http.ResponseWriter, r *http.Request) {
 	// them as strings and parse below so callers still receive time.Time.
 	var createdStr, updatedStr string
 	err := h.Pool.QueryRowContext(r.Context(), `
-		SELECT id, COALESCE(name, legal_name, '') AS name,
-		       COALESCE(legal_name, '') AS legal_name,
-		       COALESCE(state_code, state, '') AS state_code,
-		       COALESCE(license_number, '') AS license_number,
-		       COALESCE(owner_email, '') AS owner_email,
-		       COALESCE(phone, '') AS phone,
-		       capacity, timezone,
-		       COALESCE(stripe_customer_id, '') AS stripe_cust,
-		       created_at, updated_at
-		FROM providers WHERE id = ?`, pid).
+		SELECT p.id,
+		       COALESCE(p.name, p.legal_name, '') AS name,
+		       COALESCE(p.legal_name, '') AS legal_name,
+		       COALESCE(p.state_code, p.state, '') AS state_code,
+		       COALESCE(p.license_number, '') AS license_number,
+		       COALESCE(p.owner_email, '') AS owner_email,
+		       COALESCE(p.phone, '') AS phone,
+		       p.capacity, p.timezone,
+		       COALESCE((SELECT s.stripe_customer_id FROM subscriptions s WHERE s.provider_id = p.id ORDER BY s.created_at DESC LIMIT 1), '') AS stripe_cust,
+		       p.created_at, p.updated_at
+		FROM providers p WHERE p.id = ?`, pid).
 		Scan(&p.ID, &p.Name, &p.LegalName, &p.StateCode, &p.LicenseNumber, &p.OwnerEmail,
 			&p.OwnerPhone, &p.Capacity, &p.Timezone, &p.StripeCustID, &createdStr, &updatedStr)
 	if err != nil {

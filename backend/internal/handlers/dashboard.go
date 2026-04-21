@@ -147,11 +147,29 @@ func (h *DashboardHandler) loadStaff(r *http.Request, pid string) ([]models.Staf
 }
 
 func (h *DashboardHandler) loadDocs(r *http.Request, pid string) (map[string][]models.Document, error) {
+	// NOTE: the `documents` table carries two sets of columns — the canonical
+	// ones from migration 000004 (owner_kind/owner_id/doc_type/s3_key/
+	// expiration_date) and a later handler-era alias set (subject_kind/
+	// subject_id/kind/storage_*). We map both into the handler's expected
+	// shape. When the alias columns are NULL we fall back to the canonical
+	// values so compliance evaluation always sees a populated struct.
 	rows, err := h.Pool.QueryContext(r.Context(), `
-		SELECT id, provider_id, subject_kind, COALESCE(subject_id,''), kind, title,
-		       storage_bucket, storage_key, mime_type, size_bytes,
-		       issued_at, expires_at, COALESCE(ocr_confidence,0), COALESCE(ocr_source,''),
-		       COALESCE(uploaded_by,''), COALESCE(uploaded_via,''), last_chase_sent_at,
+		SELECT id, provider_id,
+		       COALESCE(subject_kind, owner_kind, '') AS subject_kind,
+		       COALESCE(subject_id, owner_id, '') AS subject_id,
+		       COALESCE(kind, doc_type, '') AS kind,
+		       COALESCE(title, original_filename, '') AS title,
+		       COALESCE(storage_bucket, '') AS storage_bucket,
+		       COALESCE(storage_key, s3_key, '') AS storage_key,
+		       COALESCE(mime_type, '') AS mime_type,
+		       COALESCE(size_bytes, byte_size, 0) AS size_bytes,
+		       NULL AS issued_at,
+		       expiration_date AS expires_at,
+		       COALESCE(ocr_confidence, 0) AS ocr_confidence,
+		       '' AS ocr_source,
+		       '' AS uploaded_by,
+		       COALESCE(uploaded_via, '') AS uploaded_via,
+		       NULL AS last_chase_sent_at,
 		       created_at, updated_at, deleted_at
 		FROM documents WHERE provider_id = ? AND deleted_at IS NULL`, pid)
 	if err != nil {

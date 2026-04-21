@@ -243,7 +243,9 @@ export function PdfSigner({ session, onComplete, onError }: PdfSignerProps) {
       const sha256Final = await sha256(withAudit);
       audit.sha256After = sha256Final;
 
-      const blob = new Blob([withAudit], { type: "application/pdf" });
+      // Blob's BlobPart requires ArrayBuffer-backed Uint8Array in TS 5.6+.
+      // Copy into a fresh Uint8Array<ArrayBuffer> to satisfy the typings.
+      const blob = new Blob([new Uint8Array(withAudit)], { type: "application/pdf" });
       await onComplete({
         signedBlob: blob,
         auditRecord: audit,

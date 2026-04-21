@@ -84,6 +84,7 @@ type Deps struct {
 	Inspections     *handlers.InspectionHandler
 	AuditLog        *handlers.AuditLogHandler
 	DataExport      *handlers.DataExportHandler
+	TestHelpers     *handlers.TestHelperHandler // only mounted when non-production
 	Magic           *magiclink.Service
 	Session         mw.SessionReader
 	RoleLookup      mw.RoleLookuper
@@ -114,6 +115,14 @@ func NewRouter(d Deps) http.Handler {
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})
+
+	// Test helper endpoints — only mounted when non-production. Callers pass
+	// a non-nil TestHelpers handler; leaving Deps.TestHelpers nil skips mount.
+	if d.TestHelpers != nil {
+		r.Get("/api/test/latest-magic-link", d.TestHelpers.LatestMagicLink)
+		r.Post("/api/test/session", d.TestHelpers.CreateSession)
+		r.Post("/api/test/reset", d.TestHelpers.Reset)
+	}
 
 	// Public auth routes (rate-limited)
 	r.Group(func(r chi.Router) {
@@ -303,6 +312,55 @@ func slogRequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 				slog.String("request_id", chimw.GetReqID(r.Context())),
 				slog.String("remote", r.RemoteAddr),
 			)
+		})
+	}
+}
+
+// securityHeaders applies baseline security response headers to every request.
+// Content-Security-Policy allows Stripe's hosted Checkout + webhook embeds only.
+// HSTS is deliberately omitted here and terminated at nginx so dev doesn't
+// lock the browser into HTTPS-only for localhost.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		h.Set("Permissions-Policy", "camera=(), geolocation=(), microphone=()")
+		// CSP: only apply to HTML responses (API returns JSON — browsers don't parse
+		// CSP there but it's harmless; frontend docs served via Pages have their
+		// own. Setting it here protects against an API response being rendered by
+		// a misconfigured reverse proxy).
+		h.Set("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self' https://js.stripe.com; "+
+				"frame-src https://js.stripe.com https://checkout.stripe.com; "+
+				"img-src 'self' data: https:; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"connect-src 'self' https://api.stripe.com; "+
+				"object-src 'none'; "+
+				"base-uri 'self'; "+
+				"form-action 'self' https://checkout.stripe.com")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// maxBodySize wraps every request with http.MaxBytesReader so a rogue client
+// cannot OOM the server with a giant JSON blob. Document uploads use the S3
+// presign flow, so they never route through this body — 10 MiB is a generous
+// ceiling for JSON.
+func maxBodySize(n int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Stripe webhooks need the raw body byte-exact for signature
+			// verification; skip the limiter for them and rely on Stripe's own
+			// per-event size cap (<64 KB).
+			if r.URL.Path == "/webhooks/stripe" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, n)
+			next.ServeHTTP(w, r)
 		})
 	}
 }

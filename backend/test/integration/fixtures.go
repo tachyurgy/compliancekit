@@ -30,6 +30,18 @@ import (
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
 )
 
+// HarnessOpts tunes the harness for specific test scenarios — e.g. tightening
+// the rate-limit bucket when exercising the /auth/* throttle, or wiring an
+// explicit DataExport handler that the default harness leaves nil.
+type HarnessOpts struct {
+	// RateLimit, if non-nil, replaces the default generous bucket.
+	RateLimit *mw.TokenBucket
+	// WithDataExport mounts a DataExportHandler (Storage=nil). The existing
+	// route is admin-gated; tests can still hit Create/List without Storage
+	// configured — only Download needs it.
+	WithDataExport bool
+}
+
 // Harness wires together the pieces needed to exercise the real HTTP router
 // against an ephemeral SQLite database. External services (SES, Twilio, S3,
 // Stripe, Mistral, Gemini) are left nil; handlers that would call them either
@@ -46,6 +58,12 @@ type Harness struct {
 // under backend/migrations/ in order, and starts an httptest server that
 // mounts the same router main() uses.
 func NewHarness(t *testing.T) *Harness {
+	return NewHarnessWithOpts(t, HarnessOpts{})
+}
+
+// NewHarnessWithOpts is NewHarness plus a tunable HarnessOpts. Use it when a
+// test needs a tight rate-limit bucket, a DataExport handler wired in, etc.
+func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -84,6 +102,16 @@ func NewHarness(t *testing.T) *Harness {
 	inspectionsH := &handlers.InspectionHandler{Pool: pool, Log: log.With("component", "inspections")}
 	auditLogH := &handlers.AuditLogHandler{Pool: pool, Log: log.With("component", "audit_log")}
 
+	var dataExportH *handlers.DataExportHandler
+	if opts.WithDataExport {
+		dataExportH = &handlers.DataExportHandler{Pool: pool, Log: log.With("component", "dataexport")}
+	}
+
+	rateLimit := opts.RateLimit
+	if rateLimit == nil {
+		rateLimit = mw.NewTokenBucket(1000, 100) // generous so tests don't throttle
+	}
+
 	router := api.NewRouter(api.Deps{
 		Logger:          log,
 		Providers:       providers,
@@ -99,11 +127,12 @@ func NewHarness(t *testing.T) *Harness {
 		Ratio:           ratioH,
 		Inspections:     inspectionsH,
 		AuditLog:        auditLogH,
+		DataExport:      dataExportH,
 		Magic:           magic,
 		Session:         providers,
 		RoleLookup:      mw.PoolRoleLookup{DB: pool},
 		BillingChecker:  allowAllBilling{},
-		RateLimit:       mw.NewTokenBucket(1000, 100), // generous so tests don't throttle
+		RateLimit:       rateLimit,
 		FrontendOrigins: []string{"http://localhost:5173"},
 		PDFSign:         nil,
 	})
@@ -232,4 +261,52 @@ func (h *Harness) AuthAs(t *testing.T, stateCode string) (*http.Client, string, 
 
 	client := &http.Client{Jar: jar}
 	return client, providerID, userID
+}
+
+// AuthAsStaff is AuthAs but with role=provider_staff. Returns the admin
+// provider_id so tenant-isolation assertions against admin-created rows are
+// possible. Tests that need both an admin AND a staff client on the same
+// provider should instead use rbac_test.go's seedUserWithRole helper — that
+// seeds two users on one provider. AuthAsStaff here always creates a fresh
+// provider with a single staff user (mirrors AuthAs).
+func (h *Harness) AuthAsStaff(t *testing.T, stateCode string) (*http.Client, string, string) {
+	t.Helper()
+
+	stateUpper := strings.ToUpper(stateCode)
+	providerID := base62.NewID()[:22]
+	userID := base62.NewID()[:22]
+	sessionID := base62.NewID()
+	email := fmt.Sprintf("staff-%s@example.com", strings.ToLower(providerID))
+
+	if _, err := h.DB.Exec(`
+		INSERT INTO providers (id, legal_name, name, owner_email, state, state_code, capacity, timezone, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, 0, 'America/Los_Angeles', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		providerID, "Test Facility "+providerID, "Test Facility "+providerID, email, stateUpper, stateUpper); err != nil {
+		t.Fatalf("AuthAsStaff: insert provider: %v", err)
+	}
+	if _, err := h.DB.Exec(`
+		INSERT INTO users (id, provider_id, email, full_name, role, created_at, updated_at)
+		VALUES (?, ?, ?, 'Test Staff', 'provider_staff', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		userID, providerID, email); err != nil {
+		t.Fatalf("AuthAsStaff: insert user: %v", err)
+	}
+	expires := time.Now().Add(14 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	if _, err := h.DB.Exec(`
+		INSERT INTO sessions (id, provider_id, user_id, expires_at, created_at)
+		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		sessionID, providerID, userID, expires); err != nil {
+		t.Fatalf("AuthAsStaff: insert session: %v", err)
+	}
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("AuthAsStaff: cookie jar: %v", err)
+	}
+	u, err := url.Parse(h.Server.URL)
+	if err != nil {
+		t.Fatalf("AuthAsStaff: parse server URL: %v", err)
+	}
+	jar.SetCookies(u, []*http.Cookie{{Name: "ck_sess", Value: sessionID, Path: "/"}})
+
+	return &http.Client{Jar: jar}, providerID, userID
 }

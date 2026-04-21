@@ -138,6 +138,19 @@ func run() error {
 		Log:         log.With("component", "data_export"),
 	}
 
+	// Test helpers — only instantiate in non-production so they can never be
+	// mounted against a real prod DB. See handlers/testhelpers.go.
+	var testHelpers *handlers.TestHelperHandler
+	if !cfg.IsProduction() {
+		testHelpers = &handlers.TestHelperHandler{
+			Pool:         pool,
+			Magic:        magic,
+			CookieDomain: cfg.SessionCookieDomain,
+			SecureCookie: cfg.IsProduction(),
+			Log:          log.With("component", "test_helpers"),
+		}
+	}
+
 	// ---- chase service (background) ----
 	chase := notify.NewChaseService(notify.ChaseDeps{
 		Pool:            pool,
@@ -189,6 +202,7 @@ func run() error {
 		Inspections:     inspections,
 		AuditLog:        auditLog,
 		DataExport:      dataExport,
+		TestHelpers:     testHelpers,
 		Magic:           magic,
 		Session:         providers,
 		RoleLookup:      mw.PoolRoleLookup{DB: pool},

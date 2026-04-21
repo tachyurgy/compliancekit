@@ -162,12 +162,43 @@ func (h *ProviderHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.ErrForbidden)
 		return
 	}
+	// Ensure a user row exists for this provider. Signup only creates the
+	// providers row; the owner user is materialized lazily on first callback.
+	// We look up by (provider_id, email==owner_email, role='provider_admin').
+	var userID string
+	err = h.Pool.QueryRowContext(r.Context(), `
+		SELECT u.id FROM users u
+		JOIN providers p ON p.id = u.provider_id
+		WHERE u.provider_id = ? AND u.email = p.owner_email AND u.role = 'provider_admin'
+		  AND u.deleted_at IS NULL
+		LIMIT 1`, claim.ProviderID).Scan(&userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		var ownerEmail, name string
+		if err := h.Pool.QueryRowContext(r.Context(),
+			`SELECT owner_email, COALESCE(name, legal_name, '') FROM providers WHERE id = ?`,
+			claim.ProviderID).Scan(&ownerEmail, &name); err != nil {
+			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+			return
+		}
+		userID = base62.NewID()[:22]
+		if _, err := h.Pool.ExecContext(r.Context(), `
+			INSERT INTO users (id, provider_id, email, full_name, role, email_verified_at, created_at, updated_at)
+			VALUES (?, ?, ?, ?, 'provider_admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+			userID, claim.ProviderID, ownerEmail, name); err != nil {
+			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+			return
+		}
+	} else if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+
 	sessID := base62.NewID()
 	// Store session. SQLite lacks INTERVAL literals; use datetime(...).
 	if _, err := h.Pool.ExecContext(r.Context(), `
 		INSERT INTO sessions (id, provider_id, user_id, expires_at, created_at)
 		VALUES (?, ?, ?, datetime('now', '+14 days'), CURRENT_TIMESTAMP)`,
-		sessID, claim.ProviderID, claim.ProviderID); err != nil {
+		sessID, claim.ProviderID, userID); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
@@ -194,9 +225,15 @@ func (h *ProviderHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	var p models.Provider
 	err := h.Pool.QueryRowContext(r.Context(), `
-		SELECT id, name, COALESCE(legal_name, ''), state_code, COALESCE(license_number, ''),
-		       owner_email, COALESCE(owner_phone, ''), capacity, timezone,
-		       COALESCE(stripe_customer_id, ''), created_at, updated_at
+		SELECT id, COALESCE(name, legal_name, '') AS name,
+		       COALESCE(legal_name, '') AS legal_name,
+		       COALESCE(state_code, state, '') AS state_code,
+		       COALESCE(license_number, '') AS license_number,
+		       COALESCE(owner_email, '') AS owner_email,
+		       COALESCE(phone, '') AS phone,
+		       capacity, timezone,
+		       COALESCE(stripe_customer_id, '') AS stripe_cust,
+		       created_at, updated_at
 		FROM providers WHERE id = ?`, pid).
 		Scan(&p.ID, &p.Name, &p.LegalName, &p.StateCode, &p.LicenseNumber, &p.OwnerEmail,
 			&p.OwnerPhone, &p.Capacity, &p.Timezone, &p.StripeCustID, &p.CreatedAt, &p.UpdatedAt)

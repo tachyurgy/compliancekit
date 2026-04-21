@@ -90,10 +90,11 @@ func (s *Service) Generate(ctx context.Context, kind Kind, providerID, subjectID
 	tokenID := base62.NewID()[:22] // short, base62-safe primary key
 	hash := s.hash(token)
 
+	expiresAt := time.Now().Add(ttl).UTC().Format(time.RFC3339Nano)
 	_, err = s.pool.ExecContext(ctx, `
 		INSERT INTO magic_link_tokens (id, kind, provider_id, subject_id, token_hash, expires_at, created_at)
 		VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, CURRENT_TIMESTAMP)`,
-		tokenID, string(kind), providerID, subjectID, hash, time.Now().Add(ttl))
+		tokenID, string(kind), providerID, subjectID, hash, expiresAt)
 	if err != nil {
 		return "", "", fmt.Errorf("magiclink: insert: %w", err)
 	}
@@ -110,16 +111,16 @@ func (s *Service) Consume(ctx context.Context, token string) (*Claim, error) {
 	hash := s.hash(token)
 
 	var (
-		id, kindStr string
-		providerID  *string
-		subjectID   *string
-		expiresAt   time.Time
-		consumedAt  *time.Time
+		id, kindStr     string
+		providerID      *string
+		subjectID       *string
+		expiresAtRaw    string
+		consumedAtRaw   sql.NullString
 	)
 	err := s.pool.QueryRowContext(ctx, `
 		SELECT id, kind, provider_id, subject_id, expires_at, consumed_at
 		FROM magic_link_tokens
-		WHERE token_hash = ?`, hash).Scan(&id, &kindStr, &providerID, &subjectID, &expiresAt, &consumedAt)
+		WHERE token_hash = ?`, hash).Scan(&id, &kindStr, &providerID, &subjectID, &expiresAtRaw, &consumedAtRaw)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("magiclink: token not found")
@@ -127,8 +128,12 @@ func (s *Service) Consume(ctx context.Context, token string) (*Claim, error) {
 		return nil, fmt.Errorf("magiclink: select: %w", err)
 	}
 
+	expiresAt, err := parseSQLiteTime(expiresAtRaw)
+	if err != nil {
+		return nil, fmt.Errorf("magiclink: parse expires_at: %w", err)
+	}
 	now := time.Now()
-	if consumedAt != nil {
+	if consumedAtRaw.Valid && consumedAtRaw.String != "" {
 		return nil, errors.New("magiclink: token already consumed")
 	}
 	if now.After(expiresAt) {
@@ -138,10 +143,11 @@ func (s *Service) Consume(ctx context.Context, token string) (*Claim, error) {
 	kind := Kind(kindStr)
 	if IsSliding(kind) {
 		newExp := now.Add(TTLFor(kind))
+		newExpStr := newExp.UTC().Format(time.RFC3339Nano)
 		if _, err := s.pool.ExecContext(ctx, `
 			UPDATE magic_link_tokens
 			SET last_used_at = CURRENT_TIMESTAMP, expires_at = ?
-			WHERE id = ?`, newExp, id); err != nil {
+			WHERE id = ?`, newExpStr, id); err != nil {
 			return nil, fmt.Errorf("magiclink: slide: %w", err)
 		}
 		expiresAt = newExp
@@ -186,4 +192,30 @@ func (s *Service) hash(token string) []byte {
 // HashHex is exposed for debugging/tooling; returns hex-encoded HMAC.
 func (s *Service) HashHex(token string) string {
 	return hex.EncodeToString(s.hash(token))
+}
+
+// parseSQLiteTime accepts either "2006-01-02 15:04:05" (SQLite
+// CURRENT_TIMESTAMP / datetime()) or the RFC3339 form that Go's time.Time
+// driver bindings produce. Returns a UTC time.Time.
+func parseSQLiteTime(s string) (time.Time, error) {
+	if s == "" {
+		return time.Time{}, errors.New("empty timestamp")
+	}
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05.999999999 -0700 MST",
+		"2006-01-02 15:04:05.999999999Z07:00",
+		"2006-01-02T15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05.000000000 -0700 MST",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05Z",
+	}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.UTC(), nil
+		}
+	}
+	// Last-ditch: strip a trailing timezone word like " UTC".
+	return time.Time{}, fmt.Errorf("unrecognized timestamp layout: %q", s)
 }

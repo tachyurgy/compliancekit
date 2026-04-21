@@ -91,7 +91,10 @@ func TestExports_Create_202(t *testing.T) {
 	if pid != providerID {
 		t.Fatalf("data_export row has wrong provider_id: %s vs %s", pid, providerID)
 	}
-	if status != "requested" && status != "running" && status != "failed" {
+	// The status is the last-read snapshot of a goroutine-driven lifecycle.
+	// Under -race the goroutine can finish before we read; under normal runs
+	// it's usually still requested/running. Accept the whole lifecycle.
+	if status != "requested" && status != "running" && status != "completed" && status != "failed" {
 		t.Fatalf("unexpected data_export status: %q", status)
 	}
 }

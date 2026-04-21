@@ -24,6 +24,7 @@ import (
 
 	"github.com/tachyurgy/compliancekit/backend/internal/api"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
+	"github.com/tachyurgy/compliancekit/backend/internal/billing"
 	"github.com/tachyurgy/compliancekit/backend/internal/db"
 	"github.com/tachyurgy/compliancekit/backend/internal/handlers"
 	"github.com/tachyurgy/compliancekit/backend/internal/magiclink"
@@ -40,6 +41,11 @@ type HarnessOpts struct {
 	// route is admin-gated; tests can still hit Create/List without Storage
 	// configured — only Download needs it.
 	WithDataExport bool
+	// WithBillingWebhookSecret, if non-empty, wires a real billing.Service
+	// with the given webhook secret so the Stripe webhook handler can verify
+	// signatures. SecretKey is left empty (we don't make Stripe API calls
+	// from the webhook path).
+	WithBillingWebhookSecret string
 }
 
 // Harness wires together the pieces needed to exercise the real HTTP router
@@ -94,8 +100,17 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 	dash := &handlers.DashboardHandler{Pool: pool, Log: log.With("component", "dashboard")}
 	docs := &handlers.DocumentHandler{Pool: pool, Log: log.With("component", "documents")}
 	portal := &handlers.PortalHandler{Pool: pool, Magic: magic, Log: log.With("component", "portal")}
-	billH := &handlers.BillingHandler{Pool: pool, Log: log.With("component", "billing")}
-	stripeWH := &handlers.StripeWebhookHandler{Log: log.With("component", "stripe_wh")}
+
+	var billingSvc *billing.Service
+	if opts.WithBillingWebhookSecret != "" {
+		billingSvc = billing.New(billing.Config{
+			WebhookSecret: opts.WithBillingWebhookSecret,
+			Pool:          pool,
+			Logger:        log.With("component", "billing"),
+		})
+	}
+	billH := &handlers.BillingHandler{Pool: pool, Billing: billingSvc, Log: log.With("component", "billing")}
+	stripeWH := &handlers.StripeWebhookHandler{Billing: billingSvc, Log: log.With("component", "stripe_wh")}
 	drills := &handlers.DrillHandler{Pool: pool, Log: log.With("component", "drills")}
 	postingsH := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
 	ratioH := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}

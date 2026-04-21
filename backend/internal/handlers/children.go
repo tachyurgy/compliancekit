@@ -23,10 +23,14 @@ type ChildHandler struct {
 // GET /api/children
 func (h *ChildHandler) List(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
+	// date_of_birth / enroll_date / created_at / updated_at are TEXT columns;
+	// modernc's driver can't auto-scan into time.Time. Read as strings and
+	// parse via parseSQLiteTime. See handlers/drills.go for the shared helper.
 	rows, err := h.Pool.QueryContext(r.Context(), `
-		SELECT id, provider_id, first_name, last_name, date_of_birth, enroll_date,
+		SELECT id, provider_id, first_name, last_name, date_of_birth,
+		       COALESCE(enroll_date, enrollment_date, '') AS enroll_date,
 		       COALESCE(parent_email, ''), COALESCE(parent_phone, ''), COALESCE(classroom, ''),
-		       status, created_at, updated_at
+		       COALESCE(status, 'enrolled') AS status, created_at, updated_at
 		FROM children WHERE provider_id = ? ORDER BY last_name, first_name`, pid)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
@@ -36,11 +40,16 @@ func (h *ChildHandler) List(w http.ResponseWriter, r *http.Request) {
 	out := make([]models.Child, 0)
 	for rows.Next() {
 		var c models.Child
-		if err := rows.Scan(&c.ID, &c.ProviderID, &c.FirstName, &c.LastName, &c.DOB, &c.EnrollDate,
-			&c.ParentEmail, &c.ParentPhone, &c.Classroom, &c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		var dobStr, enrollStr, createdStr, updatedStr string
+		if err := rows.Scan(&c.ID, &c.ProviderID, &c.FirstName, &c.LastName, &dobStr, &enrollStr,
+			&c.ParentEmail, &c.ParentPhone, &c.Classroom, &c.Status, &createdStr, &updatedStr); err != nil {
 			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 			return
 		}
+		c.DOB = parseSQLiteTime(dobStr)
+		c.EnrollDate = parseSQLiteTime(enrollStr)
+		c.CreatedAt = parseSQLiteTime(createdStr)
+		c.UpdatedAt = parseSQLiteTime(updatedStr)
 		out = append(out, c)
 	}
 	httpx.RenderJSON(w, http.StatusOK, out)

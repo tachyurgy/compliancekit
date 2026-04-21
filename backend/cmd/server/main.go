@@ -207,7 +207,15 @@ func run() error {
 		Session:         providers,
 		RoleLookup:      mw.PoolRoleLookup{DB: pool},
 		BillingChecker:  bill,
-		RateLimit:       mw.NewTokenBucket(10, 0.5), // 10 burst, 0.5 tok/sec
+		RateLimit: func() *mw.TokenBucket {
+			// Tests need a much more generous bucket — every loginAs() burns
+			// two auth-bucket tokens (signup + callback) and individual specs
+			// can easily fire 20 logins back-to-back.
+			if strings.EqualFold(cfg.AppEnv, "test") {
+				return mw.NewTokenBucket(10_000, 1_000)
+			}
+			return mw.NewTokenBucket(10, 0.5) // 10 burst, 0.5 tok/sec
+		}(),
 		FrontendOrigins: parseOrigins(cfg.FrontendBaseURL),
 		PDFSign:         pdfsignRoutes,
 	})

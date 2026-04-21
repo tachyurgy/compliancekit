@@ -71,7 +71,11 @@ export default defineConfig({
   // iterating locally with `go run ./cmd/server` in another terminal.
   webServer: [
     {
-      command: `sh -c 'cd ../backend && ${backendEnvInline} go run ./cmd/server'`,
+      // Start sequence: nuke previous DB files, pipe every migration through
+      // sqlite3 CLI to recreate the schema, then exec the server. This runs
+      // inline with the webServer command so we don't race Playwright's
+      // globalSetup ordering (which is not guaranteed to precede webServer).
+      command: `sh -c 'rm -f ${BACKEND_DB} ${BACKEND_DB}-wal ${BACKEND_DB}-shm ${BACKEND_DB}-journal && cat ../backend/migrations/*.up.sql | sqlite3 ${BACKEND_DB} && cd ../backend && ${backendEnvInline} go run ./cmd/server'`,
       url: `http://localhost:${BACKEND_PORT}/healthz`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

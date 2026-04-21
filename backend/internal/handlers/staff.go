@@ -35,11 +35,21 @@ func (h *StaffHandler) List(w http.ResponseWriter, r *http.Request) {
 	out := make([]models.Staff, 0)
 	for rows.Next() {
 		var s models.Staff
+		// hire_date and background_check_date are TEXT columns; parse via helper.
+		var hireStr, createdStr, updatedStr string
+		var bgCheckStr sql.NullString
 		if err := rows.Scan(&s.ID, &s.ProviderID, &s.FirstName, &s.LastName, &s.Role, &s.Email, &s.Phone,
-			&s.HireDate, &s.BackgroundCheck, &s.Status, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			&hireStr, &bgCheckStr, &s.Status, &createdStr, &updatedStr); err != nil {
 			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 			return
 		}
+		s.HireDate = parseSQLiteTime(hireStr)
+		if bgCheckStr.Valid && bgCheckStr.String != "" {
+			t := parseSQLiteTime(bgCheckStr.String)
+			s.BackgroundCheck = &t
+		}
+		s.CreatedAt = parseSQLiteTime(createdStr)
+		s.UpdatedAt = parseSQLiteTime(updatedStr)
 		out = append(out, s)
 	}
 	httpx.RenderJSON(w, http.StatusOK, out)

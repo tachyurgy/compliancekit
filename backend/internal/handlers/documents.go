@@ -190,11 +190,29 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 		args = append(args, subjectID)
 	}
 
+	// NOTE: the `documents` table has two overlapping column sets (migration
+	// 000004's canonical names: owner_kind/owner_id/doc_type/s3_key, and the
+	// handler-era aliases: subject_kind/subject_id/kind/storage_key). Columns
+	// `issued_at`, `ocr_source`, `uploaded_by`, `last_chase_sent_at` were never
+	// migrated in; we synthesize defaults for them so List doesn't 500. See
+	// handlers/dashboard.go loadDocs for the mirror query.
 	rows, err := h.Pool.QueryContext(r.Context(), `
-		SELECT id, provider_id, subject_kind, COALESCE(subject_id,''), kind, title,
-		       storage_bucket, storage_key, mime_type, size_bytes,
-		       issued_at, expires_at, COALESCE(ocr_confidence,0), COALESCE(ocr_source,''),
-		       COALESCE(uploaded_by,''), COALESCE(uploaded_via,''), last_chase_sent_at,
+		SELECT id, provider_id,
+		       COALESCE(subject_kind, owner_kind, '') AS subject_kind,
+		       COALESCE(subject_id, owner_id, '') AS subject_id,
+		       COALESCE(kind, doc_type, '') AS kind,
+		       COALESCE(title, original_filename, '') AS title,
+		       COALESCE(storage_bucket, '') AS storage_bucket,
+		       COALESCE(storage_key, s3_key, '') AS storage_key,
+		       COALESCE(mime_type, '') AS mime_type,
+		       COALESCE(size_bytes, byte_size, 0) AS size_bytes,
+		       NULL AS issued_at,
+		       expiration_date AS expires_at,
+		       COALESCE(ocr_confidence, 0),
+		       '' AS ocr_source,
+		       '' AS uploaded_by,
+		       COALESCE(uploaded_via, ''),
+		       NULL AS last_chase_sent_at,
 		       created_at, updated_at, deleted_at
 		FROM documents WHERE `+where+` ORDER BY created_at DESC`, args...)
 	if err != nil {

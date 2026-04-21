@@ -15,7 +15,7 @@ test.describe('LIVE operations-drills', () => {
 
     const today = new Date().toISOString();
     const create = await page.request.post(`${BACKEND_URL}/api/drills`, {
-      data: { kind: 'fire', drill_date: today, duration_sec: 120 },
+      data: { drill_kind: 'fire', drill_date: today, duration_seconds: 120 },
       headers: { 'Content-Type': 'application/json' },
     });
     expect([200, 201]).toContain(create.status());
@@ -25,6 +25,6 @@ test.describe('LIVE operations-drills', () => {
     const drills = await list.json();
     expect(Array.isArray(drills)).toBeTruthy();
     expect(drills.length).toBeGreaterThanOrEqual(1);
-    expect(drills.some((d: any) => d.kind === 'fire')).toBeTruthy();
+    expect(drills.some((d: any) => d.drill_kind === 'fire')).toBeTruthy();
   });
 });

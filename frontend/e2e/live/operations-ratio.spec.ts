@@ -17,22 +17,29 @@ test.describe('LIVE operations-ratio', () => {
     const resp = await page.request.post(`${BACKEND_URL}/api/facility/ratio-check`, {
       data: {
         rooms: [
-          { name: 'Infant', age_group: 'infant', children: 5, staff: 1 },
-          { name: 'Preschool', age_group: 'preschool', children: 12, staff: 1 },
+          {
+            label: 'Infant',
+            age_months_low: 0,
+            age_months_high: 12,
+            children_present: 5,
+            staff_present: 1,
+          },
+          {
+            label: 'Preschool',
+            age_months_low: 36,
+            age_months_high: 60,
+            children_present: 12,
+            staff_present: 1,
+          },
         ],
       },
       headers: { 'Content-Type': 'application/json' },
     });
     expect(resp.status()).toBe(200);
     const data = await resp.json();
-    // Expect at least one room flagged as out-of-ratio.
-    const rooms: any[] = data.rooms ?? data.results ?? [];
-    expect(rooms.length).toBeGreaterThan(0);
-    const infant = rooms.find((r: any) =>
-      /infant/i.test(r.name ?? r.age_group ?? ''),
-    );
-    if (infant) {
-      expect(infant.ok ?? infant.in_ratio ?? infant.pass).toBeFalsy();
-    }
+    const rooms: any[] = data.rooms ?? [];
+    expect(rooms.length).toBe(2);
+    const infant = rooms.find((r: any) => /infant/i.test(r.label ?? ''));
+    expect(infant?.in_ratio).toBe(false);
   });
 });

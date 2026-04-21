@@ -248,7 +248,54 @@ func (h *ProviderHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	p.CreatedAt = parseSQLiteTime(createdStr)
 	p.UpdatedAt = parseSQLiteTime(updatedStr)
-	httpx.RenderJSON(w, http.StatusOK, p)
+
+	// The frontend's SessionUser schema expects a flatter shape keyed by
+	// `email`, `fullName`, `providerId`, `role`, `onboardingComplete` — see
+	// frontend/src/api/providers.ts. Until the schemas are unified we emit
+	// BOTH the Provider fields AND the SessionUser fields so whichever side
+	// reads the payload finds what it expects.
+	//
+	// onboardingComplete: we treat a provider with a non-empty address+capacity
+	// as onboarded. Exact criteria will live on a dedicated column in a future
+	// migration (tracked as ADR: onboarding-state).
+	var onboarded bool
+	var city string
+	_ = h.Pool.QueryRowContext(r.Context(),
+		`SELECT COALESCE(onboarding_complete, 0), COALESCE(city, '') FROM providers WHERE id = ?`, pid).
+		Scan(&onboarded, &city)
+	// Fall back to a heuristic if onboarding_complete is untrusted.
+	if !onboarded {
+		onboarded = p.Capacity > 0 && city != ""
+	}
+
+	// Resolve the owner user row (created lazily on first callback).
+	var userID, userName string
+	_ = h.Pool.QueryRowContext(r.Context(), `
+		SELECT id, COALESCE(full_name, '') FROM users
+		WHERE provider_id = ? AND role = 'provider_admin' AND deleted_at IS NULL
+		ORDER BY created_at ASC LIMIT 1`, pid).Scan(&userID, &userName)
+
+	httpx.RenderJSON(w, http.StatusOK, map[string]any{
+		// Provider-shape fields (backend consumers).
+		"id":                  p.ID,
+		"name":                p.Name,
+		"legal_name":          p.LegalName,
+		"state_code":          p.StateCode,
+		"license_number":      p.LicenseNumber,
+		"owner_email":         p.OwnerEmail,
+		"phone":               p.OwnerPhone,
+		"capacity":            p.Capacity,
+		"timezone":            p.Timezone,
+		"stripe_customer_id":  p.StripeCustID,
+		"created_at":          p.CreatedAt,
+		"updated_at":          p.UpdatedAt,
+		// SessionUser-shape fields (frontend consumers).
+		"email":               p.OwnerEmail,
+		"fullName":            userName,
+		"providerId":          p.ID,
+		"role":                "owner",
+		"onboardingComplete":  onboarded,
+	})
 }
 
 // PATCH /api/me

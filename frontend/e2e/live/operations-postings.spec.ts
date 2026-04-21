@@ -32,7 +32,7 @@ test.describe('LIVE operations-postings', () => {
     const patch = await page.request.patch(
       `${BACKEND_URL}/api/facility/postings/${first.key ?? first.id}`,
       {
-        data: { posted: true },
+        data: { posted_at: new Date().toISOString() },
         headers: { 'Content-Type': 'application/json' },
       },
     );

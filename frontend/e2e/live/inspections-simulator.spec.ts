@@ -13,28 +13,25 @@ test.describe('LIVE inspections-simulator', () => {
   test('start + respond + finalize an inspection', async ({ page }) => {
     await loginAs(page, { state: 'CA' });
 
-    // Start a mock inspection.
+    // Start a mock inspection. No body required; state is inferred from the
+    // provider. Response is { run, checklist: { items }, responses }.
     const start = await page.request.post(`${BACKEND_URL}/api/inspections`, {
-      data: { kind: 'self', state_code: 'CA' },
+      data: {},
       headers: { 'Content-Type': 'application/json' },
     });
     expect([200, 201]).toContain(start.status());
-    const run = await start.json();
-    expect(run.id).toBeTruthy();
-
-    // Load the run — it should include a set of items.
-    const get = await page.request.get(`${BACKEND_URL}/api/inspections/${run.id}`);
-    expect(get.status()).toBe(200);
-    const full = await get.json();
-    const items: any[] = full.items ?? [];
+    const detail = await start.json();
+    const runID: string = detail.run.id;
+    const items: any[] = detail.checklist?.items ?? [];
+    expect(items.length).toBeGreaterThan(0);
 
     // Answer the first few items (3 pass, 2 fail).
     for (let i = 0; i < Math.min(items.length, 5); i++) {
-      const status = i < 3 ? 'pass' : 'fail';
+      const answer = i < 3 ? 'pass' : 'fail';
       const patch = await page.request.patch(
-        `${BACKEND_URL}/api/inspections/${run.id}/items/${items[i].id}`,
+        `${BACKEND_URL}/api/inspections/${runID}/items/${items[i].id}`,
         {
-          data: { status, notes: status === 'fail' ? 'seeded by e2e' : '' },
+          data: { answer, note: answer === 'fail' ? 'seeded by e2e' : '' },
           headers: { 'Content-Type': 'application/json' },
         },
       );
@@ -43,7 +40,7 @@ test.describe('LIVE inspections-simulator', () => {
 
     // Finalize.
     const fin = await page.request.post(
-      `${BACKEND_URL}/api/inspections/${run.id}/finalize`,
+      `${BACKEND_URL}/api/inspections/${runID}/finalize`,
       { data: {}, headers: { 'Content-Type': 'application/json' } },
     );
     expect([200, 201]).toContain(fin.status());

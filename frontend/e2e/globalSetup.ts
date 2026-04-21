@@ -20,6 +20,8 @@ const __dirname = path.dirname(__filename);
  * same end state for a fresh DB.
  */
 export default async function globalSetup(): Promise<void> {
+  const started = Date.now();
+  console.log(`[globalSetup] starting at ${new Date(started).toISOString()}`);
   const dbPath = '/tmp/ck-e2e.db';
   // Nuke DB + WAL/SHM sidecars. The Go server opens with WAL so these files
   // are written alongside the main DB file.
@@ -68,4 +70,7 @@ export default async function globalSetup(): Promise<void> {
   // Expose the path to the rest of the suite if helpers want to poke the DB
   // directly — but we prefer HTTP test endpoints to raw DB access.
   process.env.CK_E2E_DB = dbPath;
+  console.log(
+    `[globalSetup] finished at ${new Date().toISOString()} (${Date.now() - started}ms; used=${used})`,
+  );
 }

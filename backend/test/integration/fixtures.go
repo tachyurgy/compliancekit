@@ -11,14 +11,19 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/api"
+	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/db"
 	"github.com/tachyurgy/compliancekit/backend/internal/handlers"
 	"github.com/tachyurgy/compliancekit/backend/internal/magiclink"
@@ -73,6 +78,11 @@ func NewHarness(t *testing.T) *Harness {
 	portal := &handlers.PortalHandler{Pool: pool, Magic: magic, Log: log.With("component", "portal")}
 	billH := &handlers.BillingHandler{Pool: pool, Log: log.With("component", "billing")}
 	stripeWH := &handlers.StripeWebhookHandler{Log: log.With("component", "stripe_wh")}
+	drills := &handlers.DrillHandler{Pool: pool, Log: log.With("component", "drills")}
+	postingsH := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
+	ratioH := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}
+	inspectionsH := &handlers.InspectionHandler{Pool: pool, Log: log.With("component", "inspections")}
+	auditLogH := &handlers.AuditLogHandler{Pool: pool, Log: log.With("component", "audit_log")}
 
 	router := api.NewRouter(api.Deps{
 		Logger:          log,
@@ -84,8 +94,14 @@ func NewHarness(t *testing.T) *Harness {
 		Portal:          portal,
 		Billing:         billH,
 		StripeWebhook:   stripeWH,
+		Drills:          drills,
+		Postings:        postingsH,
+		Ratio:           ratioH,
+		Inspections:     inspectionsH,
+		AuditLog:        auditLogH,
 		Magic:           magic,
 		Session:         providers,
+		RoleLookup:      mw.PoolRoleLookup{DB: pool},
 		BillingChecker:  allowAllBilling{},
 		RateLimit:       mw.NewTokenBucket(1000, 100), // generous so tests don't throttle
 		FrontendOrigins: []string{"http://localhost:5173"},
@@ -155,4 +171,65 @@ type allowAllBilling struct{}
 
 func (allowAllBilling) HasActiveSubscription(ctx context.Context, providerID string) (bool, error) {
 	return true, nil
+}
+
+// AuthAs creates a fresh provider + admin user directly via SQL, issues a
+// sessions row (skipping the magic-link flow, which is covered separately),
+// and returns an *http.Client whose cookie jar carries the ck_sess cookie for
+// every subsequent request. Tests that need a signed-in client use this.
+//
+// stateCode is stored on both the legacy `state` column and the handler-era
+// `state_code` column so all handler SQL reads find the expected value.
+func (h *Harness) AuthAs(t *testing.T, stateCode string) (*http.Client, string, string) {
+	t.Helper()
+
+	stateUpper := strings.ToUpper(stateCode)
+	providerID := base62.NewID()[:22]
+	userID := base62.NewID()[:22]
+	sessionID := base62.NewID()
+	email := fmt.Sprintf("owner-%s@example.com", strings.ToLower(providerID))
+
+	// Provider row — legal_name is NOT NULL in 000001; also populate the
+	// migration-000012 columns the handlers actually read from.
+	if _, err := h.DB.Exec(`
+		INSERT INTO providers (id, legal_name, name, owner_email, state, state_code, capacity, timezone, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, 0, 'America/Los_Angeles', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		providerID, "Test Facility "+providerID, "Test Facility "+providerID, email, stateUpper, stateUpper); err != nil {
+		t.Fatalf("AuthAs: insert provider: %v", err)
+	}
+
+	if _, err := h.DB.Exec(`
+		INSERT INTO users (id, provider_id, email, full_name, role, created_at, updated_at)
+		VALUES (?, ?, ?, 'Test Admin', 'provider_admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		userID, providerID, email); err != nil {
+		t.Fatalf("AuthAs: insert user: %v", err)
+	}
+
+	// Session row — expires_at is TEXT per 000009 schema, so we pass a
+	// datetime('now', '+14 days') expression; but since we're going through
+	// database/sql, bind a literal ISO-8601 timestamp instead.
+	expires := time.Now().Add(14 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	if _, err := h.DB.Exec(`
+		INSERT INTO sessions (id, provider_id, user_id, expires_at, created_at)
+		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		sessionID, providerID, userID, expires); err != nil {
+		t.Fatalf("AuthAs: insert session: %v", err)
+	}
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("AuthAs: cookie jar: %v", err)
+	}
+	u, err := url.Parse(h.Server.URL)
+	if err != nil {
+		t.Fatalf("AuthAs: parse server URL: %v", err)
+	}
+	jar.SetCookies(u, []*http.Cookie{{
+		Name:  "ck_sess",
+		Value: sessionID,
+		Path:  "/",
+	}})
+
+	client := &http.Client{Jar: jar}
+	return client, providerID, userID
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
@@ -106,6 +107,11 @@ func (h *DrillHandler) Create(w http.ResponseWriter, r *http.Request) {
 		`SELECT created_at, updated_at FROM drill_logs WHERE id = ?`, out.ID).
 		Scan(&out.CreatedAt, &out.UpdatedAt)
 
+	auditlog.EmitDrillCreate(r.Context(), h.Pool, pid, uid, out.ID, map[string]any{
+		"drill_kind": out.DrillKind,
+		"drill_date": out.DrillDate,
+	}, r)
+
 	httpx.RenderJSON(w, http.StatusCreated, out)
 }
 
@@ -164,12 +170,19 @@ func (h *DrillHandler) List(w http.ResponseWriter, r *http.Request) {
 	out := make([]DrillLog, 0)
 	for rows.Next() {
 		var d DrillLog
-		if err := rows.Scan(&d.ID, &d.ProviderID, &d.DrillKind, &d.DrillDate, &d.LoggedByUserID,
+		// SQLite's modernc.org/sqlite driver returns TEXT DATETIME columns as Go
+		// strings — database/sql cannot auto-convert into *time.Time. Scan the
+		// three timestamp columns into intermediate strings and parse them.
+		var drillDateRaw, createdAtRaw, updatedAtRaw string
+		if err := rows.Scan(&d.ID, &d.ProviderID, &d.DrillKind, &drillDateRaw, &d.LoggedByUserID,
 			&d.DurationSeconds, &d.Notes, &d.AttachmentDocumentID,
-			&d.CreatedAt, &d.UpdatedAt); err != nil {
+			&createdAtRaw, &updatedAtRaw); err != nil {
 			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 			return
 		}
+		d.DrillDate = parseSQLiteTime(drillDateRaw)
+		d.CreatedAt = parseSQLiteTime(createdAtRaw)
+		d.UpdatedAt = parseSQLiteTime(updatedAtRaw)
 		out = append(out, d)
 	}
 	httpx.RenderJSON(w, http.StatusOK, out)
@@ -191,5 +204,25 @@ func (h *DrillHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.ErrNotFound)
 		return
 	}
+	auditlog.EmitDrillDelete(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), id, r)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// parseSQLiteTime parses a TEXT timestamp from SQLite into a time.Time.
+// SQLite emits two formats depending on how the value was inserted:
+//   - "2006-01-02 15:04:05"           (CURRENT_TIMESTAMP default)
+//   - "2006-01-02T15:04:05Z"          (Go time.Time encoded via driver)
+// Falls back to zero time on parse failure rather than erroring the whole
+// request — the UI can tolerate a blank timestamp; 500 on a list endpoint
+// cannot.
+func parseSQLiteTime(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02 15:04:05", "2006-01-02T15:04:05"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
 }

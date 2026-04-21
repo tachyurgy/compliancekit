@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
 	"github.com/tachyurgy/compliancekit/backend/internal/models"
@@ -211,6 +212,11 @@ func (h *PostingHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
+
+	auditlog.EmitPostingUpdate(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), key, map[string]any{
+		"unpost":              in.Unpost,
+		"all_required_posted": allPosted,
+	}, r)
 
 	// Re-render to keep response shape identical to GET.
 	items := make([]PostingItem, 0, len(defs))

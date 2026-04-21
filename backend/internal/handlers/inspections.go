@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	"github.com/tachyurgy/compliancekit/backend/internal/inspection"
@@ -113,6 +114,7 @@ func (h *InspectionHandler) Start(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
+	auditlog.EmitInspectionStart(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), runID, r)
 	httpx.RenderJSON(w, http.StatusCreated, runDetailDTO{
 		Run:       run,
 		Checklist: checklist,
@@ -316,6 +318,14 @@ func (h *InspectionHandler) Finalize(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
+	auditlog.EmitInspectionFinalize(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), runID, map[string]any{
+		"score":           score,
+		"items_passed":    run.ItemsPassed,
+		"items_failed":    run.ItemsFailed,
+		"items_na":        run.ItemsNA,
+		"total_items":     run.TotalItems,
+		"state":           run.State,
+	}, r)
 	httpx.RenderJSON(w, http.StatusOK, runDetailDTO{
 		Run:       run,
 		Checklist: checklist,

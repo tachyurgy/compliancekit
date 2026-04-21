@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   ClipboardCheck,
   FlaskConical,
+  ScrollText,
 } from 'lucide-react';
 
 import { useSession } from '@/hooks/useSession';
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/templates', label: 'Templates', icon: FileSignature },
   { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/settings/audit-log', label: 'Audit Log', icon: ScrollText },
 ];
 
 export default function Layout(): JSX.Element {

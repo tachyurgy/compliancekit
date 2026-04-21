@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
@@ -132,6 +133,12 @@ func (h *DocumentHandler) Finalize(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
+	auditlog.EmitDocumentUpload(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), id, map[string]any{
+		"kind":           kind,
+		"mime_type":      mime,
+		"ocr_source":     source,
+		"ocr_confidence": confidence,
+	}, r)
 	httpx.RenderJSON(w, http.StatusOK, map[string]any{
 		"document_id": id, "expires_at": expires, "ocr_confidence": confidence, "ocr_source": source,
 	})
@@ -223,6 +230,7 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
+	auditlog.EmitDocumentDelete(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), id, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 

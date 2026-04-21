@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	"github.com/tachyurgy/compliancekit/backend/internal/magiclink"
@@ -96,6 +97,10 @@ func (h *ProviderHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	_ = token
+	auditlog.EmitSignup(r.Context(), h.Pool, actualID, map[string]any{
+		"state_code":  stateUpper,
+		"owner_email": in.OwnerEmail,
+	}, r)
 	httpx.RenderJSON(w, http.StatusAccepted, map[string]string{"status": "sent"})
 }
 
@@ -176,6 +181,7 @@ func (h *ProviderHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		Secure:   h.SecureCookie,
 		SameSite: http.SameSiteLaxMode,
 	})
+	auditlog.EmitLogin(r.Context(), h.Pool, claim.ProviderID, claim.ProviderID, r)
 	httpx.RenderJSON(w, http.StatusOK, map[string]string{"status": "ok", "provider_id": claim.ProviderID})
 }
 
@@ -235,7 +241,61 @@ func (h *ProviderHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, fmt.Errorf("update provider: %w", err)))
 		return
 	}
+	auditlog.EmitMeUpdate(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), r)
 	h.Me(w, r)
+}
+
+// DELETE /api/providers/me — soft-delete the provider (start the 90-day
+// retention clock). Requires a typed confirmation (body {"confirm":"DELETE"})
+// to avoid accidental one-click wipeouts. The retention worker will
+// hard-delete the tenant's data after the grace window elapses.
+//
+// This handler does NOT log the user out — the session stays valid so the
+// Settings UI can render a "Scheduled for deletion on <date>" banner on the
+// next request. Re-subscribing (or clearing deleted_at via support) cancels
+// the pending purge.
+func (h *ProviderHandler) DeleteMe(w http.ResponseWriter, r *http.Request) {
+	pid := mw.ProviderIDFrom(r.Context())
+	if pid == "" {
+		httpx.RenderError(w, r, httpx.ErrUnauthorized)
+		return
+	}
+	var in struct {
+		Confirm string `json:"confirm"`
+	}
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.RenderError(w, r, err)
+		return
+	}
+	if in.Confirm != "DELETE" {
+		httpx.RenderError(w, r, httpx.BadRequestf(`confirmation required: send {"confirm":"DELETE"}`))
+		return
+	}
+	_, err := h.Pool.ExecContext(r.Context(), `
+		UPDATE providers
+		   SET deleted_at = CURRENT_TIMESTAMP,
+		       canceled_at = COALESCE(canceled_at, CURRENT_TIMESTAMP),
+		       updated_at = CURRENT_TIMESTAMP
+		 WHERE id = ?`, pid)
+	if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, fmt.Errorf("soft-delete provider: %w", err)))
+		return
+	}
+	auditlog.Emit(r.Context(), h.Pool, auditlog.Entry{
+		ProviderID: pid,
+		ActorKind:  auditlog.ActorKindProviderAdmin,
+		ActorID:    mw.UserIDFrom(r.Context()),
+		Action:     "provider.deletion_requested",
+		TargetKind: auditlog.TargetKindProvider,
+		TargetID:   pid,
+		IP:         auditlog.ClientIP(r),
+		UserAgent:  r.UserAgent(),
+	})
+	httpx.RenderJSON(w, http.StatusOK, map[string]any{
+		"status":             "scheduled_for_deletion",
+		"grace_period_days":  90,
+		"message":            "Your account is scheduled for deletion. All data will be permanently removed in 90 days unless you contact support to cancel.",
+	})
 }
 
 // LookupSession implements middleware.SessionReader.

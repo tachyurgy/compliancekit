@@ -82,8 +82,11 @@ type Deps struct {
 	Postings        *handlers.PostingHandler
 	Ratio           *handlers.RatioHandler
 	Inspections     *handlers.InspectionHandler
+	AuditLog        *handlers.AuditLogHandler
+	DataExport      *handlers.DataExportHandler
 	Magic           *magiclink.Service
 	Session         mw.SessionReader
+	RoleLookup      mw.RoleLookuper
 	BillingChecker  mw.BillingChecker
 	RateLimit       *mw.TokenBucket
 	FrontendOrigins []string
@@ -126,6 +129,18 @@ func NewRouter(d Deps) http.Handler {
 	// Stripe webhook — raw body required by Stripe signing.
 	r.Post("/webhooks/stripe", d.StripeWebhook.Handle)
 
+	// adminOnly is a convenience wrapper that gates a subrouter to
+	// provider_admin. Kept local so we don't sprinkle the role string at
+	// every call site.
+	adminOnly := func(inner func(r chi.Router)) func(r chi.Router) {
+		return func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireRole(d.RoleLookup, mw.RoleProviderAdmin))
+				inner(r)
+			})
+		}
+	}
+
 	// Session-protected API.
 	r.Route("/api", func(r chi.Router) {
 		r.Use(mw.RequireProviderSession(d.Session))
@@ -134,30 +149,39 @@ func NewRouter(d Deps) http.Handler {
 		r.Patch("/me", d.Providers.UpdateMe)
 		r.Get("/dashboard", d.Dashboard.Get)
 
+		// Children: reads are open to both roles; writes are admin-only.
 		r.Route("/children", func(r chi.Router) {
 			r.Get("/", d.Children.List)
-			r.Post("/", d.Children.Create)
 			r.Get("/{id}", d.Children.Get)
-			r.Patch("/{id}", d.Children.Update)
-			r.Delete("/{id}", d.Children.Delete)
 			r.Get("/{id}/documents", d.Children.ListDocuments)
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Post("/", d.Children.Create)
+				r.Patch("/{id}", d.Children.Update)
+				r.Delete("/{id}", d.Children.Delete)
+			}))
 		})
 
+		// Staff: reads are open to both roles; writes are admin-only.
 		r.Route("/staff", func(r chi.Router) {
 			r.Get("/", d.Staff.List)
-			r.Post("/", d.Staff.Create)
 			r.Get("/{id}", d.Staff.Get)
-			r.Patch("/{id}", d.Staff.Update)
-			r.Delete("/{id}", d.Staff.Delete)
 			r.Get("/{id}/documents", d.Staff.ListDocuments)
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Post("/", d.Staff.Create)
+				r.Patch("/{id}", d.Staff.Update)
+				r.Delete("/{id}", d.Staff.Delete)
+			}))
 		})
 
+		// Documents: list/get are open; presign/finalize/delete are admin-only.
 		r.Route("/documents", func(r chi.Router) {
-			r.Post("/presign", d.Documents.Presign)
 			r.Get("/", d.Documents.List)
 			r.Get("/{id}", d.Documents.Get)
-			r.Post("/{id}/finalize", d.Documents.Finalize)
-			r.Delete("/{id}", d.Documents.Delete)
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Post("/presign", d.Documents.Presign)
+				r.Post("/{id}/finalize", d.Documents.Finalize)
+				r.Delete("/{id}", d.Documents.Delete)
+			}))
 		})
 
 		r.Route("/billing", func(r chi.Router) {
@@ -169,31 +193,60 @@ func NewRouter(d Deps) http.Handler {
 		if d.Drills != nil {
 			r.Route("/drills", func(r chi.Router) {
 				r.Get("/", d.Drills.List)
-				r.Post("/", d.Drills.Create)
-				r.Delete("/{id}", d.Drills.Delete)
+				r.Group(adminOnly(func(r chi.Router) {
+					r.Post("/", d.Drills.Create)
+					r.Delete("/{id}", d.Drills.Delete)
+				}))
 			})
 		}
 		if d.Postings != nil || d.Ratio != nil {
 			r.Route("/facility", func(r chi.Router) {
 				if d.Postings != nil {
 					r.Get("/postings", d.Postings.List)
-					r.Patch("/postings/{key}", d.Postings.Upsert)
+					r.Group(adminOnly(func(r chi.Router) {
+						r.Patch("/postings/{key}", d.Postings.Upsert)
+					}))
 				}
 				if d.Ratio != nil {
-					r.Post("/ratio-check", d.Ratio.Check)
+					r.Group(adminOnly(func(r chi.Router) {
+						r.Post("/ratio-check", d.Ratio.Check)
+					}))
 				}
 			})
 		}
 		if d.Inspections != nil {
 			r.Route("/inspections", func(r chi.Router) {
 				r.Get("/", d.Inspections.List)
-				r.Post("/", d.Inspections.Start)
 				r.Get("/{id}", d.Inspections.Get)
-				r.Patch("/{id}/items/{item_id}", d.Inspections.UpsertResponse)
-				r.Post("/{id}/finalize", d.Inspections.Finalize)
 				r.Get("/{id}/report.pdf", d.Inspections.Report)
+				r.Group(adminOnly(func(r chi.Router) {
+					r.Post("/", d.Inspections.Start)
+					r.Patch("/{id}/items/{item_id}", d.Inspections.UpsertResponse)
+					r.Post("/{id}/finalize", d.Inspections.Finalize)
+				}))
 			})
 		}
+
+		// Audit log: admin-only read.
+		if d.AuditLog != nil {
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Get("/audit-log", d.AuditLog.List)
+			}))
+		}
+
+		// Data & Retention: export and delete. All endpoints admin-only because
+		// both actions expose or destroy the entire tenant dataset.
+		if d.DataExport != nil {
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Get("/exports", d.DataExport.List)
+				r.Post("/exports", d.DataExport.Create)
+				r.Get("/exports/{id}/download", d.DataExport.Download)
+			}))
+		}
+		// DELETE /api/providers/me schedules a 90-day retention purge.
+		r.Group(adminOnly(func(r chi.Router) {
+			r.Delete("/providers/me", d.Providers.DeleteMe)
+		}))
 
 		// Paywalled routes — require active subscription
 		r.Group(func(r chi.Router) {

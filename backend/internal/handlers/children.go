@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
@@ -76,6 +77,7 @@ func (h *ChildHandler) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
+	auditlog.EmitChildCreate(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), in.ID, r)
 	httpx.RenderJSON(w, http.StatusCreated, in)
 }
 
@@ -132,6 +134,7 @@ func (h *ChildHandler) Update(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
+	auditlog.EmitChildUpdate(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), id, r)
 	h.Get(w, r)
 }
 
@@ -144,6 +147,7 @@ func (h *ChildHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
+	auditlog.EmitChildDelete(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), id, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 

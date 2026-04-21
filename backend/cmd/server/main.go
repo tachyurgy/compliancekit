@@ -21,7 +21,11 @@ import (
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
 	"github.com/tachyurgy/compliancekit/backend/internal/notify"
 	"github.com/tachyurgy/compliancekit/backend/internal/ocr"
+	"github.com/tachyurgy/compliancekit/backend/internal/pdfsign"
+	"github.com/tachyurgy/compliancekit/backend/internal/pdfsignadapter"
+	"github.com/tachyurgy/compliancekit/backend/internal/retention"
 	"github.com/tachyurgy/compliancekit/backend/internal/storage"
+	"github.com/tachyurgy/compliancekit/backend/internal/workers"
 )
 
 func main() {
@@ -127,6 +131,12 @@ func run() error {
 	postings := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
 	ratio := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}
 	inspections := &handlers.InspectionHandler{Pool: pool, Log: log.With("component", "inspections")}
+	auditLog := &handlers.AuditLogHandler{Pool: pool, Log: log.With("component", "audit_log")}
+	dataExport := &handlers.DataExportHandler{
+		Pool: pool, Storage: s3Client, Emailer: emailer,
+		DownloadTTL: 15 * time.Minute,
+		Log:         log.With("component", "data_export"),
+	}
 
 	// ---- chase service (background) ----
 	chase := notify.NewChaseService(notify.ChaseDeps{
@@ -138,6 +148,29 @@ func run() error {
 		Logger:          log.With("component", "chase"),
 	})
 	go chase.RunDaily(rootCtx)
+
+	// ---- session GC + nightly compliance snapshot recompute (background) ----
+	sessionGC := &workers.SessionGC{Pool: pool, Log: log.With("component", "session_gc")}
+	go sessionGC.RunDaily(rootCtx)
+
+	snapshotWorker := &workers.SnapshotWorker{Pool: pool, Log: log.With("component", "snapshot")}
+	go snapshotWorker.RunDaily(rootCtx)
+
+	// 90-day data purge worker (GDPR / Terms of Service 90-day grace period).
+	purgeWorker := retention.NewPurgeWorker(pool, s3Client, log.With("component", "retention"))
+	go purgeWorker.RunDaily(rootCtx)
+
+	// ---- pdfsign (in-house e-signature) ----
+	// Adapter bridges the external pdfsign package to our storage + session
+	// middleware so Deps.PDFSign is non-nil and /api/pdfsign/* routes mount.
+	pdfsignStore := pdfsign.NewPgStore(pool)
+	pdfsignSvc := pdfsign.NewService(pdfsign.Config{
+		Store:       pdfsignStore,
+		Blobs:       pdfsignadapter.NewBlobStore(s3Client),
+		Bucket:      cfg.S3BucketSignedPDFs,
+		SigningBase: cfg.FrontendBaseURL,
+	})
+	pdfsignRoutes := pdfsignadapter.New(pdfsignSvc, pdfsignStore, s3Client, cfg.S3BucketSignedPDFs, cfg.FrontendBaseURL)
 
 	// ---- router ----
 	handler := api.NewRouter(api.Deps{
@@ -154,12 +187,15 @@ func run() error {
 		Postings:        postings,
 		Ratio:           ratio,
 		Inspections:     inspections,
+		AuditLog:        auditLog,
+		DataExport:      dataExport,
 		Magic:           magic,
 		Session:         providers,
+		RoleLookup:      mw.PoolRoleLookup{DB: pool},
 		BillingChecker:  bill,
 		RateLimit:       mw.NewTokenBucket(10, 0.5), // 10 burst, 0.5 tok/sec
 		FrontendOrigins: parseOrigins(cfg.FrontendBaseURL),
-		PDFSign:         nil, // pdfsign package wires in here
+		PDFSign:         pdfsignRoutes,
 	})
 
 	srv := &http.Server{

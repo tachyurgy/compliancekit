@@ -21,6 +21,7 @@ import InspectionDetail from '@/pages/InspectionDetail';
 import Operations from '@/pages/Operations';
 import Settings from '@/pages/Settings';
 import SettingsBilling from '@/pages/SettingsBilling';
+import SettingsAuditLog from '@/pages/SettingsAuditLog';
 import PortalParent from '@/pages/PortalParent';
 import PortalStaff from '@/pages/PortalStaff';
 
@@ -130,6 +131,7 @@ export default function App(): JSX.Element {
             <Route path="/templates" element={<DocumentTemplates />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/billing" element={<SettingsBilling />} />
+            <Route path="/settings/audit-log" element={<SettingsAuditLog />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

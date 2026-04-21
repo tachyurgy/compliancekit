@@ -130,6 +130,52 @@ func (c *Client) PutAuditJSON(ctx context.Context, key string, v any) error {
 	return c.put(ctx, c.buckets.AuditTrail, key, "application/json", bytes.NewReader(b))
 }
 
+// PutObject puts an arbitrary object to the given bucket/key. Used by the
+// data export worker to upload the finished ZIP.
+func (c *Client) PutObject(ctx context.Context, bucket, key, mimeType string, body io.Reader) error {
+	return c.put(ctx, bucket, key, mimeType, body)
+}
+
+// GetObject fetches an arbitrary object. Caller must Close the reader.
+func (c *Client) GetObject(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+	out, err := c.s3.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: get %s/%s: %w", bucket, key, err)
+	}
+	return out.Body, nil
+}
+
+// ListPrefix yields every key under bucket/prefix. Returns keys (not full URIs).
+// Callers paginate server-side; we return a fully materialized slice because
+// the expected result size (per-tenant exports) is small.
+func (c *Client) ListPrefix(ctx context.Context, bucket, prefix string) ([]string, error) {
+	var keys []string
+	var continuation *string
+	for {
+		out, err := c.s3.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            aws.String(bucket),
+			Prefix:            aws.String(prefix),
+			ContinuationToken: continuation,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("storage: list %s/%s: %w", bucket, prefix, err)
+		}
+		for _, o := range out.Contents {
+			if o.Key == nil {
+				continue
+			}
+			keys = append(keys, *o.Key)
+		}
+		if out.IsTruncated == nil || !*out.IsTruncated {
+			return keys, nil
+		}
+		continuation = out.NextContinuationToken
+	}
+}
+
 // DeleteAllForProvider removes every object whose key begins with providers/<id>/.
 // Used on GDPR delete + subscription churn cleanup.
 func (c *Client) DeleteAllForProvider(ctx context.Context, providerID string) error {

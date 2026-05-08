@@ -81,9 +81,10 @@ func run() error {
 	}
 
 	sms := notify.NewSMSSender(notify.SMSConfig{
-		AccountSID: cfg.TwilioAccountSID,
-		AuthToken:  cfg.TwilioAuthToken,
-		From:       cfg.TwilioFromNumber,
+		AccountSID:          cfg.TwilioAccountSID,
+		AuthToken:           cfg.TwilioAuthToken,
+		From:                cfg.TwilioFromNumber,
+		MessagingServiceSID: cfg.TwilioMessagingServiceSID,
 	})
 
 	// ---- magic link + billing ----
@@ -138,6 +139,11 @@ func run() error {
 		Log:         log.With("component", "data_export"),
 	}
 	contact := &handlers.ContactHandler{Pool: pool, Log: log.With("component", "contact")}
+	nag := &handlers.NagHandler{
+		Pool: pool, Magic: magic, Emailer: emailer, SMS: sms,
+		FrontendBase: cfg.FrontendBaseURL,
+		Log:          log.With("component", "nag"),
+	}
 
 	// Test helpers — only instantiate in non-production so they can never be
 	// mounted against a real prod DB. See handlers/testhelpers.go.
@@ -204,6 +210,7 @@ func run() error {
 		AuditLog:        auditLog,
 		DataExport:      dataExport,
 		Contact:         contact,
+		Nag:             nag,
 		TestHelpers:     testHelpers,
 		Magic:           magic,
 		Session:         providers,

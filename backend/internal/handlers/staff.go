@@ -58,7 +58,10 @@ func (h *StaffHandler) List(w http.ResponseWriter, r *http.Request) {
 // POST /api/staff
 func (h *StaffHandler) Create(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
-	var in models.Staff
+	var in struct {
+		models.Staff
+		PreferredContactChannel string `json:"preferred_contact_channel"`
+	}
 	if err := httpx.DecodeJSON(r, &in); err != nil {
 		httpx.RenderError(w, r, err)
 		return
@@ -73,15 +76,28 @@ func (h *StaffHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if in.Status == "" {
 		in.Status = "active"
 	}
+	channel := in.PreferredContactChannel
+	if channel == "" {
+		channel = "email"
+	}
+	if channel != "email" && channel != "sms" && channel != "both" {
+		httpx.RenderError(w, r, httpx.BadRequestf("preferred_contact_channel must be one of email, sms, both"))
+		return
+	}
+	if (channel == "sms" || channel == "both") && in.Phone == "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("phone is required when preferred_contact_channel is sms or both"))
+		return
+	}
 	in.ID = base62.NewID()[:22]
 	in.ProviderID = pid
 
 	_, err := h.Pool.ExecContext(r.Context(), `
 		INSERT INTO staff (id, provider_id, first_name, last_name, role, email, phone, hire_date,
-		                  background_check_date, status, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+		                  background_check_date, status, preferred_contact_channel,
+		                  contact_channel_set_at, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
 		in.ID, in.ProviderID, in.FirstName, in.LastName, in.Role, in.Email, in.Phone, in.HireDate,
-		in.BackgroundCheck, in.Status)
+		in.BackgroundCheck, in.Status, channel)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
@@ -113,30 +129,41 @@ func (h *StaffHandler) Update(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
 	id := chi.URLParam(r, "id")
 	var in struct {
-		FirstName       *string    `json:"first_name"`
-		LastName        *string    `json:"last_name"`
-		Role            *string    `json:"role"`
-		Email           *string    `json:"email"`
-		Phone           *string    `json:"phone"`
-		BackgroundCheck *time.Time `json:"background_check_date"`
-		Status          *string    `json:"status"`
+		FirstName               *string    `json:"first_name"`
+		LastName                *string    `json:"last_name"`
+		Role                    *string    `json:"role"`
+		Email                   *string    `json:"email"`
+		Phone                   *string    `json:"phone"`
+		BackgroundCheck         *time.Time `json:"background_check_date"`
+		Status                  *string    `json:"status"`
+		PreferredContactChannel *string    `json:"preferred_contact_channel"`
 	}
 	if err := httpx.DecodeJSON(r, &in); err != nil {
 		httpx.RenderError(w, r, err)
 		return
 	}
+	if in.PreferredContactChannel != nil {
+		c := *in.PreferredContactChannel
+		if c != "email" && c != "sms" && c != "both" {
+			httpx.RenderError(w, r, httpx.BadRequestf("preferred_contact_channel must be one of email, sms, both"))
+			return
+		}
+	}
 	_, err := h.Pool.ExecContext(r.Context(), `
 		UPDATE staff SET
-		  first_name            = COALESCE(?, first_name),
-		  last_name             = COALESCE(?, last_name),
-		  role                  = COALESCE(?, role),
-		  email                 = COALESCE(?, email),
-		  phone                 = COALESCE(?, phone),
-		  background_check_date = COALESCE(?, background_check_date),
-		  status                = COALESCE(?, status),
-		  updated_at            = CURRENT_TIMESTAMP
+		  first_name                = COALESCE(?, first_name),
+		  last_name                 = COALESCE(?, last_name),
+		  role                      = COALESCE(?, role),
+		  email                     = COALESCE(?, email),
+		  phone                     = COALESCE(?, phone),
+		  background_check_date     = COALESCE(?, background_check_date),
+		  status                    = COALESCE(?, status),
+		  preferred_contact_channel = COALESCE(?, preferred_contact_channel),
+		  contact_channel_set_at    = CASE WHEN ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE contact_channel_set_at END,
+		  updated_at                = CURRENT_TIMESTAMP
 		WHERE id = ? AND provider_id = ?`,
 		in.FirstName, in.LastName, in.Role, in.Email, in.Phone, in.BackgroundCheck, in.Status,
+		in.PreferredContactChannel, in.PreferredContactChannel,
 		id, pid)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))

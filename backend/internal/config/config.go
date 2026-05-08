@@ -34,9 +34,10 @@ type Config struct {
 	StripeWebhookSecret string `env:"STRIPE_WEBHOOK_SECRET,required"`
 	StripePricePro      string `env:"STRIPE_PRICE_PRO,required"`
 
-	TwilioAccountSID string `env:"TWILIO_ACCOUNT_SID"`
-	TwilioAuthToken  string `env:"TWILIO_AUTH_TOKEN"`
-	TwilioFromNumber string `env:"TWILIO_FROM_NUMBER"`
+	TwilioAccountSID         string `env:"TWILIO_ACCOUNT_SID"`
+	TwilioAuthToken          string `env:"TWILIO_AUTH_TOKEN"`
+	TwilioFromNumber         string `env:"TWILIO_FROM_NUMBER"`
+	TwilioMessagingServiceSID string `env:"TWILIO_MESSAGING_SERVICE_SID"`
 
 	MistralAPIKey string `env:"MISTRAL_API_KEY"`
 	GeminiAPIKey  string `env:"GEMINI_API_KEY"`

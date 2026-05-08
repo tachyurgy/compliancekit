@@ -9,25 +9,27 @@ import (
 )
 
 type SMSSender struct {
-	client *twilio.RestClient
-	from   string
+	client     *twilio.RestClient
+	from       string // E.164 sender — used when not empty
+	serviceSID string // Twilio Messaging Service SID — used when From is empty
 }
 
 type SMSConfig struct {
-	AccountSID string
-	AuthToken  string
-	From       string
+	AccountSID        string
+	AuthToken         string
+	From              string // E.164. Optional if MessagingServiceSID is set.
+	MessagingServiceSID string // MGxxxx... Optional alternative to From; required for trial accounts that don't own a phone number.
 }
 
 func NewSMSSender(cfg SMSConfig) *SMSSender {
 	if cfg.AccountSID == "" || cfg.AuthToken == "" {
-		return &SMSSender{from: cfg.From}
+		return &SMSSender{from: cfg.From, serviceSID: cfg.MessagingServiceSID}
 	}
 	client := twilio.NewRestClientWithParams(twilio.ClientParams{
 		Username: cfg.AccountSID,
 		Password: cfg.AuthToken,
 	})
-	return &SMSSender{client: client, from: cfg.From}
+	return &SMSSender{client: client, from: cfg.From, serviceSID: cfg.MessagingServiceSID}
 }
 
 // Send sends a single SMS. Returns the provider message SID on success.
@@ -38,9 +40,16 @@ func (s *SMSSender) Send(to, body string) (string, error) {
 	if to == "" || body == "" {
 		return "", fmt.Errorf("notify: sms missing required fields")
 	}
+	if s.from == "" && s.serviceSID == "" {
+		return "", fmt.Errorf("notify: sms requires From number or MessagingServiceSID")
+	}
 	params := &twilioapi.CreateMessageParams{}
 	params.SetTo(to)
-	params.SetFrom(s.from)
+	if s.serviceSID != "" {
+		params.SetMessagingServiceSid(s.serviceSID)
+	} else {
+		params.SetFrom(s.from)
+	}
 	params.SetBody(body)
 	resp, err := s.client.Api.CreateMessage(params)
 	if err != nil {

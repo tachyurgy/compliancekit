@@ -88,6 +88,7 @@ type Deps struct {
 	AuditLog        *handlers.AuditLogHandler
 	DataExport      *handlers.DataExportHandler
 	Contact         *handlers.ContactHandler
+	Nag             *handlers.NagHandler
 	TestHelpers     *handlers.TestHelperHandler // only mounted when non-production
 	Magic           *magiclink.Service
 	Session         mw.SessionReader
@@ -199,11 +200,17 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/", d.Staff.List)
 			r.Get("/{id}", d.Staff.Get)
 			r.Get("/{id}/documents", d.Staff.ListDocuments)
+			if d.Nag != nil {
+				r.Get("/{id}/nag-history", d.Nag.History)
+			}
 			r.Group(adminOnly(func(r chi.Router) {
 				r.Post("/", d.Staff.Create)
 				r.Patch("/{id}", d.Staff.Update)
 				r.Delete("/{id}", d.Staff.Delete)
 				r.Post("/{id}/portal-link", d.Providers.MintStaffPortalLink)
+				if d.Nag != nil {
+					r.Post("/{id}/nag", d.Nag.Trigger)
+				}
 			}))
 		})
 

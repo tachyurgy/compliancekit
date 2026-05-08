@@ -12,6 +12,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
@@ -32,22 +34,33 @@ type ProviderHandler struct {
 	Log          *slog.Logger
 }
 
+// minPasswordLen is the floor for new passwords. We require length only;
+// strength rules tend to push users to predictable substitutions and we'd
+// rather invest in good rate-limiting (already wired) than complexity rules.
+const minPasswordLen = 10
+
 // POST /api/auth/signup
-// body: { "name": "Sunshine Daycare", "owner_email": "...", "state_code": "CA" }
-// Creates a provider stub and emails a signup magic link.
+// body: { "name", "owner_email", "state_code", "password" }
+// Creates a provider AND its admin user with a password hash, then logs in.
 func (h *ProviderHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Name       string `json:"name"`
 		OwnerEmail string `json:"owner_email"`
 		StateCode  string `json:"state_code"`
+		Password   string `json:"password"`
 	}
 	if err := httpx.DecodeJSON(r, &in); err != nil {
 		httpx.RenderError(w, r, err)
 		return
 	}
 	in.OwnerEmail = strings.ToLower(strings.TrimSpace(in.OwnerEmail))
-	if in.Name == "" || in.OwnerEmail == "" || in.StateCode == "" {
-		httpx.RenderError(w, r, httpx.BadRequestf("name, owner_email, and state_code are required"))
+	in.Name = strings.TrimSpace(in.Name)
+	if in.Name == "" || in.OwnerEmail == "" || in.StateCode == "" || in.Password == "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("name, owner_email, state_code, and password are required"))
+		return
+	}
+	if len(in.Password) < minPasswordLen {
+		httpx.RenderError(w, r, httpx.BadRequestf("password must be at least %d characters", minPasswordLen))
 		return
 	}
 	switch strings.ToUpper(in.StateCode) {
@@ -57,152 +70,154 @@ func (h *ProviderHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Upsert provider by owner_email. Populate both the legacy canonical
-	// columns (legal_name, state) from migration 000001 and the handler-era
-	// columns (name, state_code) added by migration 000012, so reads work from
-	// either schema view.
+	// Refuse to silently overwrite an existing account on signup. Returning a
+	// generic error here is a tradeoff: it leaks that the email is registered,
+	// but the alternative (auto-login on duplicate) lets anyone reset another
+	// owner's account. Prefer explicit /signin if you already have an account.
+	var existingID string
+	err := h.Pool.QueryRowContext(r.Context(),
+		`SELECT id FROM providers WHERE owner_email = ? AND deleted_at IS NULL`, in.OwnerEmail).Scan(&existingID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	if existingID != "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("an account with that email already exists; please sign in"))
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
+	if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+
 	providerID := base62.NewID()[:22]
 	stateUpper := strings.ToUpper(in.StateCode)
-	_, err := h.Pool.ExecContext(r.Context(), `
-		INSERT INTO providers (id, legal_name, name, owner_email, state, state_code, capacity, timezone, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 0, 'America/Los_Angeles', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		ON CONFLICT (owner_email) DO UPDATE SET
-			name = EXCLUDED.name,
-			legal_name = EXCLUDED.legal_name,
-			state = EXCLUDED.state,
-			state_code = EXCLUDED.state_code,
-			updated_at = CURRENT_TIMESTAMP`,
-		providerID, in.Name, in.Name, in.OwnerEmail, stateUpper, stateUpper)
-	if err != nil {
-		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
-		return
-	}
-	// Re-read to get the canonical ID (may have been pre-existing).
-	var actualID string
-	_ = h.Pool.QueryRowContext(r.Context(), `SELECT id FROM providers WHERE owner_email = ?`, in.OwnerEmail).Scan(&actualID)
 
-	token, path, err := h.Magic.Generate(r.Context(), magiclink.KindProviderSignup, actualID, actualID, 0)
+	tx, err := h.Pool.BeginTx(r.Context(), nil)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
-	url := h.FrontendBase + path
-	if h.Emailer != nil {
-		sub, html, text := notify.RenderMagicLinkEmail(notify.MagicLinkEmailData{
-			RecipientName: in.Name, ActionText: "Finish creating your ComplianceKit account",
-			URL: url, ExpiresIn: "15 minutes",
-		})
-		if err := h.Emailer.Send(r.Context(), notify.EmailMessage{
-			To: in.OwnerEmail, Subject: sub, HTMLBody: html, PlainBody: text,
-		}); err != nil {
-			h.Log.Warn("signup: email send", "err", err)
-		}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(r.Context(), `
+		INSERT INTO providers (id, legal_name, name, owner_email, state, state_code, capacity, timezone, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, 0, 'America/Los_Angeles', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		providerID, in.Name, in.Name, in.OwnerEmail, stateUpper, stateUpper); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
 	}
-	_ = token
-	auditlog.EmitSignup(r.Context(), h.Pool, actualID, map[string]any{
+
+	userID := base62.NewID()[:22]
+	if _, err := tx.ExecContext(r.Context(), `
+		INSERT INTO users (id, provider_id, email, full_name, role, password_hash, password_set_at, email_verified_at, created_at, updated_at)
+		VALUES (?, ?, ?, ?, 'provider_admin', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		userID, providerID, in.OwnerEmail, in.Name, string(hashed)); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+
+	if err := h.establishSession(w, r, providerID, userID); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	auditlog.EmitSignup(r.Context(), h.Pool, providerID, map[string]any{
 		"state_code":  stateUpper,
 		"owner_email": in.OwnerEmail,
 	}, r)
-	httpx.RenderJSON(w, http.StatusAccepted, map[string]string{"status": "sent"})
+	httpx.RenderJSON(w, http.StatusOK, map[string]string{
+		"status":      "ok",
+		"provider_id": providerID,
+		"user_id":     userID,
+	})
 }
 
-// POST /api/auth/signin { "email": "..." }  -> emails a 15-min magic link
+// POST /api/auth/signin { "email", "password" } -> sets session cookie
 func (h *ProviderHandler) Signin(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 	if err := httpx.DecodeJSON(r, &in); err != nil {
 		httpx.RenderError(w, r, err)
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(in.Email))
-	if email == "" {
-		httpx.RenderError(w, r, httpx.BadRequestf("email required"))
+	if email == "" || in.Password == "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("email and password required"))
 		return
 	}
-	var providerID, name string
-	err := h.Pool.QueryRowContext(r.Context(),
-		`SELECT id, name FROM providers WHERE owner_email = ? AND deleted_at IS NULL`, email).Scan(&providerID, &name)
+
+	var userID, providerID, hash string
+	err := h.Pool.QueryRowContext(r.Context(), `
+		SELECT u.id, u.provider_id, COALESCE(u.password_hash, '')
+		FROM users u
+		JOIN providers p ON p.id = u.provider_id
+		WHERE u.email = ? AND u.role = 'provider_admin'
+		  AND u.deleted_at IS NULL AND p.deleted_at IS NULL
+		LIMIT 1`, email).Scan(&userID, &providerID, &hash)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			// Don't leak whether email exists; pretend success.
-			httpx.RenderJSON(w, http.StatusAccepted, map[string]string{"status": "sent"})
+			// Burn a hash anyway to keep the timing similar between
+			// nonexistent-email and bad-password.
+			_ = bcrypt.CompareHashAndPassword(
+				[]byte("$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalid"),
+				[]byte(in.Password))
+			httpx.RenderError(w, r, httpx.ErrUnauthorized)
 			return
 		}
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
-	_, path, err := h.Magic.Generate(r.Context(), magiclink.KindProviderSignin, providerID, providerID, 0)
-	if err != nil {
-		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+	if hash == "" {
+		// Account predates password auth (was magic-link only). Force a reset
+		// rather than silently letting them sign in.
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrUnauthorized,
+			fmt.Errorf("account requires password reset")))
 		return
 	}
-	url := h.FrontendBase + path
-	if h.Emailer != nil {
-		sub, html, text := notify.RenderMagicLinkEmail(notify.MagicLinkEmailData{
-			RecipientName: name, ActionText: "Sign in to ComplianceKit",
-			URL: url, ExpiresIn: "15 minutes",
-		})
-		_ = h.Emailer.Send(r.Context(), notify.EmailMessage{To: email, Subject: sub, HTMLBody: html, PlainBody: text})
-	}
-	httpx.RenderJSON(w, http.StatusAccepted, map[string]string{"status": "sent"})
-}
-
-// GET /api/auth/callback?t=... — exchanges magic link for a session cookie.
-func (h *ProviderHandler) Callback(w http.ResponseWriter, r *http.Request) {
-	token := r.URL.Query().Get("t")
-	if token == "" {
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(in.Password)); err != nil {
 		httpx.RenderError(w, r, httpx.ErrUnauthorized)
 		return
 	}
-	claim, err := h.Magic.Consume(r.Context(), token)
-	if err != nil {
-		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrUnauthorized, err))
-		return
-	}
-	if claim.Kind != magiclink.KindProviderSignup && claim.Kind != magiclink.KindProviderSignin {
-		httpx.RenderError(w, r, httpx.ErrForbidden)
-		return
-	}
-	// Ensure a user row exists for this provider. Signup only creates the
-	// providers row; the owner user is materialized lazily on first callback.
-	// We look up by (provider_id, email==owner_email, role='provider_admin').
-	var userID string
-	err = h.Pool.QueryRowContext(r.Context(), `
-		SELECT u.id FROM users u
-		JOIN providers p ON p.id = u.provider_id
-		WHERE u.provider_id = ? AND u.email = p.owner_email AND u.role = 'provider_admin'
-		  AND u.deleted_at IS NULL
-		LIMIT 1`, claim.ProviderID).Scan(&userID)
-	if errors.Is(err, sql.ErrNoRows) {
-		var ownerEmail, name string
-		if err := h.Pool.QueryRowContext(r.Context(),
-			`SELECT owner_email, COALESCE(name, legal_name, '') FROM providers WHERE id = ?`,
-			claim.ProviderID).Scan(&ownerEmail, &name); err != nil {
-			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
-			return
-		}
-		userID = base62.NewID()[:22]
-		if _, err := h.Pool.ExecContext(r.Context(), `
-			INSERT INTO users (id, provider_id, email, full_name, role, email_verified_at, created_at, updated_at)
-			VALUES (?, ?, ?, ?, 'provider_admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-			userID, claim.ProviderID, ownerEmail, name); err != nil {
-			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
-			return
-		}
-	} else if err != nil {
+
+	if err := h.establishSession(w, r, providerID, userID); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
+	if _, err := h.Pool.ExecContext(r.Context(),
+		`UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?`, userID); err != nil {
+		h.Log.Warn("signin: last_login_at update", "err", err)
+	}
+	auditlog.EmitLogin(r.Context(), h.Pool, providerID, providerID, r)
+	httpx.RenderJSON(w, http.StatusOK, map[string]string{
+		"status":      "ok",
+		"provider_id": providerID,
+		"user_id":     userID,
+	})
+}
 
+// Callback is preserved as a deprecation stub. Magic-link auth has been
+// removed in favor of passwords; existing links 410.
+func (h *ProviderHandler) Callback(w http.ResponseWriter, r *http.Request) {
+	httpx.RenderError(w, r, httpx.BadRequestf("magic-link login is no longer supported; please sign in with your password"))
+}
+
+// establishSession inserts a sessions row and sets the ck_sess cookie. Used
+// by Signup and Signin so the cookie/expiry contract stays in one place.
+func (h *ProviderHandler) establishSession(w http.ResponseWriter, r *http.Request, providerID, userID string) error {
 	sessID := base62.NewID()
-	// Store session. SQLite lacks INTERVAL literals; use datetime(...).
 	if _, err := h.Pool.ExecContext(r.Context(), `
 		INSERT INTO sessions (id, provider_id, user_id, expires_at, created_at)
 		VALUES (?, ?, ?, datetime('now', '+14 days'), CURRENT_TIMESTAMP)`,
-		sessID, claim.ProviderID, userID); err != nil {
-		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
-		return
+		sessID, providerID, userID); err != nil {
+		return err
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "ck_sess",
@@ -214,8 +229,7 @@ func (h *ProviderHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		Secure:   h.SecureCookie,
 		SameSite: http.SameSiteLaxMode,
 	})
-	auditlog.EmitLogin(r.Context(), h.Pool, claim.ProviderID, claim.ProviderID, r)
-	httpx.RenderJSON(w, http.StatusOK, map[string]string{"status": "ok", "provider_id": claim.ProviderID})
+	return nil
 }
 
 // GET /api/me

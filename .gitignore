@@ -13,6 +13,9 @@ api-keys
 cloudlfare-key-do-not-commit
 cloudflare-key-do-not-commit
 hetzner-key
+twilio-keys
+aws-keys
+*-keys
 *-key-do-not-commit
 ssh_key
 ssh_key.pub

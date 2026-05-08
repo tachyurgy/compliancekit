@@ -6,8 +6,8 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { useSession } from '@/hooks/useSession';
 
 import Landing from '@/pages/Landing';
-import MagicLinkRequest from '@/pages/MagicLinkRequest';
-import MagicLinkCallback from '@/pages/MagicLinkCallback';
+import Login from '@/pages/Login';
+import Signup from '@/pages/Signup';
 import OnboardingWizard from '@/pages/onboarding/OnboardingWizard';
 import Dashboard from '@/pages/Dashboard';
 import Children from '@/pages/Children';
@@ -88,8 +88,8 @@ export default function App(): JSX.Element {
         <Routes>
           {/* Public */}
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<MagicLinkRequest />} />
-          <Route path="/auth/callback/:token" element={<MagicLinkCallback />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
 
           {/* Public token-gated portals (parents / staff). No account required. */}
           <Route path="/portal/parent/:token" element={<PortalParent />} />

@@ -56,21 +56,38 @@ export const providersApi = {
     return ProviderSchema.parse(data);
   },
 
-  async requestMagicLink(email: string): Promise<{ ok: true }> {
-    await apiFetch('/api/auth/magic-link', {
-      method: 'POST',
-      json: { email },
-      skipAuthRedirect: true,
-    });
-    return { ok: true };
+  async signup(input: {
+    name: string;
+    ownerEmail: string;
+    stateCode: 'CA' | 'TX' | 'FL';
+    password: string;
+  }): Promise<{ providerId: string; userId: string }> {
+    const data = await apiFetch<{ provider_id: string; user_id: string }>(
+      '/api/auth/signup',
+      {
+        method: 'POST',
+        json: {
+          name: input.name,
+          owner_email: input.ownerEmail,
+          state_code: input.stateCode,
+          password: input.password,
+        },
+        skipAuthRedirect: true,
+      },
+    );
+    return { providerId: data.provider_id, userId: data.user_id };
   },
 
-  async consumeMagicLink(token: string): Promise<SessionUser> {
-    const data = await apiFetch<unknown>(`/api/auth/callback/${encodeURIComponent(token)}`, {
-      method: 'POST',
-      skipAuthRedirect: true,
-    });
-    return SessionUserSchema.parse(data);
+  async signin(email: string, password: string): Promise<{ providerId: string; userId: string }> {
+    const data = await apiFetch<{ provider_id: string; user_id: string }>(
+      '/api/auth/signin',
+      {
+        method: 'POST',
+        json: { email, password },
+        skipAuthRedirect: true,
+      },
+    );
+    return { providerId: data.provider_id, userId: data.user_id };
   },
 
   async logout(): Promise<void> {

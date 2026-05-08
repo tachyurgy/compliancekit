@@ -8,6 +8,21 @@
 credentials.json
 secrets/
 
+# CRITICAL — server credentials, never commit
+api-keys
+cloudlfare-key-do-not-commit
+cloudflare-key-do-not-commit
+hetzner-key
+*-key-do-not-commit
+ssh_key
+ssh_key.pub
+deploy/ssh_id*
+deploy/root_pw
+deploy/known_hosts
+deploy/*.env
+backend/params-*.env
+!backend/params-example.env
+
 # Build artifacts
 backend/bin/
 backend/tmp/

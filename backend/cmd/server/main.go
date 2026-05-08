@@ -137,6 +137,7 @@ func run() error {
 		DownloadTTL: 15 * time.Minute,
 		Log:         log.With("component", "data_export"),
 	}
+	contact := &handlers.ContactHandler{Pool: pool, Log: log.With("component", "contact")}
 
 	// Test helpers — only instantiate in non-production so they can never be
 	// mounted against a real prod DB. See handlers/testhelpers.go.
@@ -202,6 +203,7 @@ func run() error {
 		Inspections:     inspections,
 		AuditLog:        auditLog,
 		DataExport:      dataExport,
+		Contact:         contact,
 		TestHelpers:     testHelpers,
 		Magic:           magic,
 		Session:         providers,

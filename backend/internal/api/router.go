@@ -87,6 +87,7 @@ type Deps struct {
 	Inspections     *handlers.InspectionHandler
 	AuditLog        *handlers.AuditLogHandler
 	DataExport      *handlers.DataExportHandler
+	Contact         *handlers.ContactHandler
 	TestHelpers     *handlers.TestHelperHandler // only mounted when non-production
 	Magic           *magiclink.Service
 	Session         mw.SessionReader
@@ -140,6 +141,11 @@ func NewRouter(d Deps) http.Handler {
 
 	// Stripe webhook — raw body required by Stripe signing.
 	r.Post("/webhooks/stripe", d.StripeWebhook.Handle)
+
+	// Public marketing-site contact form.
+	if d.Contact != nil {
+		r.Post("/webhooks/contact", d.Contact.Post)
+	}
 
 	// adminOnly is a convenience wrapper that gates a subrouter to
 	// provider_admin. Kept local so we don't sprinkle the role string at

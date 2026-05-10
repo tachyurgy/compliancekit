@@ -11,73 +11,18 @@ import {
 
 import PageHeader from '@/components/common/PageHeader';
 import Card from '@/components/common/Card';
-import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
 import EmptyState from '@/components/common/EmptyState';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import TrialBanner from '@/components/common/TrialBanner';
+import ScoreHero, { ScoreHeroSkeleton } from '@/components/dashboard/ScoreHero';
 import { useDashboard } from '@/hooks/useDashboard';
-import { formatDate, formatRelativeDays, formatTimestamp } from '@/lib/format';
-
-function ScoreRing({ score }: { score: number }): JSX.Element {
-  const radius = 54;
-  const circ = 2 * Math.PI * radius;
-  const offset = circ - (score / 100) * circ;
-  const color =
-    score >= 90
-      ? 'text-brand-600'
-      : score >= 70
-        ? 'text-caution-500'
-        : 'text-critical-600';
-
-  return (
-    <div className="relative h-36 w-36 flex-shrink-0">
-      <svg viewBox="0 0 128 128" className="h-full w-full -rotate-90">
-        <circle
-          cx="64"
-          cy="64"
-          r={radius}
-          stroke="currentColor"
-          strokeWidth="10"
-          fill="none"
-          className="text-gray-100"
-        />
-        <circle
-          cx="64"
-          cy="64"
-          r={radius}
-          stroke="currentColor"
-          strokeWidth="10"
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          className={color}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-3xl font-semibold text-gray-900">{score}</div>
-        <div className="text-xs text-gray-500">of 100</div>
-      </div>
-    </div>
-  );
-}
-
-function HeroSkeleton(): JSX.Element {
-  return (
-    <div className="card p-6 flex items-center gap-6">
-      <div className="skeleton h-36 w-36 rounded-full" />
-      <div className="flex-1 space-y-3">
-        <div className="skeleton h-5 w-1/3" />
-        <div className="skeleton h-4 w-2/3" />
-        <div className="skeleton h-4 w-1/2" />
-      </div>
-    </div>
-  );
-}
+import { useScore } from '@/hooks/useScore';
+import { formatDate, formatRelativeDays } from '@/lib/format';
 
 export default function Dashboard(): JSX.Element {
   const { data, isLoading, isError, error, refetch } = useDashboard();
+  const score = useScore();
 
   return (
     <div>
@@ -104,8 +49,18 @@ export default function Dashboard(): JSX.Element {
         }
       />
 
+      {/* REQ-013: live score hero. Loads independently of /api/dashboard so a
+          slow rules eval can't block the most important glance on the page. */}
+      {score.isLoading ? (
+        <ScoreHeroSkeleton />
+      ) : score.data ? (
+        <ScoreHero data={score.data} />
+      ) : null}
+
+      <div className="mt-6" />
+
       {isLoading ? (
-        <HeroSkeleton />
+        <ScoreHeroSkeleton />
       ) : isError ? (
         <div className="card p-6 flex items-start gap-3 text-critical-700">
           <AlertTriangle className="h-5 w-5 mt-0.5" />
@@ -121,35 +76,10 @@ export default function Dashboard(): JSX.Element {
         </div>
       ) : data ? (
         <>
-          <div className="card p-6 flex flex-col sm:flex-row items-start sm:items-center gap-6">
-            <ScoreRing score={data.complianceScore} />
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-brand-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Compliance score</h2>
-                <Badge
-                  variant={
-                    data.scoreDelta >= 0 ? 'compliant' : data.scoreDelta < -5 ? 'critical' : 'warning'
-                  }
-                >
-                  {data.scoreDelta >= 0 ? '+' : ''}
-                  {data.scoreDelta} pts
-                </Badge>
-              </div>
-              <p className="mt-1 text-sm text-gray-600">
-                Last updated {formatTimestamp(data.updatedAt)}. Based on {data.counts.children}{' '}
-                children, {data.counts.staff} staff, and {data.counts.documents} documents.
-              </p>
-              <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <KpiTile label="Critical alerts" value={data.counts.criticalAlerts} tone="critical" />
-                <KpiTile label="Warnings" value={data.counts.warningAlerts} tone="warning" />
-                <KpiTile label="Children" value={data.counts.children} />
-                <KpiTile label="Staff" value={data.counts.staff} />
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* REQ-013: the score hero replaces the old ScoreRing/KPI grid.
+              Below it we keep the critical-alerts list and 90-day timeline,
+              which are still useful for the operator who wants to drill in. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card
               title="Critical alerts"
               description="These need action now or could lead to a citation."
@@ -248,21 +178,3 @@ export default function Dashboard(): JSX.Element {
   );
 }
 
-function KpiTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone?: 'critical' | 'warning';
-}): JSX.Element {
-  const color =
-    tone === 'critical' ? 'text-critical-600' : tone === 'warning' ? 'text-caution-600' : 'text-gray-900';
-  return (
-    <div className="rounded-lg bg-surface-muted px-3 py-2">
-      <div className={`text-xl font-semibold ${color}`}>{value}</div>
-      <div className="text-xs text-gray-600">{label}</div>
-    </div>
-  );
-}

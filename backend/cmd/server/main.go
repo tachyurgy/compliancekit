@@ -187,6 +187,16 @@ func run() error {
 		Pool: pool, Magic: magic, FrontendBase: cfg.FrontendBaseURL,
 	}
 
+	// REQ-013: synthesised dashboard score handler.
+	scoreH := &handlers.ScoreHandler{Pool: pool, Log: log.With("component", "score")}
+
+	// REQ-016a: kiosk + attendance + drill roster.
+	kioskH := &handlers.KioskHandler{Pool: pool, Log: log.With("component", "kiosk")}
+	attendanceH := &handlers.AttendanceHandler{Pool: pool, Log: log.With("component", "attendance")}
+
+	// REQ-016b: opt-in ratio coach.
+	ratioCoachH := &handlers.RatioCoachHandler{Pool: pool, Log: log.With("component", "ratio_coach")}
+
 	// Test helpers — only instantiate in non-production so they can never be
 	// mounted against a real prod DB. See handlers/testhelpers.go.
 	var testHelpers *handlers.TestHelperHandler
@@ -217,6 +227,15 @@ func run() error {
 
 	snapshotWorker := &workers.SnapshotWorker{Pool: pool, Log: log.With("component", "snapshot")}
 	go snapshotWorker.RunDaily(rootCtx)
+
+	// REQ-013: daily synth-score snapshot writer (powers the future sparkline).
+	scoreSnap := &workers.ScoreSnapshotWorker{Pool: pool, Log: log.With("component", "score_snapshot")}
+	go scoreSnap.RunDaily(rootCtx)
+
+	// REQ-016b: ratio coach sampler — only does work for providers with the
+	// flag flipped on. Cheap when no one's opted in.
+	ratioSampler := &workers.RatioSampler{Pool: pool, Log: log.With("component", "ratio_sampler")}
+	go ratioSampler.Run(rootCtx)
 
 	// 90-day data purge worker (GDPR / Terms of Service 90-day grace period).
 	purgeWorker := retention.NewPurgeWorker(pool, s3Client, log.With("component", "retention"))
@@ -259,6 +278,10 @@ func run() error {
 		Nag:             nag,
 		Facility:        facility,
 		UploadLink:      uploadLink,
+		Score:           scoreH,
+		Kiosk:           kioskH,
+		Attendance:      attendanceH,
+		RatioCoach:      ratioCoachH,
 		TestHelpers:     testHelpers,
 		Magic:           magic,
 		Session:         providers,

@@ -101,6 +101,10 @@ type Deps struct {
 	Nag             *handlers.NagHandler
 	Facility        *handlers.FacilityHandler   // REQ-003: 4-step onboarding wizard
 	UploadLink      *handlers.UploadLinkHandler // REQ-004: shareable staff upload link
+	Score           *handlers.ScoreHandler      // REQ-013: synthesised dashboard score
+	Kiosk           *handlers.KioskHandler      // REQ-016a: facility-scoped attendance kiosk
+	Attendance      *handlers.AttendanceHandler // REQ-016a: today + history + drill roster PDF
+	RatioCoach      *handlers.RatioCoachHandler // REQ-016b: live ratio snapshot + opt-in
 	TestHelpers     *handlers.TestHelperHandler // only mounted when non-production
 	Magic           *magiclink.Service
 	Session         mw.SessionReader
@@ -166,6 +170,16 @@ func NewRouter(d Deps) http.Handler {
 		r.Post("/webhooks/contact", d.Contact.Post)
 	}
 
+	// REQ-016a: kiosk endpoints. The session-issue endpoint is admin-only and
+	// lives under /api below; the per-event endpoints validate the kiosk
+	// session bearer themselves so a mounted iPad can sign children in
+	// without a user logged in. The PIN is the second factor.
+	if d.Kiosk != nil {
+		r.Post("/kiosk/sign-in", d.Kiosk.SignIn)
+		r.Post("/kiosk/sign-out", d.Kiosk.SignOut)
+		r.Get("/kiosk/roster", d.Kiosk.Roster)
+	}
+
 	// adminOnly is a convenience wrapper that gates a subrouter to
 	// provider_admin. Kept local so we don't sprinkle the role string at
 	// every call site.
@@ -192,6 +206,38 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/me", d.Providers.Me)
 		r.Patch("/me", d.Providers.UpdateMe)
 		r.Get("/dashboard", d.Dashboard.Get)
+
+		// REQ-013: synthesised compliance score (and history for the future
+		// sparkline). Lives off the engine + classification weights in
+		// internal/compliance/score.go.
+		if d.Score != nil {
+			r.Get("/compliance/score", d.Score.Get)
+			r.Get("/compliance/score/history", d.Score.History)
+		}
+
+		// REQ-016a: kiosk session minting (admin issues a 4h facility-bound
+		// token to a mounted iPad).
+		if d.Kiosk != nil {
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Post("/kiosk/session", d.Kiosk.IssueSession)
+				r.Post("/kiosk/pins/staff/{id}", d.Kiosk.RotateStaffPIN)
+				r.Post("/kiosk/pins/child/{id}", d.Kiosk.RotateChildPIN)
+			}))
+		}
+
+		// REQ-016a/b: attendance + ratio coach.
+		if d.Attendance != nil {
+			r.Get("/attendance/today", d.Attendance.Today)
+			r.Get("/attendance/history", d.Attendance.History)
+			r.Get("/drill-roster.pdf", d.Attendance.DrillRosterPDF)
+		}
+		if d.RatioCoach != nil {
+			r.Get("/ratios/snapshot", d.RatioCoach.Snapshot)
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Put("/settings/ratios", d.RatioCoach.UpdateSettings)
+				r.Post("/operations/water-activity", d.RatioCoach.SetWaterActivity)
+			}))
+		}
 
 		// Onboarding wizard finalize — admin-only. Flipping onboarding_complete
 		// and seeding staff/children is a tenant-wide write; gate it the same

@@ -16,6 +16,7 @@ import EmptyState from '@/components/common/EmptyState';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import TrialBanner from '@/components/common/TrialBanner';
 import ScoreHero, { ScoreHeroSkeleton } from '@/components/dashboard/ScoreHero';
+import AttendanceStrip from '@/components/dashboard/AttendanceStrip';
 import { useDashboard } from '@/hooks/useDashboard';
 import { useScore } from '@/hooks/useScore';
 import { formatDate, formatRelativeDays } from '@/lib/format';
@@ -48,6 +49,10 @@ export default function Dashboard(): JSX.Element {
           </>
         }
       />
+
+      {/* REQ-016: today's warnings + absence cards. Sit ABOVE the score hero
+          because they are the most time-sensitive surface on the page. */}
+      <AttendanceStrip />
 
       {/* REQ-013: live score hero. Loads independently of /api/dashboard so a
           slow rules eval can't block the most important glance on the page. */}

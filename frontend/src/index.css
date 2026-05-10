@@ -1,3 +1,9 @@
+/* REQ-012 / REQ-013: pull Fraunces in so the dashboard ScoreHero numeral
+   and the brand-voice serif moments (kiosk welcome, drill roster header,
+   score band copy) render with the same display face the marketing site
+   uses. Variable font, three weights — small payload. */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

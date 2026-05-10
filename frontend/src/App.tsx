@@ -29,6 +29,9 @@ import PortalStaff from '@/pages/PortalStaff';
 const DocumentTemplates = lazy(() => import('@/pages/DocumentTemplates'));
 const SignDocument = lazy(() => import('@/pages/SignDocument'));
 
+// Inspector Mode (REQ-009) — separate route tree, separate visual identity.
+const InspectorView = lazy(() => import('@/pages/inspector/InspectorView'));
+
 function RequireAuth({ children }: { children: JSX.Element }): JSX.Element {
   const { user, status } = useSession();
   const location = useLocation();
@@ -104,6 +107,20 @@ export default function App(): JSX.Element {
             element={
               <RequireAuth>
                 <OnboardingWizard />
+              </RequireAuth>
+            }
+          />
+
+          {/* Inspector Mode — authenticated, but renders OUTSIDE the operator
+              Layout so the navy palette and dropped chrome take over the
+              whole page. The DCF Licensing Counselor sees only this. */}
+          <Route
+            path="/inspector"
+            element={
+              <RequireAuth>
+                <RequireOnboarded>
+                  <InspectorView />
+                </RequireOnboarded>
               </RequireAuth>
             }
           />

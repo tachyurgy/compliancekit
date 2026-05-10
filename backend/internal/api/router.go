@@ -102,9 +102,8 @@ type Deps struct {
 	Facility        *handlers.FacilityHandler   // REQ-003: 4-step onboarding wizard
 	UploadLink      *handlers.UploadLinkHandler // REQ-004: shareable staff upload link
 	Score           *handlers.ScoreHandler      // REQ-013: synthesised dashboard score
-	Kiosk           *handlers.KioskHandler      // REQ-016a: facility-scoped attendance kiosk
-	Attendance      *handlers.AttendanceHandler // REQ-016a: today + history + drill roster PDF
-	RatioCoach      *handlers.RatioCoachHandler // REQ-016b: live ratio snapshot + opt-in
+	Kiosk           *handlers.KioskHandler      // REQ-016: facility-scoped attendance kiosk
+	Attendance      *handlers.AttendanceHandler // REQ-016: today + history + drill roster PDF
 	TestHelpers     *handlers.TestHelperHandler // only mounted when non-production
 	Magic           *magiclink.Service
 	Session         mw.SessionReader
@@ -215,28 +214,22 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/compliance/score/history", d.Score.History)
 		}
 
-		// REQ-016a: kiosk session minting (admin issues a 4h facility-bound
-		// token to a mounted iPad).
+		// REQ-016: kiosk session minting (admin issues a 4h facility-bound
+		// token to a mounted iPad) + parent/staff PIN rotation.
 		if d.Kiosk != nil {
 			r.Group(adminOnly(func(r chi.Router) {
 				r.Post("/kiosk/session", d.Kiosk.IssueSession)
 				r.Post("/kiosk/pins/staff/{id}", d.Kiosk.RotateStaffPIN)
 				r.Post("/kiosk/pins/child/{id}", d.Kiosk.RotateChildPIN)
+				r.Post("/settings/kiosk/rotate-pins", d.Kiosk.BulkRotatePINs)
 			}))
 		}
 
-		// REQ-016a/b: attendance + ratio coach.
+		// REQ-016: attendance reads + drill roster PDF.
 		if d.Attendance != nil {
 			r.Get("/attendance/today", d.Attendance.Today)
 			r.Get("/attendance/history", d.Attendance.History)
 			r.Get("/drill-roster.pdf", d.Attendance.DrillRosterPDF)
-		}
-		if d.RatioCoach != nil {
-			r.Get("/ratios/snapshot", d.RatioCoach.Snapshot)
-			r.Group(adminOnly(func(r chi.Router) {
-				r.Put("/settings/ratios", d.RatioCoach.UpdateSettings)
-				r.Post("/operations/water-activity", d.RatioCoach.SetWaterActivity)
-			}))
 		}
 
 		// Onboarding wizard finalize — admin-only. Flipping onboarding_complete

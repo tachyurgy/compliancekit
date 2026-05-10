@@ -41,7 +41,7 @@
           <td class="pad" style="padding:0 32px 8px 32px;">
             <div class="meta" style="background:#fbeee2;border-left:4px solid #c5774a;padding:14px 16px;border-radius:6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
               <div style="font-size:14px;color:#5a6a7a;margin-bottom:4px;">Card on file</div>
-              <div style="font-size:16px;color:#0c1722;font-weight:600;margin-bottom:10px;">{{.CardBrand}} ending in {{.CardLast4}}</div>
+              <div style="font-size:16px;color:#0c1722;font-weight:600;margin-bottom:10px;">{{.CardBrand}}{{if .CardLast4}} ending in {{.CardLast4}}{{end}}</div>
               <div style="font-size:14px;color:#5a6a7a;margin-bottom:4px;">Amount</div>
               <div style="font-size:16px;color:#0c1722;font-weight:600;margin-bottom:10px;">${{.AmountDue}}</div>
               <div style="font-size:14px;color:#5a6a7a;margin-bottom:4px;">Reason from your bank</div>

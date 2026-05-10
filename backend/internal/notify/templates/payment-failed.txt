@@ -2,7 +2,7 @@ Hi {{.FirstName}}, your card didn't go through.
 
 We tried to charge your Levelbrook subscription for {{.FacilityName}} and the card was declined. This usually means the card expired, the bank flagged it, or there's a typo on the billing address.
 
-Card on file:    {{.CardBrand}} ending in {{.CardLast4}}
+Card on file:    {{.CardBrand}}{{if .CardLast4}} ending in {{.CardLast4}}{{end}}
 Amount:          ${{.AmountDue}}
 Reason:          {{.DeclineReason}}
 

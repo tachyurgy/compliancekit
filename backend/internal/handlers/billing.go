@@ -298,7 +298,7 @@ func (n *PaymentFailedNotifier) OnInvoicePaymentFailed(providerID, invoiceID, cu
 	subject, html, text, err := notify.RenderPaymentFailed(notify.PaymentFailedData{
 		FirstName:        pickFirstName(fullName, name),
 		FacilityName:     name,
-		CardBrand:        "your card on file", // we don't have brand/last4 in the webhook event; the body still reads cleanly
+		CardBrand:        "Card on file", // brand/last4 aren't in the invoice.payment_failed event; the template suppresses 'ending in' when CardLast4 is empty
 		CardLast4:        "",
 		AmountDue:        notify.FormatAmount(amountDueCents),
 		DeclineReason:    declineReason,

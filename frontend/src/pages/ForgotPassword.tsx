@@ -48,8 +48,9 @@ export default function ForgotPassword(): JSX.Element {
               <Mail className="mx-auto h-10 w-10 text-brand-600" />
               <h1 className="mt-3 text-xl font-semibold text-gray-900">Check your email</h1>
               <p className="mt-2 text-sm text-gray-600">
-                If that email is on file, we just sent a reset link. The link
-                works for 30 minutes.
+                If there's a Levelbrook account for that email, you'll get a
+                reset link in a minute. The link works for 30 minutes — check
+                spam if you don't see it.
               </p>
               <Link
                 to="/login"
@@ -62,18 +63,19 @@ export default function ForgotPassword(): JSX.Element {
             <>
               <h1 className="text-xl font-semibold text-gray-900">Reset your password</h1>
               <p className="mt-1 text-sm text-gray-600">
-                Type the email you used to sign up. We'll send you a link.
+                Type the email you signed up with. We'll send you a link to
+                pick a new password.
               </p>
               <form onSubmit={onSubmit} className="mt-5 space-y-4" noValidate>
                 <Input
-                  label="Email"
+                  label="Email address"
                   type="email"
                   autoComplete="email"
                   error={errors.email?.message}
                   {...register('email')}
                 />
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? 'Sending…' : 'Send reset link'}
+                  {isSubmitting ? 'Sending…' : 'Email me a reset link'}
                 </Button>
               </form>
               <p className="mt-6 text-center text-sm text-gray-600">

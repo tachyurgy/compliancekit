@@ -1,0 +1,18 @@
+Hi! Quick note about {{.ChildFirstName}}'s immunization record.
+
+{{.FacilityName}} keeps everyone's paperwork up to date with Levelbrook. {{.ChildFirstName}}'s immunization record is coming up on its expiration date, and we'd love a fresh copy from the doctor's office.
+
+Child: {{.ChildFirstName}} {{.ChildLastName}}
+Immunization record expires: {{.ExpiresOnLong}}
+
+Upload {{.ChildFirstName}}'s record: {{.UploadURL}}
+
+A photo of the form (Florida DH 680) works great — or a PDF if your pediatrician sent one. The link is just for you, and you can open it on your phone.
+
+Already have a fresh copy? Just reply and let us know.
+
+--
+Levelbrook · Compliance for Florida child care
+levelbrookteam@gmail.com
+
+You're receiving this because {{.ChildFirstName}} is enrolled at {{.FacilityName}}.

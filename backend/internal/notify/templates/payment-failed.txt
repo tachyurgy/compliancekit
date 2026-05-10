@@ -1,0 +1,19 @@
+Hi {{.FirstName}}, your card didn't go through.
+
+We tried to charge your Levelbrook subscription for {{.FacilityName}} and the card was declined. This usually means the card expired, the bank flagged it, or there's a typo on the billing address.
+
+Card on file:    {{.CardBrand}} ending in {{.CardLast4}}
+Amount:          ${{.AmountDue}}
+Reason:          {{.DeclineReason}}
+
+Update payment method: {{.UpdatePaymentURL}}
+
+We'll try again automatically over the next few days. If we can't reach a working card by {{.RetryDeadline}}, your account will pause and reminders to staff and parents will stop going out.
+
+Stuck? Reply here and we'll sort it out with you.
+
+--
+Levelbrook · Compliance for Florida child care
+levelbrookteam@gmail.com
+
+You're receiving this because you manage billing for {{.FacilityName}}.

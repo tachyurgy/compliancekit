@@ -1,0 +1,18 @@
+Hi {{.FirstName}}, your {{.DocumentTitle}} is expiring soon.
+
+{{.FacilityName}} uses Levelbrook to keep staff files current. Could you upload a fresh copy when you have a minute?
+
+Document: {{.DocumentTitle}}
+Expires:  {{.ExpiresOnLong}}
+
+Upload a new copy: {{.UploadURL}}
+
+The link is private to you and works on your phone. Snap a photo of the certificate or upload a PDF — either is fine.
+
+Already renewed? Just reply and let your director know.
+
+--
+Levelbrook · Compliance for Florida child care
+levelbrookteam@gmail.com
+
+You're receiving this because you're a staff member at {{.FacilityName}}.

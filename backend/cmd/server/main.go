@@ -165,6 +165,12 @@ func run() error {
 		Pool: pool, Emailer: emailer, AppBase: cfg.AppBaseURL,
 		Log: log.With("component", "checkout_notifier"),
 	})
+	// REQ-022 wiring: send the branded payment-failed email after Stripe's
+	// invoice.payment_failed webhook lands.
+	bill.SetPaymentFailedNotifier(&handlers.PaymentFailedNotifier{
+		Pool: pool, Emailer: emailer, AppBase: cfg.AppBaseURL,
+		Log: log.With("component", "payment_failed_notifier"),
+	})
 	drills := &handlers.DrillHandler{Pool: pool, Log: log.With("component", "drills")}
 	postings := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
 	ratio := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}
@@ -217,6 +223,13 @@ func run() error {
 
 	snapshotWorker := &workers.SnapshotWorker{Pool: pool, Log: log.With("component", "snapshot")}
 	go snapshotWorker.RunDaily(rootCtx)
+
+	// REQ-022 trial-ending-3-days reminder.
+	trialReminder := &workers.TrialReminderWorker{
+		Pool: pool, Emailer: emailer, AppBase: cfg.AppBaseURL,
+		Log: log.With("component", "trial_reminder"),
+	}
+	go trialReminder.RunDaily(rootCtx)
 
 	// 90-day data purge worker (GDPR / Terms of Service 90-day grace period).
 	purgeWorker := retention.NewPurgeWorker(pool, s3Client, log.With("component", "retention"))

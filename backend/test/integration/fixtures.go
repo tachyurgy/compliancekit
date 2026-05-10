@@ -131,6 +131,17 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 	facility := &handlers.FacilityHandler{Pool: pool, Log: log.With("component", "facility")}
 	uploadLink := &handlers.UploadLinkHandler{Pool: pool, Magic: magic, FrontendBase: "http://localhost:5173"}
 
+	// REQ-011 / REQ-034: AuthHandler powers /api/auth/forgot-password,
+	// /api/auth/reset-password, /api/auth/sessions, /api/auth/signout-everywhere.
+	// Emailer is nil in tests; the handler skips the email-send branch and
+	// still creates the password_resets row, which is what we assert on.
+	authH := &handlers.AuthHandler{
+		Pool: pool, Emailer: nil,
+		FrontendBase: "http://localhost:5173",
+		CookieDomain: "localhost", SecureCookie: false,
+		Log: log.With("component", "auth"),
+	}
+
 	router := api.NewRouter(api.Deps{
 		Logger:          log,
 		Providers:       providers,
@@ -150,6 +161,7 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 		DataExport:      dataExportH,
 		Facility:        facility,
 		UploadLink:      uploadLink,
+		Auth:            authH,
 		Magic:           magic,
 		Session:         providers,
 		RoleLookup:      mw.PoolRoleLookup{DB: pool},

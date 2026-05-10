@@ -32,6 +32,19 @@ func TestHealthz(t *testing.T) {
 //     password — this endpoint must NOT leak account existence.
 const testSignupPassword = "QABot-Strong-12345" // ≥12 chars
 
+// validSignupBody returns the JSON body shape /api/auth/signup expects when
+// you want a successful signup. Centralizes the field names + password so
+// downstream tests (password_reset_test.go, etc.) don't drift if either the
+// API contract or the password length floor changes.
+func validSignupBody(name, email, stateCode string) map[string]string {
+	return map[string]string{
+		"name":        name,
+		"owner_email": email,
+		"state_code":  stateCode,
+		"password":    testSignupPassword,
+	}
+}
+
 // TestSignup_HappyPath_CA covers the most basic real signup: CA provider,
 // valid shape, server returns 200 + ck_sess cookie and writes a providers row.
 func TestSignup_HappyPath_CA(t *testing.T) {
@@ -279,6 +292,12 @@ func TestUnsupportedStateDashboard_SkippedInMVP(t *testing.T) {
 // --- helpers ---
 
 func doJSON(t *testing.T, method, url string, body any) *http.Response {
+	return doJSONWith(t, http.DefaultClient, method, url, body)
+}
+
+// doJSONWith is the cookie-aware variant — pass a *http.Client with a
+// CookieJar to keep the session across requests in a multi-step test.
+func doJSONWith(t *testing.T, client *http.Client, method, url string, body any) *http.Response {
 	t.Helper()
 	b, err := json.Marshal(body)
 	if err != nil {
@@ -289,7 +308,7 @@ func doJSON(t *testing.T, method, url string, body any) *http.Response {
 		t.Fatalf("new request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, url, err)
 	}

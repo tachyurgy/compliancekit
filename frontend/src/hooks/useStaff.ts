@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { staffApi, type Staff } from '@/api/staff';
+import { staffApi, type CreateStaffInput } from '@/api/staff';
 
-export function useStaffList() {
+export function useStaffList(filter?: { status?: 'passing' | 'missing' | 'expired' }) {
   return useQuery({
-    queryKey: ['staff'],
-    queryFn: () => staffApi.list(),
+    queryKey: ['staff', filter ?? null],
+    queryFn: () => staffApi.list(filter),
   });
 }
 
@@ -19,7 +19,7 @@ export function useStaffMember(id: string | undefined) {
 export function useCreateStaff() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Partial<Staff>) => staffApi.create(input),
+    mutationFn: (input: CreateStaffInput) => staffApi.create(input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['staff'] });
       void qc.invalidateQueries({ queryKey: ['dashboard'] });
@@ -30,7 +30,7 @@ export function useCreateStaff() {
 export function useUpdateStaff(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Partial<Staff>) => staffApi.update(id, input),
+    mutationFn: (input: Partial<CreateStaffInput>) => staffApi.update(id, input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['staff'] });
       void qc.invalidateQueries({ queryKey: ['staff', id] });
@@ -38,13 +38,24 @@ export function useUpdateStaff(id: string) {
   });
 }
 
-export function useDeleteStaff() {
+export function useArchiveStaff() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => staffApi.remove(id),
+    mutationFn: (id: string) => staffApi.archive(id),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['staff'] });
       void qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+export function useSendReminder(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { reason?: 'missing' | 'manual'; doc_kind?: string; note?: string }) =>
+      staffApi.sendReminder(id, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['staff', id] });
     },
   });
 }

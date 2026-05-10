@@ -39,6 +39,12 @@ package api
 //   PATCH /api/inspections/{id}/items/{item_id}  inspections.UpsertResponse
 //   POST  /api/inspections/{id}/finalize inspections.Finalize
 //   GET   /api/inspections/{id}/report.pdf inspections.Report
+//   GET   /api/inspection/snapshot                              inspectionMode.Snapshot
+//   POST  /api/inspection/sessions                              inspectionMode.StartSession
+//   POST  /api/inspection/sessions/{id}/sample                  inspectionMode.Sample
+//   POST  /api/inspection/sessions/{id}/finding                 inspectionMode.AddFinding
+//   POST  /api/inspection/sessions/{id}/end                     inspectionMode.EndSession
+//   GET   /api/inspection/sessions/{id}/plan-of-correction.pdf  inspectionMode.DownloadPlan
 //   POST  /api/sign/request             pdfsign.RequestSignature (external pkg)
 //   GET   /api/sign/status/{id}         pdfsign.Status           (external pkg)
 //
@@ -85,6 +91,7 @@ type Deps struct {
 	Postings        *handlers.PostingHandler
 	Ratio           *handlers.RatioHandler
 	Inspections     *handlers.InspectionHandler
+	InspectionMode  *handlers.InspectionModeHandler
 	AuditLog        *handlers.AuditLogHandler
 	DataExport      *handlers.DataExportHandler
 	Contact         *handlers.ContactHandler
@@ -300,6 +307,23 @@ func NewRouter(d Deps) http.Handler {
 					r.Post("/", d.Inspections.Start)
 					r.Patch("/{id}/items/{item_id}", d.Inspections.UpsertResponse)
 					r.Post("/{id}/finalize", d.Inspections.Finalize)
+				}))
+			})
+		}
+
+		// Inspector Mode (REQ-009) — singular path so it doesn't collide with
+		// the simulator's /inspections/* surface above. The snapshot endpoint
+		// is the read-model that powers all 7 tabs in one round-trip; the
+		// session endpoints capture the live event log + Plan of Correction.
+		if d.InspectionMode != nil {
+			r.Route("/inspection", func(r chi.Router) {
+				r.Get("/snapshot", d.InspectionMode.Snapshot)
+				r.Group(adminOnly(func(r chi.Router) {
+					r.Post("/sessions", d.InspectionMode.StartSession)
+					r.Post("/sessions/{id}/sample", d.InspectionMode.Sample)
+					r.Post("/sessions/{id}/finding", d.InspectionMode.AddFinding)
+					r.Post("/sessions/{id}/end", d.InspectionMode.EndSession)
+					r.Get("/sessions/{id}/plan-of-correction.pdf", d.InspectionMode.DownloadPlan)
 				}))
 			})
 		}

@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   FlaskConical,
   ScrollText,
+  Scale,
 } from 'lucide-react';
 
 import { useSession } from '@/hooks/useSession';
@@ -97,9 +98,20 @@ export default function Layout(): JSX.Element {
                 </NavLink>
               ))}
             </nav>
-            <div className="p-3 border-t border-gray-100">
+            <div className="p-3 border-t border-gray-100 space-y-2">
+              {/* Inspector Mode (REQ-009): one tap from anywhere in the
+                  operator UI. Persistent — the owner wants this to be the
+                  single most visible button on the screen. */}
+              <Link
+                to="/inspector"
+                onClick={() => setMobileOpen(false)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800"
+              >
+                <Scale className="h-4 w-4" />
+                <span>Open Inspector View</span>
+              </Link>
               {user && (
-                <div className="px-3 pb-3">
+                <div className="px-3 pb-1 pt-2 border-t border-gray-100">
                   <p className="text-xs text-gray-500">Signed in as</p>
                   <p className="text-sm font-medium text-gray-800 truncate">
                     {user.fullName ?? user.email}

@@ -36,6 +36,17 @@ const config: Config = {
           muted: '#f9fafb',
           sunken: '#f3f4f6',
         },
+        // Inspector Mode palette — deep navy + warm parchment.
+        // Used only by the /inspector/* routes; never on the operator UI.
+        inspector: {
+          ink: '#0d1f3c',         // primary navy: headers, tab labels, body text
+          'ink-soft': '#1f2c4f',  // hover / subtle accents
+          accent: '#c9a960',      // warm gold for icon highlights and rule lines
+          paper: '#f7f5f1',       // page background (warmer than #fff)
+          card: '#ffffff',        // content cards on top of the paper
+          rule: '#e1ddd5',        // dividers / rules (parchment grey)
+          muted: '#5a6478',       // secondary copy (license #, dates)
+        },
       },
       fontFamily: {
         sans: [

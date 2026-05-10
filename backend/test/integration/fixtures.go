@@ -115,6 +115,7 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 	postingsH := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
 	ratioH := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}
 	inspectionsH := &handlers.InspectionHandler{Pool: pool, Log: log.With("component", "inspections")}
+	inspectionModeH := &handlers.InspectionModeHandler{Pool: pool, Log: log.With("component", "inspector_mode")}
 	auditLogH := &handlers.AuditLogHandler{Pool: pool, Log: log.With("component", "audit_log")}
 
 	var dataExportH *handlers.DataExportHandler
@@ -144,6 +145,7 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 		Postings:        postingsH,
 		Ratio:           ratioH,
 		Inspections:     inspectionsH,
+		InspectionMode:  inspectionModeH,
 		AuditLog:        auditLogH,
 		DataExport:      dataExportH,
 		Facility:        facility,

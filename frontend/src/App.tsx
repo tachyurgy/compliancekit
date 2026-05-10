@@ -28,6 +28,9 @@ import Settings from '@/pages/Settings';
 import SettingsBilling from '@/pages/SettingsBilling';
 import SettingsAuditLog from '@/pages/SettingsAuditLog';
 import SettingsSecurity from '@/pages/SettingsSecurity';
+import SettingsKiosk from '@/pages/SettingsKiosk';
+import Kiosk from '@/pages/Kiosk';
+import DrillRoster from '@/pages/DrillRoster';
 import PortalParent from '@/pages/PortalParent';
 import PortalStaff from '@/pages/PortalStaff';
 import PortalUpload from '@/pages/PortalUpload';
@@ -102,6 +105,13 @@ export default function App(): JSX.Element {
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
+
+          {/* REQ-016: kiosk + drill-roster. Both render outside the operator
+              Layout — kiosk is facility-scoped (the iPad pairs with a 4h
+              session token in localStorage), and the drill-roster view is a
+              full-bleed glanceable page used during an evacuation. */}
+          <Route path="/kiosk" element={<Kiosk />} />
+          <Route path="/drill-roster" element={<DrillRoster />} />
 
           {/* Public token-gated portals (parents / staff). No account required. */}
           {/* /u/:token is the unified Levelbrook upload portal (REQ-005/006/008). */}
@@ -189,6 +199,7 @@ export default function App(): JSX.Element {
             <Route path="/settings/billing" element={<SettingsBilling />} />
             <Route path="/settings/audit-log" element={<SettingsAuditLog />} />
             <Route path="/settings/security" element={<SettingsSecurity />} />
+            <Route path="/settings/kiosk" element={<SettingsKiosk />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -193,6 +193,14 @@ func run() error {
 		Pool: pool, Magic: magic, FrontendBase: cfg.FrontendBaseURL,
 	}
 
+	// REQ-013: synthesised dashboard score handler.
+	scoreH := &handlers.ScoreHandler{Pool: pool, Log: log.With("component", "score")}
+
+	// REQ-016: kiosk + attendance + drill roster (no rooms; warnings come from
+	// pure compliance/ratio.go computation, not a stateful coach).
+	kioskH := &handlers.KioskHandler{Pool: pool, Log: log.With("component", "kiosk")}
+	attendanceH := &handlers.AttendanceHandler{Pool: pool, Log: log.With("component", "attendance")}
+
 	// Test helpers — only instantiate in non-production so they can never be
 	// mounted against a real prod DB. See handlers/testhelpers.go.
 	var testHelpers *handlers.TestHelperHandler
@@ -223,6 +231,10 @@ func run() error {
 
 	snapshotWorker := &workers.SnapshotWorker{Pool: pool, Log: log.With("component", "snapshot")}
 	go snapshotWorker.RunDaily(rootCtx)
+
+	// REQ-013: daily synth-score snapshot writer (powers the future sparkline).
+	scoreSnap := &workers.ScoreSnapshotWorker{Pool: pool, Log: log.With("component", "score_snapshot")}
+	go scoreSnap.RunDaily(rootCtx)
 
 	// REQ-022 trial-ending-3-days reminder.
 	trialReminder := &workers.TrialReminderWorker{
@@ -272,6 +284,9 @@ func run() error {
 		Nag:             nag,
 		Facility:        facility,
 		UploadLink:      uploadLink,
+		Score:           scoreH,
+		Kiosk:           kioskH,
+		Attendance:      attendanceH,
 		TestHelpers:     testHelpers,
 		Magic:           magic,
 		Session:         providers,

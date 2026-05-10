@@ -55,7 +55,7 @@ export default function Layout(): JSX.Element {
       <div className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 bg-white border-b border-gray-100">
         <Link to="/dashboard" className="flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-brand-600" />
-          <span className="font-semibold">ComplianceKit</span>
+          <span className="font-semibold">Levelbrook</span>
         </Link>
         <button
           type="button"
@@ -77,7 +77,7 @@ export default function Layout(): JSX.Element {
           <div className="h-full flex flex-col">
             <div className="hidden lg:flex items-center gap-2 px-5 h-16 border-b border-gray-100">
               <ShieldCheck className="h-6 w-6 text-brand-600" />
-              <span className="font-semibold text-gray-900">ComplianceKit</span>
+              <span className="font-semibold text-gray-900">Levelbrook</span>
             </div>
             <nav className="flex-1 p-3 space-y-1">
               {NAV_ITEMS.map((item) => (

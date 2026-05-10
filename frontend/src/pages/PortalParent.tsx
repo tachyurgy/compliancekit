@@ -159,7 +159,7 @@ function PortalShell({ children }: { children: React.ReactNode }): JSX.Element {
       <header className="bg-white border-b border-gray-100">
         <div className="max-w-xl mx-auto px-4 h-14 flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-brand-600" />
-          <span className="font-semibold">ComplianceKit</span>
+          <span className="font-semibold">Levelbrook</span>
         </div>
       </header>
       <main className="max-w-xl mx-auto px-4 py-6">{children}</main>

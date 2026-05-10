@@ -244,6 +244,83 @@ func (n *CheckoutNotifier) OnCheckoutCompleted(providerID, sessionID string) {
 	logger.Info("welcome: sent", "provider_id", providerID, "to", email)
 }
 
+// PaymentFailedNotifier implements billing.PaymentFailedNotifier. It renders
+// and sends the REQ-022 branded payment-failed email after Stripe's
+// invoice.payment_failed webhook lands. Wired via Service.SetPaymentFailedNotifier
+// in main.go.
+type PaymentFailedNotifier struct {
+	Pool    *sql.DB
+	Emailer *notify.Emailer
+	AppBase string
+	Log     *slog.Logger
+}
+
+func (n *PaymentFailedNotifier) OnInvoicePaymentFailed(providerID, invoiceID, customerID string, amountDueCents int64, declineReason string) {
+	if n == nil || n.Pool == nil {
+		return
+	}
+	logger := n.Log
+	if logger == nil {
+		logger = slog.Default()
+	}
+	if n.Emailer == nil {
+		logger.Info("payment-failed: emailer not configured; skipping send", "provider_id", providerID)
+		return
+	}
+
+	var email, name, fullName string
+	if err := n.Pool.QueryRow(`
+		SELECT COALESCE(p.owner_email,''),
+		       COALESCE(p.name, p.legal_name, ''),
+		       COALESCE((SELECT u.full_name FROM users u
+		                  WHERE u.provider_id = p.id AND u.role = 'provider_admin'
+		                    AND u.deleted_at IS NULL
+		                  ORDER BY u.created_at ASC LIMIT 1), '')
+		  FROM providers p WHERE p.id = ?`, providerID).Scan(&email, &name, &fullName); err != nil {
+		logger.Warn("payment-failed: lookup provider", "provider_id", providerID, "err", err)
+		return
+	}
+	if email == "" {
+		logger.Warn("payment-failed: provider has no owner_email", "provider_id", providerID)
+		return
+	}
+
+	if declineReason == "" {
+		declineReason = notify.DefaultDeclineReason
+	}
+
+	// Retry deadline = now + 7 days, matching the past-due grace window in
+	// Service.HasActiveSubscription. Stripe's smart retries actually run on
+	// a different cadence; the email's purpose is to give the operator a
+	// concrete date by which they need to act, not to mirror Stripe exactly.
+	retryDeadline := time.Now().UTC().Add(7 * 24 * time.Hour).Format("Jan 2, 2006")
+
+	subject, html, text, err := notify.RenderPaymentFailed(notify.PaymentFailedData{
+		FirstName:        pickFirstName(fullName, name),
+		FacilityName:     name,
+		CardBrand:        "your card on file", // we don't have brand/last4 in the webhook event; the body still reads cleanly
+		CardLast4:        "",
+		AmountDue:        notify.FormatAmount(amountDueCents),
+		DeclineReason:    declineReason,
+		RetryDeadline:    retryDeadline,
+		UpdatePaymentURL: strings.TrimRight(n.AppBase, "/") + "/settings/billing",
+	})
+	if err != nil {
+		logger.Warn("payment-failed: render", "err", err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := n.Emailer.Send(ctx, notify.EmailMessage{
+		To: email, Subject: subject, HTMLBody: html, PlainBody: text,
+		ReferenceID: "payment-failed:" + invoiceID,
+	}); err != nil {
+		logger.Warn("payment-failed: send", "provider_id", providerID, "err", err)
+		return
+	}
+	logger.Info("payment-failed: sent", "provider_id", providerID, "to", email, "invoice", invoiceID)
+}
+
 func pickFirstName(fullName, fallback string) string {
 	if s := strings.TrimSpace(fullName); s != "" {
 		return s

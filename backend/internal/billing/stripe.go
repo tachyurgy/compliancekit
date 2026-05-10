@@ -29,15 +29,30 @@ type PostCheckoutNotifier interface {
 	OnCheckoutCompleted(providerID, sessionID string)
 }
 
+// PaymentFailedNotifier is the REQ-022 contract for sending the branded
+// payment-failed email after Stripe's `invoice.payment_failed` webhook.
+// Kept as a sibling interface (not an extension of PostCheckoutNotifier)
+// because the two side-effects have different lifetimes — welcome runs
+// once per signup, payment-failed can fire repeatedly for the same
+// provider — and tests stub them independently.
+//
+// amountDueCents is the Stripe `amount_due` value (cents). declineReason
+// is human-readable text — the handler is responsible for falling back
+// to a safe default if Stripe gave us nothing usable.
+type PaymentFailedNotifier interface {
+	OnInvoicePaymentFailed(providerID, invoiceID, customerID string, amountDueCents int64, declineReason string)
+}
+
 type Service struct {
-	pool            *sql.DB
-	secretKey       string
-	webhookSecret   string
-	frontendBaseURL string
-	priceMonthly    string
-	priceAnnual     string
-	notifier        PostCheckoutNotifier
-	log             *slog.Logger
+	pool                  *sql.DB
+	secretKey             string
+	webhookSecret         string
+	frontendBaseURL       string
+	priceMonthly          string
+	priceAnnual           string
+	notifier              PostCheckoutNotifier
+	paymentFailedNotifier PaymentFailedNotifier
+	log                   *slog.Logger
 }
 
 type Config struct {
@@ -72,6 +87,10 @@ func New(cfg Config) *Service {
 // SetNotifier wires a post-checkout side-effect handler. Optional — webhook
 // handling proceeds with or without it.
 func (s *Service) SetNotifier(n PostCheckoutNotifier) { s.notifier = n }
+
+// SetPaymentFailedNotifier wires the REQ-022 payment-failed email handler.
+// Optional — webhook handling proceeds with or without it.
+func (s *Service) SetPaymentFailedNotifier(n PaymentFailedNotifier) { s.paymentFailedNotifier = n }
 
 // PriceIDFor returns the configured Stripe price ID for the REQ-002 plan
 // codes. Returns empty string for unknown codes; the caller falls back.
@@ -278,10 +297,25 @@ func (s *Service) HandleWebhook(r *http.Request) error {
 		}
 		// Mark the provider's subscription_status to past_due; the dashboard
 		// banner reads this column.
+		var providerID string
 		if inv.Customer != nil {
 			_, _ = s.pool.ExecContext(ctx,
 				`UPDATE providers SET subscription_status = 'past_due', updated_at = CURRENT_TIMESTAMP
 				 WHERE stripe_customer_id = ?`, inv.Customer.ID)
+			_ = s.pool.QueryRowContext(ctx, `SELECT id FROM providers WHERE stripe_customer_id = ?`, inv.Customer.ID).Scan(&providerID)
+		}
+		// REQ-022: fire the branded payment-failed email. Async so we ack
+		// Stripe fast — Stripe expects 2xx within ~30s.
+		if s.paymentFailedNotifier != nil && providerID != "" {
+			declineReason := ""
+			if inv.LastFinalizationError != nil {
+				declineReason = inv.LastFinalizationError.Msg
+			}
+			customerID := ""
+			if inv.Customer != nil {
+				customerID = inv.Customer.ID
+			}
+			go s.paymentFailedNotifier.OnInvoicePaymentFailed(providerID, inv.ID, customerID, inv.AmountDue, declineReason)
 		}
 
 	default:

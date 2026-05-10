@@ -132,6 +132,7 @@ func run() error {
 	postings := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
 	ratio := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}
 	inspections := &handlers.InspectionHandler{Pool: pool, Log: log.With("component", "inspections")}
+	inspectionMode := &handlers.InspectionModeHandler{Pool: pool, Log: log.With("component", "inspector_mode")}
 	auditLog := &handlers.AuditLogHandler{Pool: pool, Log: log.With("component", "audit_log")}
 	dataExport := &handlers.DataExportHandler{
 		Pool: pool, Storage: s3Client, Emailer: emailer,
@@ -207,6 +208,7 @@ func run() error {
 		Postings:        postings,
 		Ratio:           ratio,
 		Inspections:     inspections,
+		InspectionMode:  inspectionMode,
 		AuditLog:        auditLog,
 		DataExport:      dataExport,
 		Contact:         contact,

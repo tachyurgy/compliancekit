@@ -89,6 +89,8 @@ type Deps struct {
 	DataExport      *handlers.DataExportHandler
 	Contact         *handlers.ContactHandler
 	Nag             *handlers.NagHandler
+	Facility        *handlers.FacilityHandler   // REQ-003: 4-step onboarding wizard
+	UploadLink      *handlers.UploadLinkHandler // REQ-004: shareable staff upload link
 	TestHelpers     *handlers.TestHelperHandler // only mounted when non-production
 	Magic           *magiclink.Service
 	Session         mw.SessionReader
@@ -196,23 +198,48 @@ func NewRouter(d Deps) http.Handler {
 		})
 
 		// Staff: reads are open to both roles; writes are admin-only.
+		// REQ-004 swaps Staff.List → ListWithRollup and Staff.Get → GetDetail
+		// to surface the status-pill rollup and required-doc checklist.
 		r.Route("/staff", func(r chi.Router) {
-			r.Get("/", d.Staff.List)
-			r.Get("/{id}", d.Staff.Get)
+			r.Get("/", d.Staff.ListWithRollup)
+			r.Get("/{id}", d.Staff.GetDetail)
 			r.Get("/{id}/documents", d.Staff.ListDocuments)
 			if d.Nag != nil {
 				r.Get("/{id}/nag-history", d.Nag.History)
+			}
+			if d.UploadLink != nil {
+				r.Get("/{id}/upload-link", d.UploadLink.Get)
 			}
 			r.Group(adminOnly(func(r chi.Router) {
 				r.Post("/", d.Staff.Create)
 				r.Patch("/{id}", d.Staff.Update)
 				r.Delete("/{id}", d.Staff.Delete)
+				r.Post("/{id}/archive", d.Staff.Archive)
 				r.Post("/{id}/portal-link", d.Providers.MintStaffPortalLink)
 				if d.Nag != nil {
 					r.Post("/{id}/nag", d.Nag.Trigger)
 				}
 			}))
 		})
+
+		// Facility (REQ-003 onboarding wizard). GET is open to both roles
+		// so the dashboard can read; PATCH and the rooms write paths are
+		// admin-only.
+		if d.Facility != nil {
+			r.Get("/facility", d.Facility.Get)
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Patch("/facility", d.Facility.Patch)
+				r.Post("/facility/complete-onboarding", d.Facility.CompleteOnboarding)
+			}))
+			r.Route("/rooms", func(r chi.Router) {
+				r.Get("/", d.Facility.ListRooms)
+				r.Group(adminOnly(func(r chi.Router) {
+					r.Post("/", d.Facility.CreateRoom)
+					r.Patch("/{id}", d.Facility.PatchRoom)
+					r.Delete("/{id}", d.Facility.DeleteRoom)
+				}))
+			})
+		}
 
 		// Documents: list/get are open; presign/finalize/delete are admin-only.
 		r.Route("/documents", func(r chi.Router) {

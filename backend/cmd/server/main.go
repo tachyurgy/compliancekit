@@ -144,6 +144,10 @@ func run() error {
 		FrontendBase: cfg.FrontendBaseURL,
 		Log:          log.With("component", "nag"),
 	}
+	facility := &handlers.FacilityHandler{Pool: pool, Log: log.With("component", "facility")}
+	uploadLink := &handlers.UploadLinkHandler{
+		Pool: pool, Magic: magic, FrontendBase: cfg.FrontendBaseURL,
+	}
 
 	// Test helpers — only instantiate in non-production so they can never be
 	// mounted against a real prod DB. See handlers/testhelpers.go.
@@ -211,6 +215,8 @@ func run() error {
 		DataExport:      dataExport,
 		Contact:         contact,
 		Nag:             nag,
+		Facility:        facility,
+		UploadLink:      uploadLink,
 		TestHelpers:     testHelpers,
 		Magic:           magic,
 		Session:         providers,

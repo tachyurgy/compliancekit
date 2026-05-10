@@ -96,7 +96,7 @@ type Deps struct {
 	DataExport      *handlers.DataExportHandler
 	Contact         *handlers.ContactHandler
 	Nag             *handlers.NagHandler
-	Facility        *handlers.FacilityHandler // REQ-003: 4-step onboarding wizard
+	Facility        *handlers.FacilityHandler   // REQ-003: 4-step onboarding wizard
 	UploadLink      *handlers.UploadLinkHandler // REQ-004: shareable staff upload link
 	TestHelpers     *handlers.TestHelperHandler // only mounted when non-production
 	Magic           *magiclink.Service
@@ -235,9 +235,10 @@ func NewRouter(d Deps) http.Handler {
 			}))
 		})
 
-		// Facility (REQ-003 onboarding wizard). GET is open to both roles
-		// so the dashboard can read; PATCH and the rooms write paths are
-		// admin-only.
+		// REQ-003 (onboarding wizard): facility GET is open to both roles so
+		// the dashboard can read; PATCH and complete-onboarding are admin-only.
+		// Rooms CRUD lives at /api/rooms within the same `if d.Facility != nil`
+		// guard.
 		if d.Facility != nil {
 			r.Get("/facility", d.Facility.Get)
 			r.Group(adminOnly(func(r chi.Router) {
@@ -283,8 +284,19 @@ func NewRouter(d Deps) http.Handler {
 				}))
 			})
 		}
-		if d.Postings != nil || d.Ratio != nil {
+		// /api/facility — onboarding wizard read/write (REQ-003) shares
+		// the prefix with the existing postings + ratio handlers. Mount
+		// them all in one Route block so chi's pattern matching doesn't
+		// conflict.
+		if d.Postings != nil || d.Ratio != nil || d.Facility != nil {
 			r.Route("/facility", func(r chi.Router) {
+				if d.Facility != nil {
+					r.Get("/", d.Facility.Get)
+					r.Group(adminOnly(func(r chi.Router) {
+						r.Patch("/", d.Facility.Patch)
+						r.Post("/complete-onboarding", d.Facility.CompleteOnboarding)
+					}))
+				}
 				if d.Postings != nil {
 					r.Get("/postings", d.Postings.List)
 					r.Group(adminOnly(func(r chi.Router) {

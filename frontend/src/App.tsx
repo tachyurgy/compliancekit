@@ -9,6 +9,7 @@ import Landing from '@/pages/Landing';
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
 import OnboardingWizard from '@/pages/onboarding/OnboardingWizard';
+import FacilityWizard from '@/pages/onboarding/FacilityWizard';
 import Dashboard from '@/pages/Dashboard';
 import Children from '@/pages/Children';
 import ChildDetail from '@/pages/ChildDetail';
@@ -105,7 +106,17 @@ export default function App(): JSX.Element {
           {/* Public signing flow (token-gated). */}
           <Route path="/sign/:token" element={<SignDocument />} />
 
-          {/* Onboarding — requires auth but NOT onboarded. */}
+          {/* REQ-003 FL onboarding wizard (4-step). New flow at
+              /onboarding/facility; legacy /onboarding/* still works for
+              non-FL accounts until we've migrated them. */}
+          <Route
+            path="/onboarding/facility"
+            element={
+              <RequireAuth>
+                <FacilityWizard />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/onboarding/*"
             element={

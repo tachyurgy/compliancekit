@@ -165,24 +165,22 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Send the email if we have an emailer wired. Failure here is logged
-		// but doesn't change the response (no email-existence leak).
+		// but doesn't change the response (no email-existence leak). REQ-034:
+		// the template lives at internal/notify/templates/password-reset.html
+		// (mirrored from active/product/email-templates/password-reset.html);
+		// FirstName escaping is handled by html/template, so we no longer
+		// need the htmlSafe() pre-encode.
 		if h.Emailer != nil {
 			resetURL := fmt.Sprintf("%s/reset-password/%s", strings.TrimRight(h.FrontendBase, "/"), token)
-			subject := "Reset your Levelbrook password"
-			html := fmt.Sprintf(`<!doctype html><html><body style="font-family:system-ui,sans-serif;color:#0c1722;background:#f3f1ec;padding:24px">
-<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:14px;padding:32px">
-  <h1 style="font-size:22px;margin:0 0 12px">Reset your Levelbrook password</h1>
-  <p>Hi %s,</p>
-  <p>Click the button below to set a new password. This link expires in 30 minutes.</p>
-  <p style="margin:24px 0">
-    <a href="%s" style="background:#caa257;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600">Reset password</a>
-  </p>
-  <p style="color:#5a6a7a;font-size:14px">If you didn't ask for this, ignore this email — your password won't change.</p>
-</div>
-</body></html>`, htmlSafe(fullName), resetURL)
-			text := fmt.Sprintf("Hi %s,\n\nReset your Levelbrook password: %s\n\nThis link expires in 30 minutes. If you didn't ask for this, ignore this email.\n", fullName, resetURL)
-			if err := h.Emailer.Send(r.Context(), notify.EmailMessage{
-				To: email, Subject: subject, HTMLBody: html, PlainBody: text,
+			subject, htmlBody, textBody, rerr := notify.RenderPasswordReset(notify.PasswordResetData{
+				FirstName: fullName,
+				ResetURL:  resetURL,
+				// ExpiresInMinutes left zero → defaults to PasswordResetExpiryMinutes (30).
+			})
+			if rerr != nil {
+				h.Log.Warn("forgot-password: render", "err", rerr, "email", email)
+			} else if err := h.Emailer.Send(r.Context(), notify.EmailMessage{
+				To: email, Subject: subject, HTMLBody: htmlBody, PlainBody: textBody,
 				ReferenceID: "password_reset",
 			}); err != nil {
 				h.Log.Warn("forgot-password: email send", "err", err, "email", email)
@@ -408,9 +406,4 @@ func newResetToken() (string, error) {
 func sha256Hex(in string) string {
 	h := sha256.Sum256([]byte(in))
 	return hex.EncodeToString(h[:])
-}
-
-func htmlSafe(s string) string {
-	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;", "'", "&#39;")
-	return r.Replace(s)
 }

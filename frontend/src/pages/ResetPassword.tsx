@@ -21,9 +21,11 @@ import { useSession } from '@/hooks/useSession';
  * Brand-voice copy lives in REQ-034:
  *   - "Pick at least 12 characters." (verbatim, matches the backend message).
  *   - "These don't match — please retype." for confirm-mismatch.
- *   - 401 from the API → the link is invalid or expired; show the dedicated
- *     "This link doesn't work anymore" panel with a Send a new link CTA
- *     pointing back at /forgot-password.
+ *   - 400/401 with a "This reset link …" message from the API → the link is
+ *     invalid, expired, or already used; show the dedicated "This link doesn't
+ *     work anymore" panel with a Send a new link CTA pointing back at
+ *     /forgot-password. (The handler currently 400s on token problems; we
+ *     also accept 401 in case it tightens later.)
  */
 const FormSchema = z
   .object({
@@ -73,18 +75,25 @@ export default function ResetPassword(): JSX.Element {
         replace: true,
       });
     } catch (err) {
-      // 401 from /api/auth/reset-password means the token is bad / expired /
-      // already used. Swap the form for the dedicated "link doesn't work"
-      // panel so the user has a single clear next action.
-      if (err instanceof ApiError && err.status === 401) {
-        setLinkDead(true);
+      // Token-related failures from /api/auth/reset-password mean the link is
+      // bad / expired / already used. Swap the form for the dedicated
+      // "link doesn't work" panel so the user has a single clear next action.
+      // The current backend returns 400 with a "This reset link …" message;
+      // we also accept 401 in case the contract tightens.
+      if (err instanceof ApiError) {
+        const tokenIssue =
+          err.status === 401 ||
+          (err.status === 400 && /reset link/i.test(err.message));
+        if (tokenIssue) {
+          setLinkDead(true);
+          return;
+        }
+        setSubmitError(err.message);
         return;
       }
-      const msg =
-        err instanceof ApiError
-          ? err.message
-          : "Something went wrong on our end. Please try again in a minute.";
-      setSubmitError(msg);
+      setSubmitError(
+        "Something went wrong on our end. Please try again in a minute.",
+      );
     }
   });
 

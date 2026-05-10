@@ -82,19 +82,21 @@ func (c *ChaseService) RunDaily(ctx context.Context) {
 }
 
 type expiringDoc struct {
-	DocID            string
-	ProviderID       string
-	ProviderName     string
-	ProviderTZ       string
-	SubjectKind      string
-	SubjectID        string
-	DocTitle         string
-	ExpiresAt        time.Time
-	RecipEmail       string
-	RecipPhone       string
-	RecipName        string
-	ChildFirstName   string
-	PreferredChannel string // 'email' | 'sms' | 'both'
+	DocID              string
+	ProviderID         string
+	ProviderName       string
+	ProviderTZ         string
+	ProviderOwnerEmail string // for Reply-To on staff/parent reminders
+	SubjectKind        string
+	SubjectID          string
+	DocTitle           string
+	ExpiresAt          time.Time
+	RecipEmail         string
+	RecipPhone         string
+	RecipName          string
+	ChildFirstName     string
+	ChildLastName      string
+	PreferredChannel   string // 'email' | 'sms' | 'both'
 }
 
 // ProcessOnce runs a single scan/send pass. Exposed for manual triggering / tests.
@@ -117,6 +119,7 @@ WITH candidates AS (
   SELECT d.id AS doc_id, d.provider_id, d.title AS doc_title,
          d.expires_at, d.owner_kind, d.owner_id,
          p.name AS provider_name, COALESCE(p.timezone,'America/Los_Angeles') AS provider_tz,
+         COALESCE(p.owner_email, '') AS provider_owner_email,
          CASE d.owner_kind
            WHEN 'child' THEN ch.parent_email
            WHEN 'staff' THEN st.email
@@ -133,6 +136,7 @@ WITH candidates AS (
            ELSE p.name
          END AS recip_name,
          CASE d.owner_kind WHEN 'child' THEN ch.first_name ELSE '' END AS child_first_name,
+         CASE d.owner_kind WHEN 'child' THEN ch.last_name  ELSE '' END AS child_last_name,
          CASE d.owner_kind
            WHEN 'child' THEN ch.preferred_contact_channel
            WHEN 'staff' THEN st.preferred_contact_channel
@@ -175,8 +179,9 @@ SELECT * FROM candidates`, windowFloor, windowEnd)
 		var r row
 		if err := rows.Scan(&r.d.DocID, &r.d.ProviderID, &r.d.DocTitle, &r.d.ExpiresAt,
 			&r.d.SubjectKind, &r.d.SubjectID, &r.d.ProviderName, &r.d.ProviderTZ,
+			&r.d.ProviderOwnerEmail,
 			&r.d.RecipEmail, &r.d.RecipPhone, &r.d.RecipName, &r.d.ChildFirstName,
-			&r.d.PreferredChannel); err != nil {
+			&r.d.ChildLastName, &r.d.PreferredChannel); err != nil {
 			return fmt.Errorf("chase: scan: %w", err)
 		}
 		batch = append(batch, r)
@@ -315,20 +320,16 @@ func (c *ChaseService) sendOne(ctx context.Context, d expiringDoc, days int) err
 	wantSMS := channel == "sms" || channel == "both"
 
 	if wantEmail && d.RecipEmail != "" && c.emailer != nil {
-		subject, html, text := RenderChaseEmail(ChaseEmailData{
-			RecipientName:   d.RecipName,
-			ChildOrStaff:    who,
-			DocTitle:        d.DocTitle,
-			ExpiresOn:       d.ExpiresAt.Format("Jan 2, 2006"),
-			DaysUntil:       days,
-			UploadURL:       uploadURL,
-			ProviderName:    d.ProviderName,
-			ProviderContact: "",
-		})
-		if err := c.emailer.Send(ctx, EmailMessage{
-			To: d.RecipEmail, Subject: subject, HTMLBody: html, PlainBody: text, ReferenceID: d.DocID,
-		}); err != nil {
-			c.log.Warn("chase: email send", "err", err)
+		subject, html, text, replyTo, renderErr := c.renderChaseEmail(d, days, uploadURL, who)
+		if renderErr != nil {
+			c.log.Warn("chase: render", "err", renderErr, "doc", d.DocID)
+		} else {
+			if err := c.emailer.Send(ctx, EmailMessage{
+				To: d.RecipEmail, Subject: subject, HTMLBody: html, PlainBody: text,
+				ReplyTo: replyTo, ReferenceID: d.DocID,
+			}); err != nil {
+				c.log.Warn("chase: email send", "err", err)
+			}
 		}
 	}
 	if wantSMS && d.RecipPhone != "" && c.sms != nil {
@@ -337,4 +338,81 @@ func (c *ChaseService) sendOne(ctx context.Context, d expiringDoc, days int) err
 		}
 	}
 	return nil
+}
+
+// renderChaseEmail picks the right branded REQ-022 template based on
+// owner_kind + (for child docs) the immunization-doc heuristic. Falls back
+// to the legacy generic RenderChaseEmail for child docs that aren't
+// immunization records, where the template's "your immunization record"
+// copy would mis-label the email.
+//
+// Reply-To resolves to the provider's owner email when available — staff
+// and parents who reply almost always want their director, not us.
+func (c *ChaseService) renderChaseEmail(d expiringDoc, days int, uploadURL, who string) (subject, html, text, replyTo string, err error) {
+	expShort := FormatExpiresShort(d.ExpiresAt)
+	expLong := FormatExpiresLong(d.ExpiresAt)
+	first := firstNameFromFull(d.RecipName)
+	replyTo = d.ProviderOwnerEmail
+
+	switch d.SubjectKind {
+	case "staff":
+		return mustReturn(RenderStaffReminder(StaffReminderData{
+			FirstName:     first,
+			FacilityName:  d.ProviderName,
+			DocumentTitle: d.DocTitle,
+			ExpiresOnLong: expLong,
+			UploadURL:     uploadURL,
+		}, expShort))(replyTo)
+
+	case "child":
+		if IsImmunizationDoc(d.DocTitle) {
+			return mustReturn(RenderParentImmunizationReminder(ParentImmunizationReminderData{
+				ChildFirstName: d.ChildFirstName,
+				ChildLastName:  d.ChildLastName,
+				FacilityName:   d.ProviderName,
+				ExpiresOnLong:  expLong,
+				UploadURL:      uploadURL,
+			}, expShort))(replyTo)
+		}
+		// Non-immunization child doc: fall through to legacy generic render.
+	}
+
+	// Legacy fallback (provider-owned docs and non-immunization child docs).
+	subj, h, t := RenderChaseEmail(ChaseEmailData{
+		RecipientName:   d.RecipName,
+		ChildOrStaff:    who,
+		DocTitle:        d.DocTitle,
+		ExpiresOn:       d.ExpiresAt.Format("Jan 2, 2006"),
+		DaysUntil:       days,
+		UploadURL:       uploadURL,
+		ProviderName:    d.ProviderName,
+		ProviderContact: "",
+	})
+	return subj, h, t, replyTo, nil
+}
+
+// mustReturn adapts the (subject, html, text, err) renderer return into
+// renderChaseEmail's (subject, html, text, replyTo, err) signature. The
+// returned closure binds the replyTo so the call site stays a single line.
+func mustReturn(subject, html, text string, err error) func(replyTo string) (string, string, string, string, error) {
+	return func(replyTo string) (string, string, string, string, error) {
+		if err != nil {
+			return "", "", "", "", err
+		}
+		return subject, html, text, replyTo, nil
+	}
+}
+
+// firstNameFromFull splits a "First Last" string and returns the first part,
+// or "there" if the input is empty.
+func firstNameFromFull(s string) string {
+	for i, r := range s {
+		if r == ' ' {
+			return s[:i]
+		}
+	}
+	if s == "" {
+		return "there"
+	}
+	return s
 }

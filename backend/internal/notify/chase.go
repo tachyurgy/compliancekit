@@ -14,8 +14,16 @@ import (
 // ChaseService scans documents for upcoming expirations and sends
 // escalating reminders on a fixed schedule.
 //
-// Schedule thresholds (days before expiration): 42 (6w), 28 (4w), 14 (2w), 7 (1w), 3.
-// Dedup: at most one send per threshold per document.
+// Schedule thresholds (days before expiration): 90, 60, 30. After the 30-day
+// reminder, weekly reminders fire indefinitely (including past expiry) at
+// days 23, 16, 9, 2, -5, -12, ... Weekly buckets are encoded as negative
+// integers (-1 = first weekly after 30, -2 = second, ...) so the existing
+// (document_id, threshold_days, channel) PK keeps deduping cleanly.
+//
+// Channel selection follows preferred_contact_channel on staff/children:
+// 'email' = email only, 'sms' = SMS only, 'both' = email + SMS at every fire.
+//
+// Dedup: at most one send per threshold per document per channel.
 // Quiet hours: never send between 21:00 and 08:00 in the recipient's TZ.
 type ChaseService struct {
 	pool     *sql.DB
@@ -50,7 +58,7 @@ func NewChaseService(d ChaseDeps) *ChaseService {
 	}
 }
 
-var chaseThresholds = []int{42, 28, 14, 7, 3}
+var chaseThresholds = []int{90, 60, 30}
 
 // RunDaily loops forever, calling ProcessOnce once per 24h (with small jitter).
 // Start this as a goroutine from main.
@@ -74,18 +82,19 @@ func (c *ChaseService) RunDaily(ctx context.Context) {
 }
 
 type expiringDoc struct {
-	DocID          string
-	ProviderID     string
-	ProviderName   string
-	ProviderTZ     string
-	SubjectKind    string
-	SubjectID      string
-	DocTitle       string
-	ExpiresAt      time.Time
-	RecipEmail     string
-	RecipPhone     string
-	RecipName      string
-	ChildFirstName string
+	DocID            string
+	ProviderID       string
+	ProviderName     string
+	ProviderTZ       string
+	SubjectKind      string
+	SubjectID        string
+	DocTitle         string
+	ExpiresAt        time.Time
+	RecipEmail       string
+	RecipPhone       string
+	RecipName        string
+	ChildFirstName   string
+	PreferredChannel string // 'email' | 'sms' | 'both'
 }
 
 // ProcessOnce runs a single scan/send pass. Exposed for manual triggering / tests.
@@ -95,11 +104,14 @@ func (c *ChaseService) ProcessOnce(ctx context.Context, now time.Time) error {
 	}
 
 	// The query unions child docs and staff docs with their respective
-	// contacts, and filters by any document whose expiration falls within
-	// the widest threshold window that we haven't yet sent a chase for.
-	// Pre-compute the upper bound in Go so the SQL stays portable (SQLite has
-	// no INTERVAL literal).
-	windowEnd := now.Add(45 * 24 * time.Hour)
+	// contacts. The window is wide on both ends:
+	//   - upper bound now+95d so the 90-day bucket can fire (with slop).
+	//   - no lower bound on "future expiry" — past-expiry docs still get
+	//     weekly chases — but we floor at -365d so we don't chase docs that
+	//     have been expired for years.
+	// Pre-compute bounds in Go since SQLite has no INTERVAL literal.
+	windowEnd := now.Add(95 * 24 * time.Hour)
+	windowFloor := now.Add(-365 * 24 * time.Hour)
 	rows, err := c.pool.QueryContext(ctx, `
 WITH candidates AS (
   SELECT d.id AS doc_id, d.provider_id, d.title AS doc_title,
@@ -120,17 +132,22 @@ WITH candidates AS (
            WHEN 'staff' THEN st.first_name || ' ' || st.last_name
            ELSE p.name
          END AS recip_name,
-         CASE d.owner_kind WHEN 'child' THEN ch.first_name ELSE '' END AS child_first_name
+         CASE d.owner_kind WHEN 'child' THEN ch.first_name ELSE '' END AS child_first_name,
+         CASE d.owner_kind
+           WHEN 'child' THEN ch.preferred_contact_channel
+           WHEN 'staff' THEN st.preferred_contact_channel
+           ELSE 'email'
+         END AS preferred_channel
     FROM documents d
     JOIN providers p ON p.id = d.provider_id
     LEFT JOIN children ch ON ch.id = d.owner_id AND d.owner_kind = 'child'
     LEFT JOIN staff    st ON st.id = d.owner_id AND d.owner_kind = 'staff'
    WHERE d.deleted_at IS NULL
      AND d.expires_at IS NOT NULL
-     AND d.expires_at > ?
+     AND d.expires_at >= ?
      AND d.expires_at <= ?
 )
-SELECT * FROM candidates`, now, windowEnd)
+SELECT * FROM candidates`, windowFloor, windowEnd)
 	if err != nil {
 		return fmt.Errorf("chase: query candidates: %w", err)
 	}
@@ -144,7 +161,8 @@ SELECT * FROM candidates`, now, windowEnd)
 		var r row
 		if err := rows.Scan(&r.d.DocID, &r.d.ProviderID, &r.d.DocTitle, &r.d.ExpiresAt,
 			&r.d.SubjectKind, &r.d.SubjectID, &r.d.ProviderName, &r.d.ProviderTZ,
-			&r.d.RecipEmail, &r.d.RecipPhone, &r.d.RecipName, &r.d.ChildFirstName); err != nil {
+			&r.d.RecipEmail, &r.d.RecipPhone, &r.d.RecipName, &r.d.ChildFirstName,
+			&r.d.PreferredChannel); err != nil {
 			return fmt.Errorf("chase: scan: %w", err)
 		}
 		batch = append(batch, r)
@@ -178,20 +196,40 @@ SELECT * FROM candidates`, now, windowEnd)
 	return nil
 }
 
-// matchThreshold returns the threshold bucket to fire for a given days-to-expiry.
-// Thresholds (days): 42, 28, 14, 7, 3. Any doc within 5 days of a threshold
-// falls into that bucket (covers daily drift between scheduler runs).
+// matchThreshold returns the bucket key to fire for a given days-to-expiry.
+//
+// Buckets:
+//   - 90, 60: fire when days is within [t-5, t] (6-day window, covers daily
+//     drift between runs).
+//   - 30: fires when days is within [24, 30]. The window extends one extra
+//     day low so it bridges cleanly to the weekly cadence (which starts at
+//     day 23).
+//   - Past day 23: weekly buckets, encoded as negative integers.
+//     -1 fires at days 23..17, -2 at 16..10, -3 at 9..3, -4 at 2..-4,
+//     -5 at -5..-11, etc. Negative encoding lets us reuse the existing
+//     INTEGER threshold_days column and PK (document_id, threshold_days,
+//     channel) without schema churn.
+//
+// Returns 0 when no bucket applies (no send).
 func matchThreshold(days int) int {
-	if days < 0 {
-		return 0
+	// Upper thresholds: 6-day window [t-5, t].
+	if days >= 85 && days <= 90 {
+		return 90
 	}
-	for _, t := range chaseThresholds {
-		if days <= t && days > t-5 {
-			return t
+	if days >= 55 && days <= 60 {
+		return 60
+	}
+	// 30-day threshold extends down to 24 to bridge to weekly.
+	if days >= 24 && days <= 30 {
+		return 30
+	}
+	// Weekly buckets after the 30-day reminder. Floor division handles
+	// negative days correctly: e.g. days=-5 → (30 - -5)/7 = 35/7 = 5.
+	if days < 24 {
+		weeks := (30 - days) / 7
+		if weeks >= 1 {
+			return -weeks
 		}
-	}
-	if days <= 3 {
-		return 3
 	}
 	return 0
 }
@@ -252,7 +290,17 @@ func (c *ChaseService) sendOne(ctx context.Context, d expiringDoc, days int) err
 		who = fmt.Sprintf("your child %s", d.ChildFirstName)
 	}
 
-	if d.RecipEmail != "" && c.emailer != nil {
+	// Channel selection follows preferred_contact_channel. Empty/unknown
+	// values default to email so a missing column or new row never goes
+	// silent.
+	channel := d.PreferredChannel
+	if channel != "sms" && channel != "both" {
+		channel = "email"
+	}
+	wantEmail := channel == "email" || channel == "both"
+	wantSMS := channel == "sms" || channel == "both"
+
+	if wantEmail && d.RecipEmail != "" && c.emailer != nil {
 		subject, html, text := RenderChaseEmail(ChaseEmailData{
 			RecipientName:   d.RecipName,
 			ChildOrStaff:    who,
@@ -269,7 +317,7 @@ func (c *ChaseService) sendOne(ctx context.Context, d expiringDoc, days int) err
 			c.log.Warn("chase: email send", "err", err)
 		}
 	}
-	if d.RecipPhone != "" && c.sms != nil && days <= 7 {
+	if wantSMS && d.RecipPhone != "" && c.sms != nil {
 		if _, err := c.sms.Send(d.RecipPhone, SMSChaseReminder(d.DocTitle, days, uploadURL)); err != nil {
 			c.log.Warn("chase: sms send", "err", err)
 		}

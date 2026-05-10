@@ -14,25 +14,30 @@ func TestMatchThreshold_BucketsByDaysUntilExpiry(t *testing.T) {
 		days int
 		want int
 	}{
-		{50, 0}, // outside widest threshold window
-		{42, 42},
-		{41, 42},
-		{38, 42},
-		{37, 0}, // past 42 − 5 slop, below next threshold
-		{28, 28},
-		{25, 28},
-		{24, 28}, // 28 - 5 + 1 = 24 (inclusive)
-		{23, 0},
-		{14, 14},
-		{11, 14},
-		{10, 14},
-		{9, 0},
-		{7, 7},
-		{4, 7},
-		{3, 7}, // 3 days ≤ 7 and > 2 → 7 bucket
-		{2, 3},
-		{0, 3}, // covered by trailing `if days <= 3` catch-all
-		{-1, 0}, // expired
+		// Outside any bucket.
+		{96, 0},
+		// 90-day window [85, 90].
+		{90, 90},
+		{85, 90},
+		{84, 0},
+		// 60-day window [55, 60].
+		{60, 60},
+		{55, 60},
+		{54, 0},
+		// 30-day window [24, 30] — extended low to bridge to weekly.
+		{30, 30},
+		{25, 30},
+		{24, 30},
+		// Weekly buckets after the 30-day reminder.
+		{23, -1},
+		{17, -1},
+		{16, -2},
+		{10, -2},
+		{9, -3},
+		{2, -4},
+		// Past expiry: weekly continues indefinitely.
+		{-5, -5},
+		{-12, -6},
 	}
 	for _, tc := range cases {
 		got := matchThreshold(tc.days)

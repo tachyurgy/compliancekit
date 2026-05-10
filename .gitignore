@@ -37,6 +37,10 @@ frontend/node_modules/
 node_modules/
 *.exe
 *.test
+.build/
+
+# Claude Code local state (worktrees, settings) — never share-worthy
+.claude/
 
 # OS / editor
 .DS_Store

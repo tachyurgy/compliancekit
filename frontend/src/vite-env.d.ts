@@ -1,5 +1,13 @@
 /// <reference types="vite/client" />
 
+// Tell TS about Vite's `?raw` query suffix for static-string imports of
+// Markdown / SQL / etc. used by the legal-doc bundler in
+// pages/onboarding/OnboardingLegal.tsx.
+declare module '*.md?raw' {
+  const content: string;
+  export default content;
+}
+
 // Augment ImportMetaEnv with the env vars we actually read in app code so
 // `import.meta.env.VITE_*` has correct types instead of the any-default.
 interface ImportMetaEnv {

@@ -1,0 +1,19 @@
+Welcome to Levelbrook!
+
+Hi {{.FirstName}},
+
+{{.FacilityName}} is set up and ready. Levelbrook will keep your staff and child files inspection-ready, so you can stop chasing paper.
+
+First step: add one staff member. We'll show you what their file needs and start chasing the missing pieces for you.
+
+Add a staff member: {{.AppURL}}/staff/new
+
+Your free trial runs until {{.TrialEndsOn}}. After that it's $99/month on the card you added. You can cancel any time at {{.AppURL}}/billing.
+
+Questions? Just reply to this email and a real person will write back.
+
+--
+Levelbrook · Compliance for Florida child care
+levelbrookteam@gmail.com
+
+You're receiving this because you just started a Levelbrook account for {{.FacilityName}}.

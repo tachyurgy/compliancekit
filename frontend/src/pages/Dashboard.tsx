@@ -15,6 +15,7 @@ import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
 import EmptyState from '@/components/common/EmptyState';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import TrialBanner from '@/components/common/TrialBanner';
 import { useDashboard } from '@/hooks/useDashboard';
 import { formatDate, formatRelativeDays, formatTimestamp } from '@/lib/format';
 
@@ -80,6 +81,7 @@ export default function Dashboard(): JSX.Element {
 
   return (
     <div>
+      <TrialBanner />
       <PageHeader
         title="Compliance dashboard"
         description="Your real-time readiness view. Anything flagged below needs action before your next inspection."

@@ -49,7 +49,7 @@ export default function SettingsBilling(): JSX.Element {
 
   const checkoutMutation = useMutation({
     mutationFn: (plan: 'starter' | 'professional' | 'enterprise') =>
-      billingApi.createCheckoutSession(plan),
+      billingApi.createCheckoutSessionLegacy(plan),
     onSuccess: ({ url }) => {
       window.location.assign(url);
     },

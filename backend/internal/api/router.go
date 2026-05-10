@@ -222,15 +222,11 @@ func NewRouter(d Deps) http.Handler {
 			}))
 		})
 
-		// Facility (REQ-003 onboarding wizard). GET is open to both roles
-		// so the dashboard can read; PATCH and the rooms write paths are
-		// admin-only.
+		// REQ-003: rooms CRUD lives at /api/rooms — separate from
+		// /api/facility (postings/ratio share that prefix; facility-row
+		// reads/writes are merged into the existing /facility Route block
+		// further down to avoid chi's prefix-conflict resolution).
 		if d.Facility != nil {
-			r.Get("/facility", d.Facility.Get)
-			r.Group(adminOnly(func(r chi.Router) {
-				r.Patch("/facility", d.Facility.Patch)
-				r.Post("/facility/complete-onboarding", d.Facility.CompleteOnboarding)
-			}))
 			r.Route("/rooms", func(r chi.Router) {
 				r.Get("/", d.Facility.ListRooms)
 				r.Group(adminOnly(func(r chi.Router) {
@@ -267,8 +263,19 @@ func NewRouter(d Deps) http.Handler {
 				}))
 			})
 		}
-		if d.Postings != nil || d.Ratio != nil {
+		// /api/facility — onboarding wizard read/write (REQ-003) shares
+		// the prefix with the existing postings + ratio handlers. Mount
+		// them all in one Route block so chi's pattern matching doesn't
+		// conflict.
+		if d.Postings != nil || d.Ratio != nil || d.Facility != nil {
 			r.Route("/facility", func(r chi.Router) {
+				if d.Facility != nil {
+					r.Get("/", d.Facility.Get)
+					r.Group(adminOnly(func(r chi.Router) {
+						r.Patch("/", d.Facility.Patch)
+						r.Post("/complete-onboarding", d.Facility.CompleteOnboarding)
+					}))
+				}
 				if d.Postings != nil {
 					r.Get("/postings", d.Postings.List)
 					r.Group(adminOnly(func(r chi.Router) {

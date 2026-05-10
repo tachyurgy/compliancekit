@@ -29,7 +29,7 @@ export default function Landing(): JSX.Element {
   if (status === 'loading') {
     return (
       <div className="h-screen grid place-items-center">
-        <LoadingSpinner label="Loading ComplianceKit" />
+        <LoadingSpinner label="Loading Levelbrook" />
       </div>
     );
   }
@@ -43,7 +43,7 @@ export default function Landing(): JSX.Element {
       <header className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-brand-600" />
-          <span className="font-semibold text-lg">ComplianceKit</span>
+          <span className="font-semibold text-lg">Levelbrook</span>
         </Link>
         <div className="flex items-center gap-2">
           <Link to="/login">
@@ -64,7 +64,7 @@ export default function Landing(): JSX.Element {
           Be inspection-ready every single day.
         </h1>
         <p className="mt-5 text-lg text-gray-600 max-w-2xl mx-auto">
-          ComplianceKit replaces the paper binder, the spreadsheet, and the pre-inspection
+          Levelbrook replaces the paper binder, the spreadsheet, and the pre-inspection
           panic with a single dashboard that tracks every requirement, deadline, and
           document your state inspector will ask for.
         </p>
@@ -92,7 +92,7 @@ export default function Landing(): JSX.Element {
 
       <footer className="border-t border-gray-100 py-8 text-center text-xs text-gray-500">
         <p>
-          &copy; {new Date().getFullYear()} ComplianceKit. Inspection-ready child care
+          &copy; {new Date().getFullYear()} Levelbrook. Inspection-ready child care
           compliance.
         </p>
       </footer>

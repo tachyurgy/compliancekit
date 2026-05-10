@@ -58,7 +58,7 @@ export default function OnboardingWizard(): JSX.Element {
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center">
           <Link to="/" className="flex items-center gap-2">
             <ShieldCheck className="h-6 w-6 text-brand-600" />
-            <span className="font-semibold">ComplianceKit</span>
+            <span className="font-semibold">Levelbrook</span>
           </Link>
         </div>
       </header>

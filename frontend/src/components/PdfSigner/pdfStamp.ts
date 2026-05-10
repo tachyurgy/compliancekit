@@ -166,7 +166,7 @@ export async function appendAuditPage(
 
   cursorY -= 10;
   page.drawText(
-    "Tampering will invalidate the SHA-256 chain recorded in the ComplianceKit audit trail.",
+    "Tampering will invalidate the SHA-256 chain recorded in the Levelbrook audit trail.",
     { x: left, y: cursorY, size: 9, font, color: rgb(0.35, 0.35, 0.35) },
   );
 

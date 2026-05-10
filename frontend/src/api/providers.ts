@@ -56,11 +56,17 @@ export const providersApi = {
     return ProviderSchema.parse(data);
   },
 
+  /**
+   * REQ-002 signup. The backend accepts both the legacy field names
+   * (name/owner_email/state_code) AND the new ones (facility_name/email/
+   * full_name) — we send both so we don't break existing call paths.
+   */
   async signup(input: {
     name: string;
     ownerEmail: string;
     stateCode: 'CA' | 'TX' | 'FL';
     password: string;
+    fullName?: string;
   }): Promise<{ providerId: string; userId: string }> {
     const data = await apiFetch<{ provider_id: string; user_id: string }>(
       '/api/auth/signup',
@@ -68,9 +74,12 @@ export const providersApi = {
         method: 'POST',
         json: {
           name: input.name,
+          facility_name: input.name,
           owner_email: input.ownerEmail,
+          email: input.ownerEmail,
           state_code: input.stateCode,
           password: input.password,
+          full_name: input.fullName ?? input.name,
         },
         skipAuthRedirect: true,
       },
@@ -78,12 +87,20 @@ export const providersApi = {
     return { providerId: data.provider_id, userId: data.user_id };
   },
 
-  async signin(email: string, password: string): Promise<{ providerId: string; userId: string }> {
+  /**
+   * REQ-011 signin. `rememberMe` defaults to true (90-day sliding session);
+   * pass false from /login when the operator unchecks "Remember me".
+   */
+  async signin(
+    email: string,
+    password: string,
+    rememberMe = true,
+  ): Promise<{ providerId: string; userId: string }> {
     const data = await apiFetch<{ provider_id: string; user_id: string }>(
       '/api/auth/signin',
       {
         method: 'POST',
-        json: { email, password },
+        json: { email, password, remember_me: rememberMe },
         skipAuthRedirect: true,
       },
     );

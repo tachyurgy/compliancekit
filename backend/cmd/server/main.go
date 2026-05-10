@@ -89,10 +89,22 @@ func run() error {
 
 	// ---- magic link + billing ----
 	magic := magiclink.NewService(pool, cfg.MagicLinkSigningKey)
+	// REQ-002: monthly + annual price IDs. Default monthly to the legacy
+	// PricePro env var so existing deploy environments don't need updating.
+	priceMonthly := cfg.StripePriceMonthly
+	if priceMonthly == "" {
+		priceMonthly = cfg.StripePricePro
+	}
+	priceAnnual := cfg.StripePriceAnnual
+	if priceAnnual == "" {
+		priceAnnual = cfg.StripePricePro
+	}
 	bill := billing.New(billing.Config{
 		SecretKey:       cfg.StripeSecretKey,
 		WebhookSecret:   cfg.StripeWebhookSecret,
 		FrontendBaseURL: cfg.FrontendBaseURL,
+		PriceIDMonthly:  priceMonthly,
+		PriceIDAnnual:   priceAnnual,
 		Pool:            pool,
 		Logger:          log.With("component", "billing"),
 	})
@@ -133,7 +145,26 @@ func run() error {
 		Log: log.With("component", "portal"),
 	}
 	billH := &handlers.BillingHandler{Pool: pool, Billing: bill, StripePrice: cfg.StripePricePro, Log: log.With("component", "billing")}
+	billV2 := &handlers.BillingV2Handler{
+		Pool: pool, Billing: bill, Emailer: emailer,
+		FrontendBase: cfg.FrontendBaseURL, AppBase: cfg.AppBaseURL,
+		Log: log.With("component", "billing_v2"),
+	}
+	authH := &handlers.AuthHandler{
+		Pool: pool, Emailer: emailer,
+		FrontendBase: cfg.FrontendBaseURL,
+		CookieDomain: cfg.SessionCookieDomain, SecureCookie: cfg.IsProduction(),
+		Log: log.With("component", "auth"),
+	}
+	legalH := &handlers.LegalHandler{Pool: pool, Log: log.With("component", "legal")}
 	stripeWH := &handlers.StripeWebhookHandler{Billing: bill, Log: log.With("component", "stripe_wh")}
+
+	// REQ-002 wiring: send the welcome email after Stripe's
+	// checkout.session.completed lands, and persist trial info on providers.
+	bill.SetNotifier(&handlers.CheckoutNotifier{
+		Pool: pool, Emailer: emailer, AppBase: cfg.AppBaseURL,
+		Log: log.With("component", "checkout_notifier"),
+	})
 	drills := &handlers.DrillHandler{Pool: pool, Log: log.With("component", "drills")}
 	postings := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
 	ratio := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}
@@ -213,6 +244,9 @@ func run() error {
 		Dashboard:       dash,
 		Portal:          portal,
 		Billing:         billH,
+		BillingV2:       billV2,
+		Auth:            authH,
+		Legal:           legalH,
 		StripeWebhook:   stripeWH,
 		Drills:          drills,
 		Postings:        postings,

@@ -86,6 +86,9 @@ type Deps struct {
 	Dashboard       *handlers.DashboardHandler
 	Portal          *handlers.PortalHandler
 	Billing         *handlers.BillingHandler
+	BillingV2       *handlers.BillingV2Handler // REQ-002 shape (annual/monthly)
+	Auth            *handlers.AuthHandler      // REQ-011 forgot/reset/sessions
+	Legal           *handlers.LegalHandler     // REQ-002 ToS/DPA e-sign
 	StripeWebhook   *handlers.StripeWebhookHandler
 	Drills          *handlers.DrillHandler
 	Postings        *handlers.PostingHandler
@@ -147,6 +150,12 @@ func NewRouter(d Deps) http.Handler {
 		r.Post("/api/auth/signin", d.Providers.Signin)
 		r.Get("/api/auth/callback", d.Providers.Callback)
 		r.Post("/api/auth/logout", d.Providers.Logout)
+		// REQ-011: alias /signout for the new frontend; /logout remains for back-compat.
+		r.Post("/api/auth/signout", d.Providers.Logout)
+		if d.Auth != nil {
+			r.Post("/api/auth/forgot-password", d.Auth.ForgotPassword)
+			r.Post("/api/auth/reset-password", d.Auth.ResetPassword)
+		}
 	})
 
 	// Stripe webhook — raw body required by Stripe signing.
@@ -272,7 +281,29 @@ func NewRouter(d Deps) http.Handler {
 		r.Route("/billing", func(r chi.Router) {
 			r.Post("/checkout", d.Billing.CreateCheckout)
 			r.Post("/portal", d.Billing.Portal)
+			// REQ-002 shape: explicit annual/monthly + trial-aware checkout.
+			if d.BillingV2 != nil {
+				r.Post("/checkout-session", d.BillingV2.CreateCheckoutSession)
+				r.Post("/portal-session", d.BillingV2.CreatePortalSession)
+				r.Get("/subscription", d.BillingV2.GetSubscription)
+			}
 		})
+
+		// REQ-011 session-management UI: list/active sessions, sign out everywhere.
+		if d.Auth != nil {
+			r.Get("/auth/sessions", d.Auth.ListSessions)
+			r.Post("/auth/signout-everywhere", d.Auth.SignoutEverywhere)
+		}
+
+		// REQ-002 ToS/DPA e-signature capture.
+		if d.Legal != nil {
+			r.Get("/legal/documents", d.Legal.Documents)
+			r.Post("/legal/sign", d.Legal.Sign)
+			// admin-only read of the audit trail
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Get("/legal/signatures", d.Legal.ListSignatures)
+			}))
+		}
 
 		// Facility & Operations: drills, wall postings, ratio checks.
 		if d.Drills != nil {

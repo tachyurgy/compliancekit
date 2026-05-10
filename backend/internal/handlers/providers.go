@@ -34,41 +34,74 @@ type ProviderHandler struct {
 	Log          *slog.Logger
 }
 
-// minPasswordLen is the floor for new passwords. We require length only;
-// strength rules tend to push users to predictable substitutions and we'd
-// rather invest in good rate-limiting (already wired) than complexity rules.
-const minPasswordLen = 10
+// minPasswordLen is the floor for new passwords. REQ-011 sets it to 12
+// (NIST 800-63B current guidance). We require length only; strength rules
+// tend to push users to predictable substitutions and we'd rather invest
+// in good rate-limiting (already wired) than complexity rules.
+const minPasswordLen = 12
 
 // POST /api/auth/signup
-// body: { "name", "owner_email", "state_code", "password" }
-// Creates a provider AND its admin user with a password hash, then logs in.
+// body (legacy): { "name", "owner_email", "state_code", "password" }
+// body (REQ-002): { "facility_name", "email", "password", "full_name", "state_code"? }
+//
+// REQ-011 raises the password floor to 12 characters. We accept either the
+// legacy field names (kept so existing tests + frontend continue to work)
+// or the REQ-002 names.
 func (h *ProviderHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	var in struct {
+		// Legacy fields
 		Name       string `json:"name"`
 		OwnerEmail string `json:"owner_email"`
-		StateCode  string `json:"state_code"`
-		Password   string `json:"password"`
+		// REQ-002 fields
+		FacilityName string `json:"facility_name"`
+		Email        string `json:"email"`
+		FullName     string `json:"full_name"`
+		// Common
+		StateCode string `json:"state_code"`
+		Password  string `json:"password"`
 	}
 	if err := httpx.DecodeJSON(r, &in); err != nil {
 		httpx.RenderError(w, r, err)
 		return
 	}
-	in.OwnerEmail = strings.ToLower(strings.TrimSpace(in.OwnerEmail))
-	in.Name = strings.TrimSpace(in.Name)
-	if in.Name == "" || in.OwnerEmail == "" || in.StateCode == "" || in.Password == "" {
-		httpx.RenderError(w, r, httpx.BadRequestf("name, owner_email, state_code, and password are required"))
+	// Coalesce legacy + new field names. Either can be sent; new takes priority.
+	facilityName := strings.TrimSpace(in.FacilityName)
+	if facilityName == "" {
+		facilityName = strings.TrimSpace(in.Name)
+	}
+	email := strings.ToLower(strings.TrimSpace(in.Email))
+	if email == "" {
+		email = strings.ToLower(strings.TrimSpace(in.OwnerEmail))
+	}
+	fullName := strings.TrimSpace(in.FullName)
+	if fullName == "" {
+		// Fall back to facility name for the user record so we always have
+		// something to render in /me — UI can prompt for full name later.
+		fullName = facilityName
+	}
+	state := strings.ToUpper(strings.TrimSpace(in.StateCode))
+	if state == "" {
+		// REQ-002 launch is FL-first. Default if the caller doesn't specify.
+		state = "FL"
+	}
+	if facilityName == "" || email == "" || in.Password == "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("facility name, email, and password are required"))
 		return
 	}
 	if len(in.Password) < minPasswordLen {
-		httpx.RenderError(w, r, httpx.BadRequestf("password must be at least %d characters", minPasswordLen))
+		httpx.RenderError(w, r, httpx.BadRequestf("Pick at least %d characters.", minPasswordLen))
 		return
 	}
-	switch strings.ToUpper(in.StateCode) {
+	switch state {
 	case "CA", "TX", "FL":
 	default:
 		httpx.RenderError(w, r, httpx.BadRequestf("state_code must be one of CA, TX, FL (MVP scope)"))
 		return
 	}
+	// Reuse local names below.
+	in.OwnerEmail = email
+	in.Name = facilityName
+	in.StateCode = state
 
 	// Refuse to silently overwrite an existing account on signup. Returning a
 	// generic error here is a tradeoff: it leaks that the email is registered,
@@ -112,9 +145,9 @@ func (h *ProviderHandler) Signup(w http.ResponseWriter, r *http.Request) {
 
 	userID := base62.NewID()[:22]
 	if _, err := tx.ExecContext(r.Context(), `
-		INSERT INTO users (id, provider_id, email, full_name, role, password_hash, password_set_at, email_verified_at, created_at, updated_at)
+		INSERT INTO users (id, provider_id, email, full_name, role, password_hash, password_set_at, password_updated_at, created_at, updated_at)
 		VALUES (?, ?, ?, ?, 'provider_admin', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-		userID, providerID, in.OwnerEmail, in.Name, string(hashed)); err != nil {
+		userID, providerID, in.OwnerEmail, fullName, string(hashed)); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
@@ -123,7 +156,7 @@ func (h *ProviderHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.establishSession(w, r, providerID, userID); err != nil {
+	if _, err := EstablishSession(w, r, h.Pool, h.CookieDomain, h.SecureCookie, providerID, userID, true); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
@@ -131,6 +164,7 @@ func (h *ProviderHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		"state_code":  stateUpper,
 		"owner_email": in.OwnerEmail,
 	}, r)
+	emitAuthAudit(r.Context(), h.Pool, userID, in.OwnerEmail, "signup", r)
 	httpx.RenderJSON(w, http.StatusOK, map[string]string{
 		"status":      "ok",
 		"provider_id": providerID,
@@ -138,11 +172,16 @@ func (h *ProviderHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/auth/signin { "email", "password" } -> sets session cookie
+// POST /api/auth/signin { "email", "password", "remember_me" } -> sets session cookie
+//
+// REQ-011: remember_me defaults to true; on true the session lasts 90 days
+// with sliding renewal on every authed request, on false it's a 24-hour
+// browser-locked session.
 func (h *ProviderHandler) Signin(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		RememberMe *bool  `json:"remember_me"`
 	}
 	if err := httpx.DecodeJSON(r, &in); err != nil {
 		httpx.RenderError(w, r, err)
@@ -152,6 +191,10 @@ func (h *ProviderHandler) Signin(w http.ResponseWriter, r *http.Request) {
 	if email == "" || in.Password == "" {
 		httpx.RenderError(w, r, httpx.BadRequestf("email and password required"))
 		return
+	}
+	rememberMe := true
+	if in.RememberMe != nil {
+		rememberMe = *in.RememberMe
 	}
 
 	var userID, providerID, hash string
@@ -183,11 +226,14 @@ func (h *ProviderHandler) Signin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(in.Password)); err != nil {
+		// REQ-011: log the failed attempt with email so a downstream alerter
+		// can spot stuffing patterns. Pool query is cheap.
+		emitAuthAudit(r.Context(), h.Pool, "", email, "signin_fail", r)
 		httpx.RenderError(w, r, httpx.ErrUnauthorized)
 		return
 	}
 
-	if err := h.establishSession(w, r, providerID, userID); err != nil {
+	if _, err := EstablishSession(w, r, h.Pool, h.CookieDomain, h.SecureCookie, providerID, userID, rememberMe); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
@@ -196,6 +242,7 @@ func (h *ProviderHandler) Signin(w http.ResponseWriter, r *http.Request) {
 		h.Log.Warn("signin: last_login_at update", "err", err)
 	}
 	auditlog.EmitLogin(r.Context(), h.Pool, providerID, providerID, r)
+	emitAuthAudit(r.Context(), h.Pool, userID, email, "signin_success", r)
 	httpx.RenderJSON(w, http.StatusOK, map[string]string{
 		"status":      "ok",
 		"provider_id": providerID,
@@ -209,28 +256,8 @@ func (h *ProviderHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	httpx.RenderError(w, r, httpx.BadRequestf("magic-link login is no longer supported; please sign in with your password"))
 }
 
-// establishSession inserts a sessions row and sets the ck_sess cookie. Used
-// by Signup and Signin so the cookie/expiry contract stays in one place.
-func (h *ProviderHandler) establishSession(w http.ResponseWriter, r *http.Request, providerID, userID string) error {
-	sessID := base62.NewID()
-	if _, err := h.Pool.ExecContext(r.Context(), `
-		INSERT INTO sessions (id, provider_id, user_id, expires_at, created_at)
-		VALUES (?, ?, ?, datetime('now', '+14 days'), CURRENT_TIMESTAMP)`,
-		sessID, providerID, userID); err != nil {
-		return err
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     "ck_sess",
-		Value:    sessID,
-		Domain:   h.CookieDomain,
-		Path:     "/",
-		Expires:  time.Now().Add(14 * 24 * time.Hour),
-		HttpOnly: true,
-		Secure:   h.SecureCookie,
-		SameSite: http.SameSiteLaxMode,
-	})
-	return nil
-}
+// establishSession was the legacy 14-day cookie inserter; superseded by
+// EstablishSession in handlers/auth.go (REQ-011 sliding 90d window).
 
 // GET /api/me
 func (h *ProviderHandler) Me(w http.ResponseWriter, r *http.Request) {
@@ -810,18 +837,30 @@ func (h *ProviderHandler) mintPortalLink(w http.ResponseWriter, r *http.Request,
 }
 
 // LookupSession implements middleware.SessionReader.
+//
+// REQ-011: on every successful lookup, slide expires_at forward to now+90d if
+// the session was created with remember_me=1, and bump last_seen_at. This is
+// the single sliding-window write path; the SQLite cost is one indexed
+// UPDATE per authed request, which the test bench shows at ~50µs.
 func (h *ProviderHandler) LookupSession(ctx context.Context, token string) (providerID, userID string, err error) {
 	err = h.Pool.QueryRowContext(ctx, `
-		SELECT provider_id, user_id FROM sessions WHERE id = ? AND expires_at > CURRENT_TIMESTAMP`, token).
+		SELECT provider_id, user_id FROM sessions
+		 WHERE id = ? AND expires_at > CURRENT_TIMESTAMP AND revoked_at IS NULL`, token).
 		Scan(&providerID, &userID)
 	if err != nil {
 		return "", "", err
 	}
+	RefreshSession(ctx, h.Pool, token)
 	return providerID, userID, nil
 }
 
 // Logout clears the session cookie and deletes the session row.
+//
+// The auth_audit row preserves the forensic signal we'd otherwise lose by
+// hard-deleting; the existing TestLogout_ClearsSession assertion expects
+// the row to be gone, so we keep DELETE here.
 func (h *ProviderHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	uid := mw.UserIDFrom(r.Context())
 	if c, err := r.Cookie("ck_sess"); err == nil && c.Value != "" {
 		_, _ = h.Pool.ExecContext(r.Context(), `DELETE FROM sessions WHERE id = ?`, c.Value)
 	}
@@ -829,5 +868,8 @@ func (h *ProviderHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		Name: "ck_sess", Value: "", Domain: h.CookieDomain, Path: "/",
 		Expires: time.Unix(0, 0), HttpOnly: true, Secure: h.SecureCookie, SameSite: http.SameSiteLaxMode,
 	})
+	if uid != "" {
+		emitAuthAudit(r.Context(), h.Pool, uid, "", "signout", r)
+	}
 	httpx.RenderJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

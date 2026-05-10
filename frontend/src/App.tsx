@@ -8,8 +8,12 @@ import { useSession } from '@/hooks/useSession';
 import Landing from '@/pages/Landing';
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
 import OnboardingWizard from '@/pages/onboarding/OnboardingWizard';
 import FacilityWizard from '@/pages/onboarding/FacilityWizard';
+import OnboardingCheckout from '@/pages/onboarding/OnboardingCheckout';
+import OnboardingLegal from '@/pages/onboarding/OnboardingLegal';
 import Dashboard from '@/pages/Dashboard';
 import Children from '@/pages/Children';
 import ChildDetail from '@/pages/ChildDetail';
@@ -23,6 +27,7 @@ import Operations from '@/pages/Operations';
 import Settings from '@/pages/Settings';
 import SettingsBilling from '@/pages/SettingsBilling';
 import SettingsAuditLog from '@/pages/SettingsAuditLog';
+import SettingsSecurity from '@/pages/SettingsSecurity';
 import PortalParent from '@/pages/PortalParent';
 import PortalStaff from '@/pages/PortalStaff';
 import PortalUpload from '@/pages/PortalUpload';
@@ -95,6 +100,8 @@ export default function App(): JSX.Element {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
 
           {/* Public token-gated portals (parents / staff). No account required. */}
           {/* /u/:token is the unified Levelbrook upload portal (REQ-005/006/008). */}
@@ -106,9 +113,26 @@ export default function App(): JSX.Element {
           {/* Public signing flow (token-gated). */}
           <Route path="/sign/:token" element={<SignDocument />} />
 
-          {/* REQ-003 FL onboarding wizard (4-step). New flow at
-              /onboarding/facility; legacy /onboarding/* still works for
-              non-FL accounts until we've migrated them. */}
+          {/* Onboarding — REQ-002 surfaces (checkout, legal) live above the
+              wizard so a brand-new operator can pay + sign before they hit
+              the REQ-003 FL facility wizard. Legacy /onboarding/* below
+              still works for non-FL accounts until we've migrated them. */}
+          <Route
+            path="/onboarding/checkout"
+            element={
+              <RequireAuth>
+                <OnboardingCheckout />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/onboarding/legal"
+            element={
+              <RequireAuth>
+                <OnboardingLegal />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/onboarding/facility"
             element={
@@ -164,6 +188,7 @@ export default function App(): JSX.Element {
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/billing" element={<SettingsBilling />} />
             <Route path="/settings/audit-log" element={<SettingsAuditLog />} />
+            <Route path="/settings/security" element={<SettingsSecurity />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

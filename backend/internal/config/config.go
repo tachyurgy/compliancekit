@@ -33,6 +33,12 @@ type Config struct {
 	StripeSecretKey     string `env:"STRIPE_SECRET_KEY,required"`
 	StripeWebhookSecret string `env:"STRIPE_WEBHOOK_SECRET,required"`
 	StripePricePro      string `env:"STRIPE_PRICE_PRO,required"`
+	// REQ-002: per-cadence price IDs. The monthly default falls back to
+	// StripePricePro so existing dev/test setups continue to work without
+	// new env vars. Annual is required for the annual-default checkout flow
+	// to function; in dev it can be the same as monthly.
+	StripePriceMonthly string `env:"STRIPE_PRICE_MONTHLY"`
+	StripePriceAnnual  string `env:"STRIPE_PRICE_ANNUAL"`
 
 	TwilioAccountSID         string `env:"TWILIO_ACCOUNT_SID"`
 	TwilioAuthToken          string `env:"TWILIO_AUTH_TOKEN"`

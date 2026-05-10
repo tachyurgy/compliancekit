@@ -89,6 +89,8 @@ type Deps struct {
 	DataExport      *handlers.DataExportHandler
 	Contact         *handlers.ContactHandler
 	Nag             *handlers.NagHandler
+	Facility        *handlers.FacilityHandler // REQ-003: 4-step onboarding wizard
+	UploadLink      *handlers.UploadLinkHandler // REQ-004: shareable staff upload link
 	TestHelpers     *handlers.TestHelperHandler // only mounted when non-production
 	Magic           *magiclink.Service
 	Session         mw.SessionReader
@@ -183,30 +185,42 @@ func NewRouter(d Deps) http.Handler {
 		}))
 
 		// Children: reads are open to both roles; writes are admin-only.
+		// REQ-008 adds withdraw, nag (parent-side), and a child upload-link.
 		r.Route("/children", func(r chi.Router) {
 			r.Get("/", d.Children.List)
 			r.Get("/{id}", d.Children.Get)
 			r.Get("/{id}/documents", d.Children.ListDocuments)
+			r.Get("/{id}/upload-link", d.Children.UploadLink)
 			r.Group(adminOnly(func(r chi.Router) {
 				r.Post("/", d.Children.Create)
 				r.Patch("/{id}", d.Children.Update)
 				r.Delete("/{id}", d.Children.Delete)
+				r.Post("/{id}/withdraw", d.Children.Withdraw)
 				r.Post("/{id}/portal-link", d.Providers.MintParentPortalLink)
+				if d.Nag != nil {
+					r.Post("/{id}/nag", d.Nag.TriggerChild)
+				}
 			}))
 		})
 
 		// Staff: reads are open to both roles; writes are admin-only.
+		// REQ-004 swaps Staff.List → ListWithRollup and Staff.Get → GetDetail
+		// to surface the status-pill rollup and required-doc checklist.
 		r.Route("/staff", func(r chi.Router) {
-			r.Get("/", d.Staff.List)
-			r.Get("/{id}", d.Staff.Get)
+			r.Get("/", d.Staff.ListWithRollup)
+			r.Get("/{id}", d.Staff.GetDetail)
 			r.Get("/{id}/documents", d.Staff.ListDocuments)
 			if d.Nag != nil {
 				r.Get("/{id}/nag-history", d.Nag.History)
+			}
+			if d.UploadLink != nil {
+				r.Get("/{id}/upload-link", d.UploadLink.Get)
 			}
 			r.Group(adminOnly(func(r chi.Router) {
 				r.Post("/", d.Staff.Create)
 				r.Patch("/{id}", d.Staff.Update)
 				r.Delete("/{id}", d.Staff.Delete)
+				r.Post("/{id}/archive", d.Staff.Archive)
 				r.Post("/{id}/portal-link", d.Providers.MintStaffPortalLink)
 				if d.Nag != nil {
 					r.Post("/{id}/nag", d.Nag.Trigger)
@@ -214,13 +228,35 @@ func NewRouter(d Deps) http.Handler {
 			}))
 		})
 
+		// Facility (REQ-003 onboarding wizard). GET is open to both roles
+		// so the dashboard can read; PATCH and the rooms write paths are
+		// admin-only.
+		if d.Facility != nil {
+			r.Get("/facility", d.Facility.Get)
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Patch("/facility", d.Facility.Patch)
+				r.Post("/facility/complete-onboarding", d.Facility.CompleteOnboarding)
+			}))
+			r.Route("/rooms", func(r chi.Router) {
+				r.Get("/", d.Facility.ListRooms)
+				r.Group(adminOnly(func(r chi.Router) {
+					r.Post("/", d.Facility.CreateRoom)
+					r.Patch("/{id}", d.Facility.PatchRoom)
+					r.Delete("/{id}", d.Facility.DeleteRoom)
+				}))
+			})
+		}
+
 		// Documents: list/get are open; presign/finalize/delete are admin-only.
+		// REQ-006 adds POST /api/documents/{id}/confirm — admin-only, sets
+		// expiration_confirmed_at and ungates the chase engine for that doc.
 		r.Route("/documents", func(r chi.Router) {
 			r.Get("/", d.Documents.List)
 			r.Get("/{id}", d.Documents.Get)
 			r.Group(adminOnly(func(r chi.Router) {
 				r.Post("/presign", d.Documents.Presign)
 				r.Post("/{id}/finalize", d.Documents.Finalize)
+				r.Post("/{id}/confirm", d.Documents.Confirm)
 				r.Delete("/{id}", d.Documents.Delete)
 			}))
 		})
@@ -314,6 +350,10 @@ func NewRouter(d Deps) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireIndividualMagicLink(d.Magic, magiclink.KindParentUpload, magiclink.KindStaffUpload))
 			r.Post("/upload", d.Portal.Upload)
+			// REQ-005 multi-shot stitching + EXIF strip happens in Finalize.
+			r.Post("/upload/{id}/finalize", d.Portal.Finalize)
+			// REQ-006 token-gated confirmation (used right after the upload).
+			r.Post("/document/{id}/confirm", d.Portal.ConfirmDocument)
 		})
 	})
 

@@ -146,6 +146,20 @@ WITH candidates AS (
      AND d.expires_at IS NOT NULL
      AND d.expires_at >= ?
      AND d.expires_at <= ?
+     -- REQ-006 confirmation gate: never fire on un-confirmed AI extractions.
+     -- We chase the document only when:
+     --   1) a human has confirmed the date (expiration_confirmed_at), OR
+     --   2) the date came from a non-OCR source (no extracted_value) — i.e.
+     --      a manually-entered expiration on the operator side.
+     -- This is the primary defense against false reminders driven by an
+     -- OCR misread; the ack flow stamps expiration_confirmed_at on the
+     -- portal /confirm path and the manager dashboard /confirm path.
+     AND (
+       d.expiration_confirmed_at IS NOT NULL
+       OR d.expiration_extracted_value IS NULL
+       OR d.expiration_extracted_value = ''
+     )
+     AND COALESCE(d.does_not_expire, 0) = 0
 )
 SELECT * FROM candidates`, windowFloor, windowEnd)
 	if err != nil {

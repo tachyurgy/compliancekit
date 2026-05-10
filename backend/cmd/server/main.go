@@ -118,14 +118,20 @@ func run() error {
 		CookieDomain: cfg.SessionCookieDomain, SecureCookie: cfg.IsProduction(),
 		Log: log.With("component", "providers"),
 	}
-	children := &handlers.ChildHandler{Pool: pool, Log: log.With("component", "children")}
+	children := &handlers.ChildHandler{
+		Pool: pool, Magic: magic, FrontendBase: cfg.FrontendBaseURL,
+		Log: log.With("component", "children"),
+	}
 	staff := &handlers.StaffHandler{Pool: pool, Log: log.With("component", "staff")}
 	docs := &handlers.DocumentHandler{
 		Pool: pool, Storage: s3Client, OCR: ocrEngine, ExpiryExtra: expiryExtra,
 		Log: log.With("component", "documents"),
 	}
 	dash := &handlers.DashboardHandler{Pool: pool, Log: log.With("component", "dashboard")}
-	portal := &handlers.PortalHandler{Pool: pool, Storage: s3Client, Magic: magic, Log: log.With("component", "portal")}
+	portal := &handlers.PortalHandler{
+		Pool: pool, Storage: s3Client, Magic: magic, Documents: docs,
+		Log: log.With("component", "portal"),
+	}
 	billH := &handlers.BillingHandler{Pool: pool, Billing: bill, StripePrice: cfg.StripePricePro, Log: log.With("component", "billing")}
 	stripeWH := &handlers.StripeWebhookHandler{Billing: bill, Log: log.With("component", "stripe_wh")}
 	drills := &handlers.DrillHandler{Pool: pool, Log: log.With("component", "drills")}
@@ -143,6 +149,10 @@ func run() error {
 		Pool: pool, Magic: magic, Emailer: emailer, SMS: sms,
 		FrontendBase: cfg.FrontendBaseURL,
 		Log:          log.With("component", "nag"),
+	}
+	facility := &handlers.FacilityHandler{Pool: pool, Log: log.With("component", "facility")}
+	uploadLink := &handlers.UploadLinkHandler{
+		Pool: pool, Magic: magic, FrontendBase: cfg.FrontendBaseURL,
 	}
 
 	// Test helpers — only instantiate in non-production so they can never be
@@ -211,6 +221,8 @@ func run() error {
 		DataExport:      dataExport,
 		Contact:         contact,
 		Nag:             nag,
+		Facility:        facility,
+		UploadLink:      uploadLink,
 		TestHelpers:     testHelpers,
 		Magic:           magic,
 		Session:         providers,

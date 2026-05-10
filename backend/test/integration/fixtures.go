@@ -127,6 +127,9 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 		rateLimit = mw.NewTokenBucket(1000, 100) // generous so tests don't throttle
 	}
 
+	facility := &handlers.FacilityHandler{Pool: pool, Log: log.With("component", "facility")}
+	uploadLink := &handlers.UploadLinkHandler{Pool: pool, Magic: magic, FrontendBase: "http://localhost:5173"}
+
 	router := api.NewRouter(api.Deps{
 		Logger:          log,
 		Providers:       providers,
@@ -143,6 +146,8 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 		Inspections:     inspectionsH,
 		AuditLog:        auditLogH,
 		DataExport:      dataExportH,
+		Facility:        facility,
+		UploadLink:      uploadLink,
 		Magic:           magic,
 		Session:         providers,
 		RoleLookup:      mw.PoolRoleLookup{DB: pool},

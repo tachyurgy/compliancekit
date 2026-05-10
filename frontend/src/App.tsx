@@ -24,6 +24,7 @@ import SettingsBilling from '@/pages/SettingsBilling';
 import SettingsAuditLog from '@/pages/SettingsAuditLog';
 import PortalParent from '@/pages/PortalParent';
 import PortalStaff from '@/pages/PortalStaff';
+import PortalUpload from '@/pages/PortalUpload';
 
 // Owned by the PdfSigner agent.
 const DocumentTemplates = lazy(() => import('@/pages/DocumentTemplates'));
@@ -92,6 +93,9 @@ export default function App(): JSX.Element {
           <Route path="/signup" element={<Signup />} />
 
           {/* Public token-gated portals (parents / staff). No account required. */}
+          {/* /u/:token is the unified Levelbrook upload portal (REQ-005/006/008). */}
+          {/* The /portal/* routes stay for back-compat with the v1 magic-link emails. */}
+          <Route path="/u/:token" element={<PortalUpload />} />
           <Route path="/portal/parent/:token" element={<PortalParent />} />
           <Route path="/portal/staff/:token" element={<PortalStaff />} />
 

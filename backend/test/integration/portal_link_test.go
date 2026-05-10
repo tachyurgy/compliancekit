@@ -46,8 +46,8 @@ func TestParentPortalLink_MintsURLForChild(t *testing.T) {
 	if out.SubjectID != childID || out.SubjectKind != "child" {
 		t.Fatalf("unexpected subject: %+v", out)
 	}
-	if !strings.Contains(out.URL, "/portal/parent?t=") {
-		t.Fatalf("url should hit /portal/parent?t=...; got %q", out.URL)
+	if !strings.Contains(out.URL, "/u/") {
+		t.Fatalf("url should hit /u/{token}; got %q", out.URL)
 	}
 	if out.ExpiresAt == "" {
 		t.Fatalf("expires_at must be set")
@@ -95,7 +95,7 @@ func TestStaffPortalLink_MintsURLForStaff(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if out.SubjectKind != "staff" || !strings.Contains(out.URL, "/portal/staff?t=") {
+	if out.SubjectKind != "staff" || !strings.Contains(out.URL, "/u/") {
 		t.Fatalf("unexpected response: %+v", out)
 	}
 }

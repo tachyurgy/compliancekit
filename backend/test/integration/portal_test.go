@@ -183,10 +183,11 @@ func TestPortal_StaffHome_KindMismatch(t *testing.T) {
 	}
 }
 
-// TestPortal_Upload_PanicsOnNilStorage verifies that the upload handler
-// currently nil-derefs Storage and is caught by chi's Recoverer as 500.
-// Flip to an expected 200 + document-row assertion once Storage is
-// injectable in the harness.
+// TestPortal_Upload_GracefulOnNilStorage verifies that the upload handler
+// returns 503 (storage_not_configured) when no S3 credentials are wired —
+// the user-friendly fallback REQ-005 calls for. Renamed from
+// _PanicsOnNilStorage now that the Portal handler short-circuits before
+// touching the nil presigner.
 func TestPortal_Upload_PanicsOnNilStorage(t *testing.T) {
 	h := NewHarness(t)
 	_, providerID, _ := h.AuthAs(t, "CA")
@@ -212,7 +213,7 @@ func TestPortal_Upload_PanicsOnNilStorage(t *testing.T) {
 		t.Fatalf("POST: %v", err)
 	}
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("nil storage upload: expected 500, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("nil storage upload: expected 503 (storage_not_configured), got %d", resp.StatusCode)
 	}
 }

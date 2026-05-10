@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -91,13 +92,24 @@ func (h *DocumentHandler) Presign(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/documents/{id}/finalize — called after the browser completes the S3 PUT.
 // Kicks off OCR + expiration extraction synchronously (for v1).
+//
+// Writes both the working values (`expires_at`, `kind`) AND the OCR-extracted
+// audit values (`expiration_extracted_value`, `document_type_extracted_value`,
+// `extraction_confidence`) per REQ-006. Until a human confirms via /confirm,
+// `expiration_confirmed_at` stays NULL and the chase engine treats this row
+// as advisory.
 func (h *DocumentHandler) Finalize(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
 	id := chi.URLParam(r, "id")
+	h.runFinalize(w, r, pid, id, mw.UserIDFrom(r.Context()))
+}
 
+// runFinalize is the shared implementation reused by the portal upload flow.
+// userID may be empty for parent/staff portal uploads — uploaded_by_user_id
+// is always nullable in that case.
+func (h *DocumentHandler) runFinalize(w http.ResponseWriter, r *http.Request, pid, id, userID string) {
 	var (
 		bucket, key, mime, kind string
-		sizeBytes               int64
 	)
 	err := h.Pool.QueryRowContext(r.Context(), `
 		SELECT storage_bucket, storage_key, mime_type, kind FROM documents
@@ -117,9 +129,11 @@ func (h *DocumentHandler) Finalize(w http.ResponseWriter, r *http.Request) {
 	defer body.Close()
 
 	var (
-		expires    *time.Time
-		confidence float64
-		source     string
+		expiresStr   string
+		expires      *time.Time
+		ocrConfidence float64
+		extractConf  float64
+		source       string
 	)
 	if h.OCR != nil && h.ExpiryExtra != nil {
 		res, err := h.OCR.Extract(r.Context(), body, mime)
@@ -129,7 +143,9 @@ func (h *DocumentHandler) Finalize(w http.ResponseWriter, r *http.Request) {
 			h.Log.Warn("finalize: expiry extract failed", "err", err, "doc", id)
 		} else {
 			source = res.Source
-			confidence = er.Confidence
+			ocrConfidence = res.Confidence
+			extractConf = er.Confidence
+			expiresStr = er.ExpirationDate
 			if er.ExpirationDate != "" {
 				if t, err := time.Parse("2006-01-02", er.ExpirationDate); err == nil {
 					expires = &t
@@ -138,50 +154,188 @@ func (h *DocumentHandler) Finalize(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Heuristic backstop for extraction_confidence: if the model gave us a
+	// recognizable date, treat as high (0.95); empty string + extracted
+	// confidence 0 → 0.0; otherwise pass the model's number through.
+	if extractConf == 0 && expiresStr != "" {
+		extractConf = 0.95
+	}
+
 	if _, err := h.Pool.ExecContext(r.Context(), `
-		UPDATE documents SET size_bytes = ?, expires_at = ?, ocr_confidence = ?, ocr_source = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND provider_id = ?`,
-		sizeBytes, expires, confidence, source, id, pid); err != nil {
+		UPDATE documents
+		   SET expires_at = ?,
+		       expiration_date = COALESCE(expiration_date, ?),
+		       expiration_extracted_value = ?,
+		       document_type_extracted_value = COALESCE(document_type_extracted_value, ?),
+		       extraction_confidence = ?,
+		       ocr_confidence = ?,
+		       ocr_source = ?,
+		       ocr_status = 'completed',
+		       updated_at = CURRENT_TIMESTAMP
+		 WHERE id = ? AND provider_id = ?`,
+		expires, expires, expiresStr, kind, extractConf, ocrConfidence, source,
+		id, pid); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
-	auditlog.EmitDocumentUpload(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), id, map[string]any{
-		"kind":           kind,
-		"mime_type":      mime,
-		"ocr_source":     source,
-		"ocr_confidence": confidence,
+	auditlog.EmitDocumentUpload(r.Context(), h.Pool, pid, userID, id, map[string]any{
+		"kind":                  kind,
+		"mime_type":             mime,
+		"ocr_source":            source,
+		"ocr_confidence":        ocrConfidence,
+		"extraction_confidence": extractConf,
 	}, r)
 	httpx.RenderJSON(w, http.StatusOK, map[string]any{
-		"document_id": id, "expires_at": expires, "ocr_confidence": confidence, "ocr_source": source,
+		"document_id":           id,
+		"expires_at":            expires,
+		"ocr_confidence":        ocrConfidence,
+		"extraction_confidence": extractConf,
+		"ocr_source":            source,
+		// echoed for the portal UI so it can render the confirmation card
+		// without a second round-trip
+		"document_type_extracted_value": kind,
+		"expiration_extracted_value":    expiresStr,
 	})
+}
+
+// confirmInput is the body shape for both manager and portal confirmation.
+type confirmInput struct {
+	DocumentType       string `json:"document_type"`
+	ExpirationDate     string `json:"expiration_date"` // YYYY-MM-DD
+	DoesNotExpire      bool   `json:"does_not_expire"`
+	AcceptedExtraction bool   `json:"accepted_extraction"`
+}
+
+// POST /api/documents/{id}/confirm — manager-side confirmation. Stamps
+// expiration_confirmed_at, persists user-edited document_type / expiration_date
+// (preserving the *_extracted_value audit fields untouched).
+//
+// REQ-006: until this fires, the chase engine should not nag for this doc.
+func (h *DocumentHandler) Confirm(w http.ResponseWriter, r *http.Request) {
+	pid := mw.ProviderIDFrom(r.Context())
+	id := chi.URLParam(r, "id")
+	uid := mw.UserIDFrom(r.Context())
+	h.runConfirm(w, r, pid, id, uid)
+}
+
+func (h *DocumentHandler) runConfirm(w http.ResponseWriter, r *http.Request, pid, id, userID string) {
+	var in confirmInput
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.RenderError(w, r, err)
+		return
+	}
+	if in.DocumentType == "" && !in.DoesNotExpire && in.ExpirationDate == "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("document_type plus expiration_date or does_not_expire is required"))
+		return
+	}
+
+	var expires *time.Time
+	if !in.DoesNotExpire && in.ExpirationDate != "" {
+		t, err := time.Parse("2006-01-02", in.ExpirationDate)
+		if err != nil {
+			httpx.RenderError(w, r, httpx.BadRequestf("expiration_date must be YYYY-MM-DD"))
+			return
+		}
+		expires = &t
+	}
+
+	res, err := h.Pool.ExecContext(r.Context(), `
+		UPDATE documents
+		   SET kind = COALESCE(NULLIF(?, ''), kind),
+		       doc_type = COALESCE(NULLIF(?, ''), doc_type),
+		       expires_at = ?,
+		       expiration_date = ?,
+		       does_not_expire = ?,
+		       expiration_confirmed_at = CURRENT_TIMESTAMP,
+		       expiration_confirmed_by_user_id = NULLIF(?, ''),
+		       updated_at = CURRENT_TIMESTAMP
+		 WHERE id = ? AND provider_id = ? AND deleted_at IS NULL`,
+		in.DocumentType, in.DocumentType,
+		expires, expires,
+		boolToInt(in.DoesNotExpire),
+		userID,
+		id, pid)
+	if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		httpx.RenderError(w, r, httpx.ErrNotFound)
+		return
+	}
+	auditlog.Emit(r.Context(), h.Pool, auditlog.Entry{
+		ProviderID: pid,
+		ActorKind:  auditlog.ActorKindProviderAdmin,
+		ActorID:    userID,
+		Action:     "document.confirm",
+		TargetKind: "document",
+		TargetID:   id,
+		Metadata: map[string]any{
+			"accepted_extraction": in.AcceptedExtraction,
+			"does_not_expire":     in.DoesNotExpire,
+		},
+		IP:        auditlog.ClientIP(r),
+		UserAgent: r.UserAgent(),
+	})
+	httpx.RenderJSON(w, http.StatusOK, map[string]any{
+		"document_id":              id,
+		"expiration_confirmed_at": time.Now().UTC().Format(time.RFC3339),
+		"does_not_expire":         in.DoesNotExpire,
+	})
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // GET /api/documents/{id}
 func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	pid := mw.ProviderIDFrom(r.Context())
 	id := chi.URLParam(r, "id")
+	d, err := h.loadDocument(r.Context(), pid, id)
+	if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrNotFound, err))
+		return
+	}
+	getURL, _ := h.Storage.PresignGetURL(r.Context(), d.StorageBucket, d.StorageKey, 10*time.Minute)
+	httpx.RenderJSON(w, http.StatusOK, map[string]any{"document": d, "download_url": getURL})
+}
+
+// loadDocument is the canonical read shape for one document — used by
+// /api/documents/:id and the portal's /portal/document/:id endpoint. Returns
+// every OCR-confirmation field (REQ-006) so the UI can render the
+// extracted-vs-confirmed state without a second round-trip.
+func (h *DocumentHandler) loadDocument(ctx context.Context, pid, id string) (models.Document, error) {
 	var d models.Document
 	var kind string
-	err := h.Pool.QueryRowContext(r.Context(), `
+	var dne int
+	err := h.Pool.QueryRowContext(ctx, `
 		SELECT id, provider_id, subject_kind, COALESCE(subject_id,''), kind, title,
 		       storage_bucket, storage_key, mime_type, size_bytes,
 		       issued_at, expires_at, COALESCE(ocr_confidence,0), COALESCE(ocr_source,''),
 		       COALESCE(uploaded_by,''), COALESCE(uploaded_via,''), last_chase_sent_at,
+		       COALESCE(expiration_extracted_value,''), COALESCE(document_type_extracted_value,''),
+		       COALESCE(extraction_confidence,0), expiration_confirmed_at,
+		       COALESCE(expiration_confirmed_by_user_id,''), COALESCE(does_not_expire,0),
 		       created_at, updated_at, deleted_at
 		FROM documents WHERE id = ? AND provider_id = ?`, id, pid).
 		Scan(&d.ID, &d.ProviderID, &d.SubjectKind, &d.SubjectID, &kind, &d.Title,
 			&d.StorageBucket, &d.StorageKey, &d.MIMEType, &d.SizeBytes,
 			&d.IssuedAt, &d.ExpiresAt, &d.OCRConfidence, &d.OCRSource,
 			&d.UploadedBy, &d.UploadedVia, &d.LastChaseSentAt,
+			&d.ExpirationExtractedValue, &d.DocumentTypeExtractedValue,
+			&d.ExtractionConfidence, &d.ExpirationConfirmedAt,
+			&d.ExpirationConfirmedByUserID, &dne,
 			&d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
 	if err != nil {
-		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrNotFound, err))
-		return
+		return models.Document{}, err
 	}
 	d.Kind = models.DocumentKind(kind)
-	// include a short-lived presigned GET
-	getURL, _ := h.Storage.PresignGetURL(r.Context(), d.StorageBucket, d.StorageKey, 10*time.Minute)
-	httpx.RenderJSON(w, http.StatusOK, map[string]any{"document": d, "download_url": getURL})
+	d.DoesNotExpire = dne != 0
+	return d, nil
 }
 
 // GET /api/documents?subject_kind=child&subject_id=...  (or provider-wide)

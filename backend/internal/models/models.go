@@ -31,18 +31,23 @@ type Provider struct {
 }
 
 type Child struct {
-	ID           string    `json:"id"`
-	ProviderID   string    `json:"provider_id"`
-	FirstName    string    `json:"first_name"`
-	LastName     string    `json:"last_name"`
-	DOB          time.Time `json:"date_of_birth"`
-	EnrollDate   time.Time `json:"enroll_date"`
-	ParentEmail  string    `json:"parent_email,omitempty"`
-	ParentPhone  string    `json:"parent_phone,omitempty"`
-	Classroom    string    `json:"classroom,omitempty"`
-	Status       string    `json:"status"` // enrolled | withdrawn | pending
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID                      string     `json:"id"`
+	ProviderID              string     `json:"provider_id"`
+	FirstName               string     `json:"first_name"`
+	LastName                string     `json:"last_name"`
+	DOB                     time.Time  `json:"date_of_birth"`
+	EnrollDate              time.Time  `json:"enroll_date"`
+	ParentName              string     `json:"parent_name,omitempty"`
+	ParentEmail             string     `json:"parent_email,omitempty"`
+	ParentPhone             string     `json:"parent_phone,omitempty"`
+	PreferredContactChannel string     `json:"preferred_contact_channel,omitempty"`
+	Classroom               string     `json:"classroom,omitempty"`
+	Allergies               string     `json:"allergies,omitempty"`
+	MedicalConditions       string     `json:"medical_conditions,omitempty"`
+	Status                  string     `json:"status"` // enrolled | withdrawn | pending
+	WithdrawnAt             *time.Time `json:"withdrawn_at,omitempty"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
 }
 
 type Staff struct {
@@ -80,26 +85,35 @@ const (
 )
 
 type Document struct {
-	ID               string       `json:"id"`
-	ProviderID       string       `json:"provider_id"`
-	SubjectKind      string       `json:"subject_kind"` // child | staff | facility
-	SubjectID        string       `json:"subject_id,omitempty"`
-	Kind             DocumentKind `json:"kind"`
-	Title            string       `json:"title"`
-	StorageBucket    string       `json:"storage_bucket"`
-	StorageKey       string       `json:"storage_key"`
-	MIMEType         string       `json:"mime_type"`
-	SizeBytes        int64        `json:"size_bytes"`
-	IssuedAt         *time.Time   `json:"issued_at,omitempty"`
-	ExpiresAt        *time.Time   `json:"expires_at,omitempty"`
-	OCRConfidence    float64      `json:"ocr_confidence,omitempty"`
-	OCRSource        string       `json:"ocr_source,omitempty"` // mistral | gemini | manual
-	UploadedBy       string       `json:"uploaded_by,omitempty"`
-	UploadedVia      string       `json:"uploaded_via,omitempty"` // provider | parent_portal | staff_portal
-	LastChaseSentAt  *time.Time   `json:"last_chase_sent_at,omitempty"`
-	CreatedAt        time.Time    `json:"created_at"`
-	UpdatedAt        time.Time    `json:"updated_at"`
-	DeletedAt        *time.Time   `json:"deleted_at,omitempty"`
+	ID                          string       `json:"id"`
+	ProviderID                  string       `json:"provider_id"`
+	SubjectKind                 string       `json:"subject_kind"` // child | staff | facility
+	SubjectID                   string       `json:"subject_id,omitempty"`
+	Kind                        DocumentKind `json:"kind"`
+	Title                       string       `json:"title"`
+	StorageBucket               string       `json:"storage_bucket"`
+	StorageKey                  string       `json:"storage_key"`
+	MIMEType                    string       `json:"mime_type"`
+	SizeBytes                   int64        `json:"size_bytes"`
+	IssuedAt                    *time.Time   `json:"issued_at,omitempty"`
+	ExpiresAt                   *time.Time   `json:"expires_at,omitempty"`
+	OCRConfidence               float64      `json:"ocr_confidence,omitempty"`
+	OCRSource                   string       `json:"ocr_source,omitempty"` // mistral | gemini | manual
+	UploadedBy                  string       `json:"uploaded_by,omitempty"`
+	UploadedVia                 string       `json:"uploaded_via,omitempty"` // provider | parent_portal | staff_portal
+	LastChaseSentAt             *time.Time   `json:"last_chase_sent_at,omitempty"`
+	// REQ-006 OCR confirmation fields. *Extracted values are append-only AI
+	// output; the corresponding mutable fields (Kind, ExpiresAt) are what the
+	// chase engine actually reads.
+	ExpirationExtractedValue    string     `json:"expiration_extracted_value,omitempty"`
+	DocumentTypeExtractedValue  string     `json:"document_type_extracted_value,omitempty"`
+	ExtractionConfidence        float64    `json:"extraction_confidence,omitempty"`
+	ExpirationConfirmedAt       *time.Time `json:"expiration_confirmed_at,omitempty"`
+	ExpirationConfirmedByUserID string     `json:"expiration_confirmed_by_user_id,omitempty"`
+	DoesNotExpire               bool       `json:"does_not_expire,omitempty"`
+	CreatedAt                   time.Time  `json:"created_at"`
+	UpdatedAt                   time.Time  `json:"updated_at"`
+	DeletedAt                   *time.Time `json:"deleted_at,omitempty"`
 }
 
 type Subscription struct {

@@ -241,7 +241,10 @@ func TestRoundtrip_EveryKind(t *testing.T) {
 			if token == "" {
 				t.Fatal("empty token")
 			}
-			if !strings.Contains(urlPath, "?t=") {
+			// Either ?t= (legacy paths) or /u/<token> (REQ-005 unified portal).
+			// Both forms carry the token; the middleware accepts ?t= and the
+			// frontend extracts the path-token before re-fetching with ?t=.
+			if !strings.Contains(urlPath, "?t=") && !strings.Contains(urlPath, "/u/") {
 				t.Fatalf("path missing token query: %s", urlPath)
 			}
 			claim, err := svc.Consume(ctx, token)
@@ -296,8 +299,8 @@ func TestPathFor_AllKinds(t *testing.T) {
 	}{
 		{magiclink.KindProviderSignup, "/auth/signup?t=abc"},
 		{magiclink.KindProviderSignin, "/auth/signin?t=abc"},
-		{magiclink.KindParentUpload, "/portal/parent?t=abc"},
-		{magiclink.KindStaffUpload, "/portal/staff?t=abc"},
+		{magiclink.KindParentUpload, "/u/abc"},
+		{magiclink.KindStaffUpload, "/u/abc"},
 		{magiclink.KindDocumentSign, "/sign?t=abc"},
 		{magiclink.Kind("weird"), "/?t=abc"},
 	}

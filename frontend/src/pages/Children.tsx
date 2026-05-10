@@ -8,6 +8,7 @@ import Badge from '@/components/common/Badge';
 import Input from '@/components/common/Input';
 import Card from '@/components/common/Card';
 import EmptyState from '@/components/common/EmptyState';
+import AddChildModal from '@/components/AddChildModal';
 import { useChildren } from '@/hooks/useChildren';
 import { formatDate, fullName } from '@/lib/format';
 
@@ -18,6 +19,7 @@ function statusVariant(status: 'compliant' | 'warning' | 'critical') {
 export default function Children(): JSX.Element {
   const { data: children = [], isLoading, isError, error, refetch } = useChildren();
   const [query, setQuery] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return children;
@@ -35,8 +37,15 @@ export default function Children(): JSX.Element {
         title="Children"
         description="Roster of enrolled children. Click any row to view required documents and immunization status."
         actions={
-          <Button leftIcon={<Plus className="h-4 w-4" />}>Add child</Button>
+          <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAddOpen(true)}>
+            Add a child
+          </Button>
         }
+      />
+      <AddChildModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreated={() => void refetch()}
       />
 
       <div className="mb-4 max-w-sm">
@@ -83,10 +92,14 @@ export default function Children(): JSX.Element {
           description={
             query
               ? 'Try a different search.'
-              : 'Add your first child to start tracking required documents.'
+              : "Add your first child to get started. We'll chase the parents for any missing forms."
           }
           action={
-            !query && <Button leftIcon={<Plus className="h-4 w-4" />}>Add child</Button>
+            !query && (
+              <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAddOpen(true)}>
+                Add a child
+              </Button>
+            )
           }
         />
       ) : (

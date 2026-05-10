@@ -43,16 +43,21 @@ func IsSliding(k Kind) bool {
 }
 
 // PathFor builds the URL path a recipient should be sent to.
+//
+// REQ-005 introduced the unified `/u/{token}` portal — both staff and parent
+// upload links now use it. The frontend routes /u/:token, fetches /portal/parent
+// or /portal/staff with `?t=`, and renders the Levelbrook portal UI. The
+// `?t=...` form below remains valid for backend middleware (RequireIndividualMagicLink
+// reads `?t=`) — we just stop sending recipients to the old /portal/* React routes.
 func PathFor(k Kind, token string) string {
 	switch k {
 	case KindProviderSignup:
 		return "/auth/signup?t=" + token
 	case KindProviderSignin:
 		return "/auth/signin?t=" + token
-	case KindParentUpload:
-		return "/portal/parent?t=" + token
-	case KindStaffUpload:
-		return "/portal/staff?t=" + token
+	case KindParentUpload, KindStaffUpload:
+		// Unified upload portal — short, SMS-friendly path.
+		return "/u/" + token
 	case KindDocumentSign:
 		return "/sign?t=" + token
 	default:

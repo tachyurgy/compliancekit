@@ -106,10 +106,21 @@ export default function ChildDetail(): JSX.Element {
             loading={sendingLink}
             onClick={handleSendPortal}
           >
-            Send parent portal link
+            Send a reminder to {firstWord(data.parentName ?? '') || 'parent'}
           </Button>
         }
       />
+
+      {/* Allergy strip — coral background per brand-voice.md, calm tone. Only
+          rendered when allergies are present so we don't take up valuable
+          dashboard real estate. */}
+      {(data as { allergies?: string }).allergies && (
+        <div className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 ring-1 ring-rose-200">
+          <span className="text-sm font-medium text-rose-900">
+            <span aria-hidden>⚠</span> Allergies: {(data as { allergies?: string }).allergies}
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card title="Parent contact">
@@ -224,6 +235,11 @@ export default function ChildDetail(): JSX.Element {
       </div>
     </div>
   );
+}
+
+function firstWord(s: string): string {
+  const i = s.indexOf(' ');
+  return i < 0 ? s : s.slice(0, i);
 }
 
 function Row({

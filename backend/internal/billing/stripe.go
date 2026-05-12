@@ -43,6 +43,19 @@ type PaymentFailedNotifier interface {
 	OnInvoicePaymentFailed(providerID, invoiceID, customerID string, amountDueCents int64, declineReason string)
 }
 
+// TrialConvertedNotifier is the REQ-010 contract for sending the branded
+// trial-converted email when a provider's subscription flips from
+// `trialing` to `active` for the first time (i.e. the first successful
+// charge after the 14-day trial). Idempotent via providers.trial_converted_email_sent_at.
+//
+// The notifier is invoked from onSubscriptionChange when we observe a
+// transition into status="active" AND we haven't sent before. Kept as a
+// separate interface (sibling to PostCheckoutNotifier / PaymentFailedNotifier)
+// for the same testability + lifetime reasons.
+type TrialConvertedNotifier interface {
+	OnTrialConverted(providerID, subscriptionID string, periodEnd time.Time)
+}
+
 type Service struct {
 	pool                  *sql.DB
 	secretKey             string
@@ -50,8 +63,9 @@ type Service struct {
 	frontendBaseURL       string
 	priceMonthly          string
 	priceAnnual           string
-	notifier              PostCheckoutNotifier
-	paymentFailedNotifier PaymentFailedNotifier
+	notifier               PostCheckoutNotifier
+	paymentFailedNotifier  PaymentFailedNotifier
+	trialConvertedNotifier TrialConvertedNotifier
 	log                   *slog.Logger
 }
 
@@ -91,6 +105,11 @@ func (s *Service) SetNotifier(n PostCheckoutNotifier) { s.notifier = n }
 // SetPaymentFailedNotifier wires the REQ-022 payment-failed email handler.
 // Optional — webhook handling proceeds with or without it.
 func (s *Service) SetPaymentFailedNotifier(n PaymentFailedNotifier) { s.paymentFailedNotifier = n }
+
+// SetTrialConvertedNotifier wires the REQ-010 trial-converted email
+// handler. Fires when a subscription's status transitions to "active"
+// for the first time (the first successful post-trial charge).
+func (s *Service) SetTrialConvertedNotifier(n TrialConvertedNotifier) { s.trialConvertedNotifier = n }
 
 // PriceIDFor returns the configured Stripe price ID for the REQ-002 plan
 // codes. Returns empty string for unknown codes; the caller falls back.
@@ -424,7 +443,31 @@ func (s *Service) onSubscriptionChange(ctx context.Context, sub *stripe.Subscrip
 		return fmt.Errorf("billing: update provider account fields: %w", err)
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// REQ-010: when the subscription transitions into "active" AND we
+	// haven't already sent the trial-converted email, fire it. The marker
+	// column (providers.trial_converted_email_sent_at) is checked + set
+	// atomically below so concurrent webhook deliveries can't double-send.
+	if sub.Status == stripe.SubscriptionStatusActive && s.trialConvertedNotifier != nil {
+		// SQLite UPDATE..WHERE..IS NULL is atomic — RowsAffected==1 means
+		// we won the race and own the send.
+		res, err := s.pool.ExecContext(ctx,
+			`UPDATE providers SET trial_converted_email_sent_at = ?
+			  WHERE id = ? AND trial_converted_email_sent_at IS NULL`,
+			time.Now().UTC().Format(time.RFC3339), providerID)
+		if err == nil {
+			if n, _ := res.RowsAffected(); n == 1 {
+				go s.trialConvertedNotifier.OnTrialConverted(providerID, sub.ID, periodEnd)
+			}
+		} else {
+			s.log.Warn("billing: mark trial_converted_email_sent_at", "provider", providerID, "err", err)
+		}
+	}
+
+	return nil
 }
 
 // planFromPriceID maps a Stripe price ID back to the REQ-002 plan code.

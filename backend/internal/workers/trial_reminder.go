@@ -22,12 +22,14 @@ type TrialReminderWorker struct {
 	Log     *slog.Logger
 }
 
-// RunDaily runs once on start, then every 24h until ctx is canceled. We
-// also run inside `runOnce` with a wide window (now+2.5d to now+3.5d) so a
-// 24h-cadence worker is sufficient — every trial-ending date falls inside
-// exactly one 24h window.
+// RunDaily runs once on start, then every 24h until ctx is canceled. Each
+// pass fires two passes back-to-back — the 3-day reminder (now+2.5d..3.5d)
+// and the 1-day reminder (now+0.5d..1.5d). Idempotent: the
+// trial_ending_email_sent_at + trial_ending_1day_email_sent_at marker
+// columns ensure a provider receives each reminder at most once.
 func (w *TrialReminderWorker) RunDaily(ctx context.Context) {
 	w.runOnce(ctx, time.Now().UTC())
+	w.run1DayOnce(ctx, time.Now().UTC())
 	t := time.NewTicker(24 * time.Hour)
 	defer t.Stop()
 	for {
@@ -36,6 +38,7 @@ func (w *TrialReminderWorker) RunDaily(ctx context.Context) {
 			return
 		case now := <-t.C:
 			w.runOnce(ctx, now.UTC())
+			w.run1DayOnce(ctx, now.UTC())
 		}
 	}
 }
@@ -157,4 +160,120 @@ func (w *TrialReminderWorker) runOnce(ctx context.Context, now time.Time) {
 	}
 
 	log.Info("trial-reminder: pass complete", "candidates", len(candidates), "sent", sent)
+}
+
+// run1DayOnce is the REQ-010 1-day pass. Same shape as runOnce above but a
+// tighter window (now+0.5d..1.5d) and a separate marker column so the
+// 3-day and 1-day reminders dedup independently.
+func (w *TrialReminderWorker) run1DayOnce(ctx context.Context, now time.Time) {
+	if w == nil || w.Pool == nil {
+		return
+	}
+	log := w.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	if w.Emailer == nil {
+		log.Info("trial-reminder-1d: emailer not configured; skipping")
+		return
+	}
+
+	windowStart := now.Add(12 * time.Hour) // +0.5d
+	windowEnd := now.Add(36 * time.Hour)   // +1.5d
+
+	rows, err := w.Pool.QueryContext(ctx, `
+		SELECT p.id,
+		       COALESCE(p.owner_email, ''),
+		       COALESCE(p.name, p.legal_name, ''),
+		       COALESCE((SELECT u.full_name FROM users u
+		                  WHERE u.provider_id = p.id AND u.role = 'provider_admin'
+		                    AND u.deleted_at IS NULL
+		                  ORDER BY u.created_at ASC LIMIT 1), ''),
+		       p.trial_ends_at
+		  FROM providers p
+		 WHERE p.deleted_at IS NULL
+		   AND p.trial_ending_1day_email_sent_at IS NULL
+		   AND p.trial_ends_at IS NOT NULL
+		   AND p.trial_ends_at >= ?
+		   AND p.trial_ends_at <= ?`,
+		windowStart.Format(time.RFC3339),
+		windowEnd.Format(time.RFC3339),
+	)
+	if err != nil {
+		log.Warn("trial-reminder-1d: query failed", "err", err)
+		return
+	}
+	defer rows.Close()
+
+	type cand struct {
+		id        string
+		email     string
+		name      string
+		fullName  string
+		trialEnds string
+	}
+	var candidates []cand
+	for rows.Next() {
+		var c cand
+		if err := rows.Scan(&c.id, &c.email, &c.name, &c.fullName, &c.trialEnds); err != nil {
+			log.Warn("trial-reminder-1d: scan failed", "err", err)
+			continue
+		}
+		candidates = append(candidates, c)
+	}
+	_ = rows.Close()
+
+	var sent int
+	for _, c := range candidates {
+		if ctx.Err() != nil {
+			return
+		}
+		if c.email == "" {
+			log.Warn("trial-reminder-1d: provider has no owner_email", "provider_id", c.id)
+			continue
+		}
+		trialEnds, err := time.Parse(time.RFC3339, c.trialEnds)
+		if err != nil {
+			log.Warn("trial-reminder-1d: parse trial_ends_at", "provider_id", c.id, "err", err)
+			continue
+		}
+
+		first := strings.TrimSpace(c.fullName)
+		if first == "" {
+			first = c.name
+		}
+
+		subject, html, text, err := notify.RenderTrialEnding1Day(notify.TrialEnding1DayData{
+			FirstName:    first,
+			FacilityName: c.name,
+			TrialEndsOn:  trialEnds.Format("Jan 2, 2006"),
+			CardBrand:    "Card on file",
+			CardLast4:    "",
+			BillingURL:   strings.TrimRight(w.AppBase, "/") + "/settings/billing",
+		})
+		if err != nil {
+			log.Warn("trial-reminder-1d: render", "provider_id", c.id, "err", err)
+			continue
+		}
+
+		sendCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		err = w.Emailer.Send(sendCtx, notify.EmailMessage{
+			To: c.email, Subject: subject, HTMLBody: html, PlainBody: text,
+			ReferenceID: "trial-ending-1d:" + c.id,
+		})
+		cancel()
+		if err != nil {
+			log.Warn("trial-reminder-1d: send", "provider_id", c.id, "err", err)
+			continue
+		}
+
+		if _, err := w.Pool.ExecContext(ctx,
+			`UPDATE providers SET trial_ending_1day_email_sent_at = ? WHERE id = ?`,
+			now.Format(time.RFC3339), c.id); err != nil {
+			log.Warn("trial-reminder-1d: mark sent", "provider_id", c.id, "err", err)
+		}
+		sent++
+	}
+
+	log.Info("trial-reminder-1d: pass complete", "candidates", len(candidates), "sent", sent)
 }

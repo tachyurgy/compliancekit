@@ -321,6 +321,95 @@ func (n *PaymentFailedNotifier) OnInvoicePaymentFailed(providerID, invoiceID, cu
 	logger.Info("payment-failed: sent", "provider_id", providerID, "to", email, "invoice", invoiceID)
 }
 
+// TrialConvertedNotifier implements billing.TrialConvertedNotifier. Fires
+// the REQ-010 branded trial-converted email after the first successful
+// charge (subscription status flips from "trialing" to "active"). The
+// billing service already won the dedup race via the
+// providers.trial_converted_email_sent_at column, so this notifier just
+// renders + sends.
+type TrialConvertedNotifier struct {
+	Pool    *sql.DB
+	Emailer *notify.Emailer
+	AppBase string
+	Log     *slog.Logger
+}
+
+func (n *TrialConvertedNotifier) OnTrialConverted(providerID, subscriptionID string, periodEnd time.Time) {
+	if n == nil || n.Pool == nil {
+		return
+	}
+	logger := n.Log
+	if logger == nil {
+		logger = slog.Default()
+	}
+	if n.Emailer == nil {
+		logger.Info("trial-converted: emailer not configured; skipping send", "provider_id", providerID)
+		return
+	}
+
+	var email, name, fullName, plan string
+	if err := n.Pool.QueryRow(`
+		SELECT COALESCE(p.owner_email,''),
+		       COALESCE(p.name, p.legal_name, ''),
+		       COALESCE((SELECT u.full_name FROM users u
+		                  WHERE u.provider_id = p.id AND u.role = 'provider_admin'
+		                    AND u.deleted_at IS NULL
+		                  ORDER BY u.created_at ASC LIMIT 1), ''),
+		       COALESCE(p.plan, '')
+		  FROM providers p WHERE p.id = ?`, providerID).Scan(&email, &name, &fullName, &plan); err != nil {
+		logger.Warn("trial-converted: lookup provider", "provider_id", providerID, "err", err)
+		return
+	}
+	if email == "" {
+		logger.Warn("trial-converted: provider has no owner_email", "provider_id", providerID)
+		return
+	}
+
+	planLabel, amount := planLabelAndAmount(plan)
+	nextCharge := ""
+	if !periodEnd.IsZero() {
+		nextCharge = periodEnd.Format("Jan 2, 2006")
+	}
+
+	subject, html, text, err := notify.RenderTrialConverted(notify.TrialConvertedData{
+		FirstName:     pickFirstName(fullName, name),
+		FacilityName:  name,
+		PlanName:      planLabel,
+		AmountCharged: amount,
+		NextChargeOn:  nextCharge,
+		AppURL:        strings.TrimRight(n.AppBase, "/"),
+	})
+	if err != nil {
+		logger.Warn("trial-converted: render", "err", err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := n.Emailer.Send(ctx, notify.EmailMessage{
+		To: email, Subject: subject, HTMLBody: html, PlainBody: text,
+		ReferenceID: "trial-converted:" + subscriptionID,
+	}); err != nil {
+		logger.Warn("trial-converted: send", "provider_id", providerID, "err", err)
+		return
+	}
+	logger.Info("trial-converted: sent", "provider_id", providerID, "to", email, "subscription", subscriptionID)
+}
+
+// planLabelAndAmount maps the REQ-002 plan codes to display label + the
+// pre-formatted dollar amount the trial-converted template expects.
+func planLabelAndAmount(plan string) (label, amount string) {
+	switch plan {
+	case "annual_948":
+		return "Levelbrook Professional — Annual", "948.00"
+	case "monthly_99":
+		return "Levelbrook Professional — Monthly", "99.00"
+	default:
+		// Default to monthly — the trial-converted hook only fires once a
+		// real subscription is active so this is just a safe fallback.
+		return "Levelbrook Professional — Monthly", "99.00"
+	}
+}
+
 func pickFirstName(fullName, fallback string) string {
 	if s := strings.TrimSpace(fullName); s != "" {
 		return s

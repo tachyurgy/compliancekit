@@ -171,6 +171,12 @@ func run() error {
 		Pool: pool, Emailer: emailer, AppBase: cfg.AppBaseURL,
 		Log: log.With("component", "payment_failed_notifier"),
 	})
+	// REQ-010 wiring: send the branded trial-converted email when a
+	// subscription flips from trialing → active for the first time.
+	bill.SetTrialConvertedNotifier(&handlers.TrialConvertedNotifier{
+		Pool: pool, Emailer: emailer, AppBase: cfg.AppBaseURL,
+		Log: log.With("component", "trial_converted_notifier"),
+	})
 	drills := &handlers.DrillHandler{Pool: pool, Log: log.With("component", "drills")}
 	postings := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
 	ratio := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}

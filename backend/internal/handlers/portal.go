@@ -324,13 +324,13 @@ func (h *PortalHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		claim.ProviderID, subjectKind, safeID(claim.SubjectID), kind, docID)
 	finalKey := keyRoot + "." + extFor(in.MIMEType)
 	if _, err := h.Pool.ExecContext(r.Context(), `
-		INSERT INTO documents (id, provider_id, subject_kind, subject_id, kind, title,
-		                      storage_bucket, storage_key, mime_type, size_bytes,
+		INSERT INTO documents (id, provider_id, owner_kind, owner_id, subject_kind, subject_id, kind, title, doc_type,
+		                      storage_bucket, storage_key, s3_key, mime_type, size_bytes,
 		                      uploaded_by, uploaded_via, ocr_status,
 		                      created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,0,?,?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-		docID, claim.ProviderID, subjectKind, claim.SubjectID, kind, title,
-		bucket, finalKey, in.MIMEType, claim.SubjectID, uploadedVia); err != nil {
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		docID, claim.ProviderID, subjectKind, claim.SubjectID, subjectKind, claim.SubjectID, kind, title, kind,
+		bucket, finalKey, finalKey, in.MIMEType, claim.SubjectID, uploadedVia); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}

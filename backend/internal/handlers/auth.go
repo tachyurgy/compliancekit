@@ -485,7 +485,7 @@ func SendEmailVerification(
 	}
 	if err := emailer.Send(ctx, notify.EmailMessage{
 		To: email, Subject: subject, HTMLBody: htmlBody, PlainBody: textBody,
-		ReferenceID: "email_verification:" + userID,
+		ReferenceID: "email_verification-" + userID,
 	}); err != nil {
 		log.Warn("email-verification: send", "err", err, "user_id", userID)
 	}

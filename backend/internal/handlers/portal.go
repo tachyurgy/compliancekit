@@ -430,7 +430,7 @@ func (h *PortalHandler) Finalize(w http.ResponseWriter, r *http.Request) {
 		mime = "application/pdf"
 	} else if isImage(mime) {
 		// Single image: re-encode in place to strip EXIF + apply rotation.
-		if err := h.stripEXIFInPlace(r.Context(), key, mime); err != nil {
+		if err := h.stripEXIFInPlace(r.Context(), bucket, key, mime); err != nil {
 			h.Log.Warn("portal finalize: exif strip", "err", err, "doc", id)
 			// non-fatal — keep going.
 		}
@@ -439,7 +439,7 @@ func (h *PortalHandler) Finalize(w http.ResponseWriter, r *http.Request) {
 	// Audit row.
 	auditID := base62.NewID()[:22]
 	var fileBytes int64
-	if body, _, err := h.Storage.GetDocument(r.Context(), key); err == nil {
+	if body, _, err := h.Storage.GetFromBucket(r.Context(), bucket, key); err == nil {
 		if buf, err := io.ReadAll(body); err == nil {
 			fileBytes = int64(len(buf))
 		}
@@ -513,7 +513,7 @@ func (h *PortalHandler) ConfirmDocument(w http.ResponseWriter, r *http.Request) 
 func (h *PortalHandler) stitchAndStore(ctx context.Context, bucket, finalKey string, partKeys []string) error {
 	imgs := make([]image.Image, 0, len(partKeys))
 	for _, k := range partKeys {
-		body, _, err := h.Storage.GetDocument(ctx, k)
+		body, _, err := h.Storage.GetFromBucket(ctx, bucket, k)
 		if err != nil {
 			return fmt.Errorf("stitch: get %s: %w", k, err)
 		}
@@ -547,9 +547,10 @@ func (h *PortalHandler) stitchAndStore(ctx context.Context, bucket, finalKey str
 }
 
 // stripEXIFInPlace decodes a single image, auto-rotates via EXIF, re-encodes
-// (which drops the EXIF block including GPS), and writes back to the same key.
-func (h *PortalHandler) stripEXIFInPlace(ctx context.Context, key, mime string) error {
-	body, _, err := h.Storage.GetDocument(ctx, key)
+// (which drops the EXIF block including GPS), and writes back to the same
+// (bucket, key) the bytes came from.
+func (h *PortalHandler) stripEXIFInPlace(ctx context.Context, bucket, key, mime string) error {
+	body, _, err := h.Storage.GetFromBucket(ctx, bucket, key)
 	if err != nil {
 		return err
 	}
@@ -573,7 +574,7 @@ func (h *PortalHandler) stripEXIFInPlace(ctx context.Context, key, mime string) 
 		return err
 	}
 	_ = mime
-	return h.Storage.PutDocument(ctx, key, "image/jpeg", &out)
+	return h.Storage.PutToBucket(ctx, bucket, key, "image/jpeg", &out)
 }
 
 func isImage(m string) bool {

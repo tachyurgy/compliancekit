@@ -120,8 +120,10 @@ func (h *DocumentHandler) runFinalize(w http.ResponseWriter, r *http.Request, pi
 		return
 	}
 
-	// Download the blob, run OCR, extract expiration.
-	body, _, err := h.Storage.GetDocument(r.Context(), key)
+	// Download the blob, run OCR, extract expiration. Browser uploads land
+	// in the raw-uploads bucket via presigned PUT; documents.storage_bucket
+	// records where the bytes actually live so we read from the right place.
+	body, _, err := h.Storage.GetFromBucket(r.Context(), bucket, key)
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return

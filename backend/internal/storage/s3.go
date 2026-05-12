@@ -86,10 +86,31 @@ func (c *Client) PutDocument(ctx context.Context, key, mimeType string, body io.
 	return c.put(ctx, c.buckets.Documents, key, mimeType, body)
 }
 
+// PutToBucket uploads to an arbitrary bucket. Used by the portal flow when
+// the bytes already live in raw-uploads (browser presigned PUT) and we want
+// to mutate-in-place (EXIF strip) without moving the object.
+func (c *Client) PutToBucket(ctx context.Context, bucket, key, mimeType string, body io.Reader) error {
+	if bucket == "" {
+		bucket = c.buckets.Documents
+	}
+	return c.put(ctx, bucket, key, mimeType, body)
+}
+
 // GetDocument fetches a blob from the documents bucket. Caller must Close the reader.
 func (c *Client) GetDocument(ctx context.Context, key string) (io.ReadCloser, string, error) {
+	return c.GetFromBucket(ctx, c.buckets.Documents, key)
+}
+
+// GetFromBucket fetches a blob from an arbitrary bucket. Use this when the
+// caller has a stored bucket name (e.g. documents.storage_bucket points at
+// the raw-uploads bucket because the browser uploaded there directly).
+// Caller must Close the reader.
+func (c *Client) GetFromBucket(ctx context.Context, bucket, key string) (io.ReadCloser, string, error) {
+	if bucket == "" {
+		bucket = c.buckets.Documents
+	}
 	out, err := c.s3.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(c.buckets.Documents),
+		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {

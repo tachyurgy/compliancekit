@@ -1,0 +1,19 @@
+Confirm your Levelbrook email
+
+Hi {{.FirstName}},
+
+Thanks for starting a Levelbrook account for {{.FacilityName}}. Open the
+link below to confirm this is your email, and we'll finish setting things
+up. This link is good for {{.ExpiresInHours}} hours.
+
+  {{.VerifyURL}}
+
+Didn't sign up? You can ignore this email — we'll delete the unverified
+account after a few days.
+
+—
+Levelbrook · Compliance for Florida child care
+levelbrookteam@gmail.com
+
+You're receiving this because someone just started a Levelbrook account
+using this email address.

@@ -1,0 +1,19 @@
+Your documents go here — {{.FacilityName}}
+
+Hi {{.FirstName}},
+
+{{.OperatorName}} at {{.FacilityName}} set up a private upload page for
+your staff file. Snap a photo or pick a PDF — we handle the rest.
+
+No account, no password. Just one tap on the link below.
+
+  {{.UploadURL}}
+
+This link is good for {{.ExpiresInDays}} days. Questions about what to
+send? Just reply — this email goes straight to {{.OperatorName}}.
+
+—
+Levelbrook · Compliance for Florida child care
+levelbrookteam@gmail.com
+
+You're receiving this because you're a staff member at {{.FacilityName}}.

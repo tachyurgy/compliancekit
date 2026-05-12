@@ -1,0 +1,20 @@
+A quick upload for {{.ChildFirstName}} — {{.FacilityName}}
+
+Hi {{.FirstName}},
+
+{{.OperatorName}} at {{.FacilityName}} set up a private page where you
+can drop {{.ChildFirstName}}'s required forms — immunization records,
+enrollment paperwork, anything they ask for. Phone photo is fine.
+
+No account, no password. Just one tap on the link below.
+
+  {{.UploadURL}}
+
+This link is good for {{.ExpiresInDays}} days. Questions about what to
+send? Just reply — this email goes straight to {{.OperatorName}}.
+
+—
+Levelbrook · Compliance for Florida child care
+levelbrookteam@gmail.com
+
+You're receiving this because {{.ChildFirstName}} is enrolled at {{.FacilityName}}.

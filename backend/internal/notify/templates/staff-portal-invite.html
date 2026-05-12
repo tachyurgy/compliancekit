@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>Upload your required documents for {{.FacilityName}}</title>
+<style>
+  body { margin:0; padding:0; background:#f3f1ec; -webkit-font-smoothing:antialiased; }
+  table { border-collapse:collapse; }
+  a { color:#0c1722; }
+  .wrap { width:100%; background:#f3f1ec; padding:24px 0; }
+  .card { width:100%; max-width:600px; background:#ffffff; border-radius:14px; }
+  .pad { padding:32px 32px 8px 32px; }
+  .pad-b { padding:8px 32px 32px 32px; }
+  .h1 { font-size:24px; line-height:1.3; font-weight:700; color:#0c1722; margin:0 0 8px 0; }
+  .p { font-size:16px; line-height:1.55; color:#243345; margin:0 0 16px 0; }
+  .small { font-size:14px; line-height:1.5; color:#5a6a7a; margin:0; }
+  .footer { font-size:12px; line-height:1.5; color:#8194a4; padding:16px 32px 24px 32px; }
+  .footer a { color:#5a6a7a; }
+  .logo { font-size:18px; font-weight:700; color:#0c1722; letter-spacing:-0.01em; }
+  .accent { display:inline-block; width:14px; height:14px; background:#caa257; border-radius:3px; vertical-align:middle; margin-right:8px; }
+  .rule { border:0; border-top:1px solid #eef2f5; margin:24px 0; }
+  .url-fallback { font-size:13px; line-height:1.5; color:#5a6a7a; word-break:break-all; background:#f7f5ee; border-radius:6px; padding:10px 12px; margin:0; font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; }
+  @media only screen and (max-width:600px) {
+    .pad, .pad-b { padding-left:20px !important; padding-right:20px !important; }
+    .footer { padding-left:20px !important; padding-right:20px !important; }
+    .h1 { font-size:22px !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#f3f1ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+<table role="presentation" class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f1ec;padding:24px 0;">
+  <tr>
+    <td align="center" style="padding:24px 12px;">
+      <table role="presentation" class="card" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:14px;">
+        <tr>
+          <td class="pad" style="padding:32px 32px 8px 32px;">
+            <div class="logo" style="font-size:18px;font-weight:700;color:#0c1722;letter-spacing:-0.01em;">
+              <span class="accent" style="display:inline-block;width:14px;height:14px;background:#caa257;border-radius:3px;vertical-align:middle;margin-right:8px;"></span>Levelbrook
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td class="pad" style="padding:24px 32px 0 32px;">
+            <h1 class="h1" style="font-size:24px;line-height:1.3;font-weight:700;color:#0c1722;margin:0 0 12px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">Hi {{.FirstName}}, your documents go here.</h1>
+            <p class="p" style="font-size:16px;line-height:1.55;color:#243345;margin:0 0 16px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">{{.OperatorName}} at <strong style="color:#0c1722;">{{.FacilityName}}</strong> set up a private upload page for your staff file. Snap a photo or pick a PDF &mdash; we handle the rest.</p>
+            <p class="p" style="font-size:16px;line-height:1.55;color:#243345;margin:0 0 16px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">No account, no password. Just one tap on the link below.</p>
+          </td>
+        </tr>
+        <tr>
+          <td class="pad" style="padding:0 32px 8px 32px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" bgcolor="#caa257" style="border-radius:8px;background:#caa257;">
+                  <a href="{{.UploadURL}}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;border-radius:8px;">Open your upload page</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td class="pad" style="padding:24px 32px 0 32px;">
+            <p class="small" style="font-size:14px;line-height:1.5;color:#5a6a7a;margin:0 0 8px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">If the button doesn&rsquo;t work, copy this link into your browser:</p>
+            <p class="url-fallback" style="font-size:13px;line-height:1.5;color:#5a6a7a;word-break:break-all;background:#f7f5ee;border-radius:6px;padding:10px 12px;margin:0;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;">{{.UploadURL}}</p>
+          </td>
+        </tr>
+        <tr>
+          <td class="pad-b" style="padding:24px 32px 8px 32px;">
+            <p class="small" style="font-size:14px;line-height:1.5;color:#5a6a7a;margin:0 0 12px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">This link is good for <strong style="color:#243345;">{{.ExpiresInDays}} days</strong>. Questions about what to send? Just reply &mdash; this email goes straight to {{.OperatorName}}.</p>
+            <hr class="rule" style="border:0;border-top:1px solid #eef2f5;margin:24px 0;">
+          </td>
+        </tr>
+        <tr>
+          <td class="footer" style="font-size:12px;line-height:1.6;color:#8194a4;padding:0 32px 28px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+            <strong style="color:#5a6a7a;">Levelbrook</strong> &middot; Compliance for Florida child care<br>
+            <a href="mailto:levelbrookteam@gmail.com" style="color:#5a6a7a;">levelbrookteam@gmail.com</a><br>
+            You&rsquo;re receiving this because you&rsquo;re a staff member at {{.FacilityName}}.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

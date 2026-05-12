@@ -76,15 +76,29 @@ func (m *Mistral) Extract(ctx context.Context, r io.Reader, mimeType string) (Re
 		return Result{}, fmt.Errorf("ocr/mistral: read body: %w", err)
 	}
 	b64 := base64.StdEncoding.EncodeToString(data)
+	dataURI := "data:" + mimeType + ";base64," + b64
 
 	// Mistral OCR API: https://api.mistral.ai/v1/ocr
-	reqBody := map[string]any{
-		"model": "mistral-ocr-latest",
-		"document": map[string]any{
-			"type":          "document_base64",
+	// The `document` field is a tagged union — `image_url` for raster images
+	// (jpeg/png/heic/webp) and `document_url` for PDFs. Both accept either a
+	// public URL or a data URI; we send a data URI so the file never has to
+	// be uploaded anywhere first.
+	var docField map[string]any
+	if mimeType == "application/pdf" {
+		docField = map[string]any{
+			"type":         "document_url",
+			"document_url": dataURI,
 			"document_name": "upload." + extFromMIME(mimeType),
-			"document_base64": "data:" + mimeType + ";base64," + b64,
-		},
+		}
+	} else {
+		docField = map[string]any{
+			"type":      "image_url",
+			"image_url": dataURI,
+		}
+	}
+	reqBody := map[string]any{
+		"model":                "mistral-ocr-latest",
+		"document":             docField,
 		"include_image_base64": false,
 	}
 	body, _ := json.Marshal(reqBody)

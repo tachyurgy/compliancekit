@@ -791,20 +791,66 @@ func (h *ProviderHandler) mintPortalLink(w http.ResponseWriter, r *http.Request,
 	// Optional: email the recipient if ?send=email AND we have an address AND
 	// an emailer is wired. This is a nice-to-have; the primary contract is
 	// returning the URL so the admin can send it themselves.
+	//
+	// REQ-010: the email body uses the branded staff-portal-invite /
+	// parent-portal-invite templates (replacing the dev-grade
+	// RenderMagicLinkEmail that pre-dated REQ-010). The Reply-To is the
+	// provider's owner email so a recipient's reply lands with their
+	// director, not with us — that's the same pattern the chase emails use.
 	emailed := false
 	if r.URL.Query().Get("send") == "email" && email != "" && h.Emailer != nil {
-		actionText := "Upload your child's required forms"
-		if subjectKind == "staff" {
-			actionText = "Upload your required certifications"
+		// Look up the facility's display name + the inviting operator's
+		// name + reply-to address. Best-effort: a missing facility name
+		// falls back to a friendly default inside the renderer.
+		var facilityName, ownerEmail string
+		_ = h.Pool.QueryRowContext(r.Context(),
+			`SELECT COALESCE(name, legal_name, ''), COALESCE(owner_email, '')
+			   FROM providers WHERE id = ?`, pid).Scan(&facilityName, &ownerEmail)
+		var operatorName string
+		_ = h.Pool.QueryRowContext(r.Context(),
+			`SELECT COALESCE(full_name, '')
+			   FROM users
+			  WHERE provider_id = ? AND role = 'provider_admin' AND deleted_at IS NULL
+			  ORDER BY created_at ASC LIMIT 1`, pid).Scan(&operatorName)
+
+		ttlDays := int((magiclink.TTLFor(kind) + (24*time.Hour - 1)) / (24 * time.Hour))
+		if ttlDays <= 0 {
+			ttlDays = 7
 		}
-		sub, html, text := notify.RenderMagicLinkEmail(notify.MagicLinkEmailData{
-			RecipientName: firstName + " " + lastName,
-			ActionText:    actionText,
-			URL:           url,
-			ExpiresIn:     "7 days",
-		})
-		if err := h.Emailer.Send(r.Context(), notify.EmailMessage{
-			To: email, Subject: sub, HTMLBody: html, PlainBody: text,
+
+		var (
+			sub, htmlBody, textBody string
+			renderErr               error
+		)
+		if subjectKind == "staff" {
+			sub, htmlBody, textBody, renderErr = notify.RenderStaffPortalInvite(notify.StaffPortalInviteData{
+				FirstName:     firstName,
+				FacilityName:  facilityName,
+				OperatorName:  operatorName,
+				UploadURL:     url,
+				ExpiresInDays: ttlDays,
+			})
+		} else {
+			// `firstName`/`lastName` here are the child's name (from the
+			// children table). We don't have the parent's first name on
+			// file, so leave FirstName blank — the renderer falls back to
+			// "there" which is the right tone for a parent we don't know
+			// by name yet. ChildFirstName carries the child's first name
+			// for personalization.
+			sub, htmlBody, textBody, renderErr = notify.RenderParentPortalInvite(notify.ParentPortalInviteData{
+				ChildFirstName: firstName,
+				FacilityName:   facilityName,
+				OperatorName:   operatorName,
+				UploadURL:      url,
+				ExpiresInDays:  ttlDays,
+			})
+		}
+		if renderErr != nil {
+			h.Log.Warn("portal link: render", "err", renderErr, "subject", subjectKind, "id", subjectID)
+		} else if err := h.Emailer.Send(r.Context(), notify.EmailMessage{
+			To: email, Subject: sub, HTMLBody: htmlBody, PlainBody: textBody,
+			ReplyTo:     ownerEmail,
+			ReferenceID: "portal-invite:" + string(kind) + ":" + subjectID,
 		}); err != nil {
 			h.Log.Warn("portal link: email send", "err", err, "subject", subjectKind, "id", subjectID)
 		} else {

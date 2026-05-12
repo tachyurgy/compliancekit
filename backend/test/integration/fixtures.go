@@ -111,6 +111,8 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 	}
 	billH := &handlers.BillingHandler{Pool: pool, Billing: billingSvc, Log: log.With("component", "billing")}
 	stripeWH := &handlers.StripeWebhookHandler{Billing: billingSvc, Log: log.With("component", "stripe_wh")}
+	sesWH := &handlers.SESWebhookHandler{Pool: pool, Log: log.With("component", "ses_wh")}
+	twilioWH := &handlers.TwilioWebhookHandler{Pool: pool, Log: log.With("component", "twilio_wh")}
 	drills := &handlers.DrillHandler{Pool: pool, Log: log.With("component", "drills")}
 	postingsH := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
 	ratioH := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}
@@ -152,6 +154,8 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 		Portal:          portal,
 		Billing:         billH,
 		StripeWebhook:   stripeWH,
+		SESWebhook:      sesWH,
+		TwilioWebhook:   twilioWH,
 		Drills:          drills,
 		Postings:        postingsH,
 		Ratio:           ratioH,

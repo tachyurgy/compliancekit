@@ -90,6 +90,8 @@ type Deps struct {
 	Auth            *handlers.AuthHandler      // REQ-011 forgot/reset/sessions
 	Legal           *handlers.LegalHandler     // REQ-002 ToS/DPA e-sign
 	StripeWebhook   *handlers.StripeWebhookHandler
+	SESWebhook      *handlers.SESWebhookHandler    // REQ-007: SES bounce / complaint → unsubscribes
+	TwilioWebhook   *handlers.TwilioWebhookHandler // REQ-007: Twilio STOP keyword → unsubscribes
 	Drills          *handlers.DrillHandler
 	Postings        *handlers.PostingHandler
 	Ratio           *handlers.RatioHandler
@@ -169,6 +171,15 @@ func NewRouter(d Deps) http.Handler {
 	// Public marketing-site contact form.
 	if d.Contact != nil {
 		r.Post("/webhooks/contact", d.Contact.Post)
+	}
+
+	// REQ-007: SES bounce + Twilio STOP webhooks. Public (no session), idempotent
+	// inserts into `unsubscribes`. SES path is SNS JSON; Twilio is form-encoded.
+	if d.SESWebhook != nil {
+		r.Post("/webhooks/ses/bounce", d.SESWebhook.Handle)
+	}
+	if d.TwilioWebhook != nil {
+		r.Post("/webhooks/twilio/sms", d.TwilioWebhook.Handle)
 	}
 
 	// REQ-016a: kiosk endpoints. The session-issue endpoint is admin-only and

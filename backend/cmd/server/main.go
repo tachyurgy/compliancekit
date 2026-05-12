@@ -158,6 +158,11 @@ func run() error {
 	}
 	legalH := &handlers.LegalHandler{Pool: pool, Log: log.With("component", "legal")}
 	stripeWH := &handlers.StripeWebhookHandler{Billing: bill, Log: log.With("component", "stripe_wh")}
+	// REQ-007: opt-out registry hooks. SES bounce JSON arrives via SNS;
+	// Twilio STOP-keyword inbound arrives as form-encoded. Both insert into
+	// the `unsubscribes` table the chase service honors per-channel.
+	sesWH := &handlers.SESWebhookHandler{Pool: pool, Log: log.With("component", "ses_wh")}
+	twilioWH := &handlers.TwilioWebhookHandler{Pool: pool, Log: log.With("component", "twilio_wh")}
 
 	// REQ-002 wiring: send the welcome email after Stripe's
 	// checkout.session.completed lands, and persist trial info on providers.
@@ -279,6 +284,8 @@ func run() error {
 		Auth:            authH,
 		Legal:           legalH,
 		StripeWebhook:   stripeWH,
+		SESWebhook:      sesWH,
+		TwilioWebhook:   twilioWH,
 		Drills:          drills,
 		Postings:        postings,
 		Ratio:           ratio,

@@ -1,0 +1,26 @@
+Welcome to Levelbrook Professional!
+
+Hi {{.FirstName}},
+
+Your first payment came through. {{.FacilityName}} is now on Levelbrook
+Professional, and we're here keeping your staff and child files
+inspection-ready in the background.
+
+Thanks for trusting us with this. We don't take it lightly.
+
+Amount charged: ${{.AmountCharged}}
+Plan:           {{.PlanName}}
+Next charge:    {{.NextChargeOn}}
+
+Open your dashboard: {{.AppURL}}
+
+Your receipt is in the billing page above. Need to switch plans or
+cancel? Same place — one click, no friction.
+
+Questions about the product? Just reply — we read every email.
+
+--
+Levelbrook · Compliance for Florida child care
+levelbrookteam@gmail.com
+
+You're receiving this because your first payment for {{.FacilityName}} succeeded.

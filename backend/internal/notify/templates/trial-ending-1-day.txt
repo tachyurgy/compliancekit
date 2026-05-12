@@ -1,0 +1,19 @@
+Hi {{.FirstName}}, 1 day left on your trial.
+
+Quick heads-up — tomorrow we'll charge the card you added and {{.FacilityName}} stays inspection-ready without a hiccup. Nothing for you to do.
+
+Plan:           Levelbrook Professional — $99/month
+First charge:   {{.TrialEndsOn}}
+Card on file:   {{.CardBrand}}{{if .CardLast4}} ending in {{.CardLast4}}{{end}}
+
+Manage billing: {{.BillingURL}}
+
+Want to switch to annual and save about 20%? You can change plans on the billing page above. Need to cancel? Same place — one click, no friction.
+
+Questions about the product? Just reply — we read every email.
+
+--
+Levelbrook · Compliance for Florida child care
+levelbrookteam@gmail.com
+
+You're receiving this because you're trialing Levelbrook for {{.FacilityName}}.

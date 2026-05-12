@@ -165,6 +165,30 @@ func (h *ProviderHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		"owner_email": in.OwnerEmail,
 	}, r)
 	emitAuthAudit(r.Context(), h.Pool, userID, in.OwnerEmail, "signup", r)
+
+	// REQ-010: fire the branded email-verification email. Best-effort —
+	// signup must complete even if SES is briefly unavailable. The user
+	// can still use the app; verification is currently advisory. We use
+	// a background context (with a 30s deadline) so the response isn't
+	// blocked on SES round-trip.
+	go func(userID, email, fullName, facilityName string, ip, ua string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		// Replay the relevant headers/IP onto a synthetic request so the
+		// audit row in email_verifications gets the original client's IP +
+		// UA rather than blanks. r.Context() would be canceled by the time
+		// the goroutine runs.
+		synth, _ := http.NewRequestWithContext(ctx, http.MethodPost, "/internal/email-verify", nil)
+		if synth != nil {
+			synth.Header.Set("User-Agent", ua)
+			if ip != "" {
+				synth.Header.Set("X-Forwarded-For", ip)
+			}
+		}
+		SendEmailVerification(ctx, h.Pool, h.Emailer, h.Log, synth,
+			h.FrontendBase, userID, email, fullName, facilityName)
+	}(userID, in.OwnerEmail, fullName, in.Name, auditlog.ClientIP(r), r.UserAgent())
+
 	httpx.RenderJSON(w, http.StatusOK, map[string]string{
 		"status":      "ok",
 		"provider_id": providerID,

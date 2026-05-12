@@ -407,3 +407,158 @@ func sha256Hex(in string) string {
 	h := sha256.Sum256([]byte(in))
 	return hex.EncodeToString(h[:])
 }
+
+// ---------------------------------------------------------------------------
+// Email verification (REQ-010)
+// ---------------------------------------------------------------------------
+//
+// On signup we mint a 24-hour single-use token, store its hash in
+// email_verifications, and email the raw token to the user. The verify
+// endpoint flips users.email_verified_at and marks the row used.
+//
+// The flow is intentionally "soft" today — we do not gate app access on
+// verification (that's a follow-up REQ). Verification at this point is for
+// deliverability hygiene + future trust signals.
+
+// SendEmailVerification mints the token, persists the hash, and dispatches
+// the branded email-verification email. Best-effort: any failure (rendering,
+// DB write, SES) is logged but never propagated, because the signup flow
+// must complete even if email is briefly unreachable. The caller passes the
+// HTTP request (for IP + UA on the audit row) and the user details we
+// already have in hand.
+func SendEmailVerification(
+	ctx context.Context,
+	pool *sql.DB,
+	emailer *notify.Emailer,
+	log *slog.Logger,
+	r *http.Request,
+	frontendBase, userID, email, fullName, facilityName string,
+) {
+	if pool == nil || userID == "" || email == "" {
+		return
+	}
+	if log == nil {
+		log = slog.Default()
+	}
+	token, err := newResetToken()
+	if err != nil {
+		log.Warn("email-verification: gen token", "err", err, "user_id", userID)
+		return
+	}
+	// Persist the email_verifications row first — independent of SES
+	// availability. That way ops can use a dev-mode endpoint (or a manual
+	// "resend verification" UI) to re-dispatch the email if the SES side
+	// was down at signup time. The row itself proves the verification token
+	// is live.
+	expires := time.Now().UTC().Add(time.Duration(notify.EmailVerificationExpiryHours) * time.Hour)
+	clientIP := ""
+	userAgent := ""
+	if r != nil {
+		clientIP = auditlog.ClientIP(r)
+		userAgent = r.UserAgent()
+	}
+	if _, err := pool.ExecContext(ctx,
+		`INSERT INTO email_verifications (id, user_id, token_hash, expires_at, ip, user_agent)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		base62.NewID()[:22], userID, sha256Hex(token), expires.Format(time.RFC3339),
+		clientIP, userAgent); err != nil {
+		log.Warn("email-verification: persist", "err", err, "user_id", userID)
+		return
+	}
+	if emailer == nil {
+		// Token row exists; we just can't dispatch the email right now.
+		// Operationally that's the same state as a successful insert + SES
+		// outage — the row is the source of truth.
+		log.Info("email-verification: emailer not configured; row persisted but send skipped", "user_id", userID)
+		return
+	}
+	verifyURL := fmt.Sprintf("%s/verify-email/%s", strings.TrimRight(frontendBase, "/"), token)
+	subject, htmlBody, textBody, rerr := notify.RenderEmailVerification(notify.EmailVerificationData{
+		FirstName:    fullName,
+		FacilityName: facilityName,
+		VerifyURL:    verifyURL,
+		// ExpiresInHours left zero → defaults to EmailVerificationExpiryHours (24).
+	})
+	if rerr != nil {
+		log.Warn("email-verification: render", "err", rerr, "user_id", userID)
+		return
+	}
+	if err := emailer.Send(ctx, notify.EmailMessage{
+		To: email, Subject: subject, HTMLBody: htmlBody, PlainBody: textBody,
+		ReferenceID: "email_verification:" + userID,
+	}); err != nil {
+		log.Warn("email-verification: send", "err", err, "user_id", userID)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/verify-email { token }
+// ---------------------------------------------------------------------------
+//
+// Marks the email_verifications row used and flips users.email_verified_at
+// to now. Idempotent: a second call with the same token returns "already
+// used" with a 400. Expired tokens return a friendly 400 prompting a resend.
+func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Token string `json:"token"`
+	}
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.RenderError(w, r, err)
+		return
+	}
+	if in.Token == "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("token required"))
+		return
+	}
+	hash := sha256Hex(in.Token)
+
+	tx, err := h.Pool.BeginTx(r.Context(), nil)
+	if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	defer tx.Rollback()
+
+	var rowID, userID, expiresStr string
+	var usedAt sql.NullString
+	err = tx.QueryRowContext(r.Context(),
+		`SELECT id, user_id, expires_at, used_at FROM email_verifications WHERE token_hash = ?`, hash).
+		Scan(&rowID, &userID, &expiresStr, &usedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		httpx.RenderError(w, r, httpx.BadRequestf("This confirmation link is no longer valid. Request a new one."))
+		return
+	}
+	if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	if usedAt.Valid && usedAt.String != "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("This confirmation link has already been used."))
+		return
+	}
+	expiresAt, _ := time.Parse(time.RFC3339, expiresStr)
+	if expiresAt.IsZero() {
+		expiresAt, _ = time.Parse("2006-01-02 15:04:05", expiresStr)
+	}
+	if !expiresAt.IsZero() && time.Now().UTC().After(expiresAt) {
+		httpx.RenderError(w, r, httpx.BadRequestf("This confirmation link has expired. Request a new one."))
+		return
+	}
+	if _, err := tx.ExecContext(r.Context(),
+		`UPDATE users SET email_verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		userID); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	if _, err := tx.ExecContext(r.Context(),
+		`UPDATE email_verifications SET used_at = CURRENT_TIMESTAMP WHERE id = ?`, rowID); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	emitAuthAudit(r.Context(), h.Pool, userID, "", "email_verified", r)
+	httpx.RenderJSON(w, http.StatusOK, map[string]string{"status": "ok", "user_id": userID})
+}

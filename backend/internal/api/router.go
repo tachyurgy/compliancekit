@@ -158,6 +158,8 @@ func NewRouter(d Deps) http.Handler {
 		if d.Auth != nil {
 			r.Post("/api/auth/forgot-password", d.Auth.ForgotPassword)
 			r.Post("/api/auth/reset-password", d.Auth.ResetPassword)
+			// REQ-010: consume the email-verification token sent at signup.
+			r.Post("/api/auth/verify-email", d.Auth.VerifyEmail)
 		}
 	})
 

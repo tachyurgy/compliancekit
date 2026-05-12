@@ -282,6 +282,13 @@ func NewRouter(d Deps) http.Handler {
 				if d.Nag != nil {
 					r.Post("/{id}/nag", d.Nag.Trigger)
 				}
+				// REQ-007 manual supersede — admin-only. Marks a staff
+				// document superseded without requiring a replacement, so the
+				// chase loop stops nagging on docs the operator retired by
+				// hand (e.g. staff transferred, old cert no longer relevant).
+				if d.Documents != nil {
+					r.Post("/{id}/document/{doc_id}/supersede", d.Documents.ManualSupersede)
+				}
 			}))
 		})
 

@@ -178,6 +178,18 @@ func (h *DocumentHandler) runFinalize(w http.ResponseWriter, r *http.Request, pi
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
+
+	// REQ-007: supersede prior active documents of the same kind for the
+	// same subject. The chase engine filters on superseded_at IS NULL, so
+	// flipping this here (right after OCR completes) stops any further
+	// reminders against the old doc as soon as a replacement lands. We
+	// stamp superseded_by_document_id with the new doc id so the audit
+	// trail records what replaced what; the operator UI can render
+	// "replaced by …" from this pair.
+	if err := supersedePriorDocuments(r.Context(), h.Pool, pid, id); err != nil {
+		// Non-fatal: the upload + OCR already succeeded. Log + continue.
+		h.Log.Warn("finalize: supersede flip failed", "err", err, "doc", id)
+	}
 	auditlog.EmitDocumentUpload(r.Context(), h.Pool, pid, userID, id, map[string]any{
 		"kind":                  kind,
 		"mime_type":             mime,
@@ -289,6 +301,122 @@ func boolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// supersedePriorDocuments marks every prior active document with the same
+// (provider_id, subject_kind, subject_id, kind) as superseded by newID.
+// "Active" = deleted_at IS NULL AND superseded_at IS NULL. Idempotent —
+// running twice is a no-op because the WHERE filter excludes already-
+// superseded rows.
+//
+// Used by:
+//   - runFinalize, when a new upload completes OCR.
+//   - SupersedeStaffDocument / explicit manager endpoint.
+//
+// The chase candidate query filters on superseded_at IS NULL so a stale
+// "your CPR expires" never goes out after the parent uploaded the new CPR.
+func supersedePriorDocuments(ctx context.Context, pool *sql.DB, providerID, newDocID string) error {
+	// Resolve the new doc's identity. We need (subject_kind, subject_id, kind)
+	// to find peers. subject_id can be NULL for provider-level docs; in that
+	// case we don't supersede (the concept doesn't apply — a fire-drill
+	// certificate uploaded today shouldn't retire last quarter's drill log).
+	var subjectKind, subjectID, kind string
+	err := pool.QueryRowContext(ctx, `
+		SELECT COALESCE(subject_kind,''), COALESCE(subject_id,''), COALESCE(kind,'')
+		FROM documents WHERE id = ? AND provider_id = ?`, newDocID, providerID).
+		Scan(&subjectKind, &subjectID, &kind)
+	if err != nil {
+		return fmt.Errorf("supersede: lookup new doc: %w", err)
+	}
+	if subjectKind == "" || subjectID == "" || kind == "" {
+		return nil
+	}
+	_, err = pool.ExecContext(ctx, `
+		UPDATE documents
+		   SET superseded_at = CURRENT_TIMESTAMP,
+		       superseded_by_document_id = ?,
+		       updated_at = CURRENT_TIMESTAMP
+		 WHERE provider_id = ?
+		   AND subject_kind = ?
+		   AND subject_id = ?
+		   AND kind = ?
+		   AND id != ?
+		   AND deleted_at IS NULL
+		   AND superseded_at IS NULL`,
+		newDocID, providerID, subjectKind, subjectID, kind, newDocID)
+	if err != nil {
+		return fmt.Errorf("supersede: update peers: %w", err)
+	}
+	return nil
+}
+
+// POST /api/staff/{id}/document/{doc_id}/supersede — REQ-007 manual
+// supersede. Admin-only. Sets superseded_at = now() on the document
+// without a replacement (superseded_by_document_id stays NULL). Idempotent.
+//
+// Used when an operator wants to retire an old doc that the auto-supersede
+// path can't infer (e.g. they uploaded the replacement under a different
+// kind, or the staff member transferred and the old cert is no longer
+// relevant). Routed under /api/staff/{id}/... so the path matches the
+// REQ-007 spec; we verify the document belongs to the staff member and
+// the provider.
+func (h *DocumentHandler) ManualSupersede(w http.ResponseWriter, r *http.Request) {
+	pid := mw.ProviderIDFrom(r.Context())
+	staffID := chi.URLParam(r, "id")
+	docID := chi.URLParam(r, "doc_id")
+	if staffID == "" || docID == "" {
+		httpx.RenderError(w, r, httpx.BadRequestf("staff id and document id required"))
+		return
+	}
+	// Verify ownership: doc belongs to the provider, to the staff subject,
+	// and is not already superseded or deleted. Idempotent: if it's already
+	// superseded we return 200 without writing.
+	var subjectKind, subjectID string
+	var alreadySuperseded sql.NullString
+	err := h.Pool.QueryRowContext(r.Context(), `
+		SELECT COALESCE(subject_kind,''), COALESCE(subject_id,''), superseded_at
+		FROM documents WHERE id = ? AND provider_id = ? AND deleted_at IS NULL`,
+		docID, pid).Scan(&subjectKind, &subjectID, &alreadySuperseded)
+	if err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrNotFound, err))
+		return
+	}
+	if subjectKind != "staff" || subjectID != staffID {
+		httpx.RenderError(w, r, httpx.ErrNotFound)
+		return
+	}
+	if alreadySuperseded.Valid && alreadySuperseded.String != "" {
+		httpx.RenderJSON(w, http.StatusOK, map[string]any{
+			"document_id":   docID,
+			"superseded_at": alreadySuperseded.String,
+			"idempotent":    true,
+		})
+		return
+	}
+	if _, err := h.Pool.ExecContext(r.Context(), `
+		UPDATE documents
+		   SET superseded_at = CURRENT_TIMESTAMP,
+		       updated_at = CURRENT_TIMESTAMP
+		 WHERE id = ? AND provider_id = ?`,
+		docID, pid); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+	auditlog.Emit(r.Context(), h.Pool, auditlog.Entry{
+		ProviderID: pid,
+		ActorKind:  auditlog.ActorKindProviderAdmin,
+		ActorID:    mw.UserIDFrom(r.Context()),
+		Action:     "document.supersede",
+		TargetKind: "document",
+		TargetID:   docID,
+		Metadata:   map[string]any{"manual": true},
+		IP:         auditlog.ClientIP(r),
+		UserAgent:  r.UserAgent(),
+	})
+	httpx.RenderJSON(w, http.StatusOK, map[string]any{
+		"document_id":   docID,
+		"superseded_at": time.Now().UTC().Format(time.RFC3339),
+	})
 }
 
 // GET /api/documents/{id}

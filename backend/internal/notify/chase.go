@@ -164,6 +164,8 @@ WITH candidates AS (
        OR d.expiration_extracted_value = ''
      )
      AND COALESCE(d.does_not_expire, 0) = 0
+     -- REQ-007: never chase a doc that has been replaced.
+     AND d.superseded_at IS NULL
 )
 SELECT * FROM candidates`, windowFloor, windowEnd)
 	if err != nil {
@@ -263,6 +265,27 @@ func inBusinessHours(now time.Time, tz string) bool {
 	return h >= 8 && h < 21
 }
 
+// isUnsubscribed returns true when the given (channel, recipient) appears in
+// the unsubscribes table. Errors are logged and treated as "not unsubscribed"
+// so a transient DB hiccup never silently drops a reminder — the bias for the
+// chase engine is to over-deliver on errors, since the operator can always
+// trust the visible audit trail more than absent sends.
+func (c *ChaseService) isUnsubscribed(ctx context.Context, channel, recipient string) bool {
+	if recipient == "" {
+		return false
+	}
+	var exists bool
+	err := c.pool.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM unsubscribes WHERE channel = ? AND recipient = ?
+		)`, channel, recipient).Scan(&exists)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		c.log.Warn("chase: unsubscribe check failed", "err", err, "channel", channel)
+		return false
+	}
+	return exists
+}
+
 func (c *ChaseService) alreadySent(ctx context.Context, docID string, threshold int) (bool, error) {
 	var exists bool
 	err := c.pool.QueryRowContext(ctx, `
@@ -318,6 +341,21 @@ func (c *ChaseService) sendOne(ctx context.Context, d expiringDoc, days int) err
 	}
 	wantEmail := channel == "email" || channel == "both"
 	wantSMS := channel == "sms" || channel == "both"
+
+	// REQ-007: honor unsubscribes per-channel. An email opt-out (SES hard
+	// bounce or operator-issued) does NOT silence SMS, and vice versa. The
+	// unsubscribes table is populated by the SES bounce hook and the Twilio
+	// STOP-keyword hook.
+	if wantEmail && d.RecipEmail != "" {
+		if c.isUnsubscribed(ctx, "email", d.RecipEmail) {
+			wantEmail = false
+		}
+	}
+	if wantSMS && d.RecipPhone != "" {
+		if c.isUnsubscribed(ctx, "sms", d.RecipPhone) {
+			wantSMS = false
+		}
+	}
 
 	if wantEmail && d.RecipEmail != "" && c.emailer != nil {
 		subject, html, text, replyTo, renderErr := c.renderChaseEmail(d, days, uploadURL, who)

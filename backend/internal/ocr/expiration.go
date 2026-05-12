@@ -17,18 +17,24 @@ type ExpirationResult struct {
 	Reasoning      string  `json:"reasoning"`
 }
 
-// ExpirationExtractor asks Gemini Flash to find an expiration/valid-through date in OCR text
-// and return a JSON object matching the response schema.
+// ExpirationExtractor asks an LLM (Mistral chat with JSON-object response
+// format) to find an expiration/valid-through date in OCR text and return a
+// JSON object matching the inline schema in the prompt.
+//
+// Was Gemini Flash originally; switched to Mistral after the free-tier
+// Gemini quota for our key dropped to limit:0 and every call started 429ing.
+// Mistral's chat-completions JSON-object mode is sufficient and the OCR
+// pipeline is already authenticated to Mistral via the same MISTRAL_API_KEY.
 type ExpirationExtractor struct {
-	APIKey     string
-	Model      string
+	APIKey     string // Mistral API key
+	Model      string // default mistral-small-latest
 	HTTPClient *http.Client
 }
 
 func NewExpirationExtractor(apiKey string) *ExpirationExtractor {
 	return &ExpirationExtractor{
 		APIKey:     apiKey,
-		Model:      "gemini-2.0-flash",
+		Model:      "mistral-small-latest",
 		HTTPClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -60,32 +66,29 @@ DOCUMENT TEXT:
 %s
 ---`, docType, truncate(ocrText, 8000))
 
-	schema := map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"expiration_date": map[string]any{"type": "string"},
-			"confidence":      map[string]any{"type": "number"},
-			"reasoning":       map[string]any{"type": "string"},
-		},
-		"required": []string{"expiration_date", "confidence", "reasoning"},
-	}
+	// Append a brief schema reminder for Mistral's JSON-object mode (Mistral
+	// chat completions accept response_format={type:json_object}, but unlike
+	// Gemini they don't take a separate response_schema argument — the
+	// schema lives inside the prompt).
+	prompt += `
+
+OUTPUT FORMAT — return ONLY one JSON object with exactly these fields:
+{"expiration_date":"YYYY-MM-DD or empty string","confidence":0.0..1.0,"reasoning":"one sentence"}`
 
 	reqBody := map[string]any{
-		"contents": []map[string]any{{
-			"parts": []map[string]any{{"text": prompt}},
-		}},
-		"generationConfig": map[string]any{
-			"temperature":        0.0,
-			"response_mime_type": "application/json",
-			"response_schema":    schema,
+		"model": e.Model,
+		"messages": []map[string]any{
+			{"role": "user", "content": prompt},
 		},
+		"response_format": map[string]any{"type": "json_object"},
+		"temperature":     0.0,
 	}
 	body, _ := json.Marshal(reqBody)
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", e.Model, e.APIKey)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.mistral.ai/v1/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("ocr/expiration: new req: %w", err)
 	}
+	req.Header.Set("Authorization", "Bearer "+e.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := e.HTTPClient.Do(req)
@@ -98,21 +101,19 @@ DOCUMENT TEXT:
 		return nil, fmt.Errorf("ocr/expiration: status %d: %s", resp.StatusCode, string(b))
 	}
 	var out struct {
-		Candidates []struct {
-			Content struct {
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"content"`
-		} `json:"candidates"`
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, fmt.Errorf("ocr/expiration: decode wrapper: %w", err)
 	}
-	if len(out.Candidates) == 0 || len(out.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("ocr/expiration: no candidates")
+	if len(out.Choices) == 0 {
+		return nil, fmt.Errorf("ocr/expiration: no choices")
 	}
-	raw := out.Candidates[0].Content.Parts[0].Text
+	raw := out.Choices[0].Message.Content
 	// response_mime_type guarantees JSON, but be defensive.
 	raw = strings.TrimSpace(raw)
 	raw = strings.TrimPrefix(raw, "```json")

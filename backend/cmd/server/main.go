@@ -119,8 +119,8 @@ func run() error {
 		ocrEngine = ocr.NewGemini(cfg.GeminiAPIKey)
 	}
 	var expiryExtra *ocr.ExpirationExtractor
-	if cfg.GeminiAPIKey != "" {
-		expiryExtra = ocr.NewExpirationExtractor(cfg.GeminiAPIKey)
+	if cfg.MistralAPIKey != "" {
+		expiryExtra = ocr.NewExpirationExtractor(cfg.MistralAPIKey)
 	}
 
 	// ---- handlers ----

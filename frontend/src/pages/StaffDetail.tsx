@@ -48,23 +48,31 @@ export default function StaffDetailPage(): JSX.Element {
   if (isError || !data) {
     return (
       <div>
-        <Link to="/staff" className="inline-flex items-center gap-1 text-sm text-gray-600 mb-4">
+        <Link
+          to="/staff"
+          className="inline-flex items-center gap-1 text-sm text-ink-700 hover:text-ink-900 mb-5"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to staff
         </Link>
-        <Card padded>
-          <div className="flex items-start gap-3 text-critical-700">
-            <AlertTriangle className="h-5 w-5 mt-0.5" />
-            <div>
-              <div className="font-medium">We couldn't load this staff member.</div>
-              <div className="text-sm text-gray-600">
-                {error instanceof Error ? error.message : 'Try again shortly.'}
-              </div>
-              <Button className="mt-3" size="sm" variant="secondary" onClick={() => refetch()}>
-                Try again
-              </Button>
+        <div
+          className="rounded-lb border border-critical-200 bg-critical-50/70 p-5 flex items-start gap-3"
+          role="alert"
+        >
+          <AlertTriangle className="h-5 w-5 mt-0.5 text-critical-600 shrink-0" />
+          <div className="flex-1">
+            <div className="font-semibold text-critical-700">
+              We couldn't load this staff member
             </div>
+            <div className="text-sm text-ink-700 mt-1 leading-relaxed">
+              {error instanceof Error
+                ? error.message
+                : 'Check your internet and try again in a moment.'}
+            </div>
+            <Button className="mt-3" size="sm" variant="secondary" onClick={() => refetch()}>
+              Try again
+            </Button>
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
@@ -81,7 +89,7 @@ export default function StaffDetailPage(): JSX.Element {
     <div>
       <Link
         to="/staff"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mb-4"
+        className="inline-flex items-center gap-1 text-sm font-medium text-ink-700 hover:text-ink-900 mb-5"
       >
         <ArrowLeft className="h-4 w-4" /> Back to staff
       </Link>
@@ -89,7 +97,7 @@ export default function StaffDetailPage(): JSX.Element {
       <PageHeader
         title={fullName(staff.firstName, staff.lastName)}
         description={
-          <span className="flex items-center gap-3 text-sm text-gray-600">
+          <span className="flex items-center gap-3 text-sm text-ink-700">
             <span>{ROLE_LABEL[staff.role] ?? staff.role.replace(/_/g, ' ')}</span>
             {staff.hireDate && <span>· Hired {formatDate(staff.hireDate)}</span>}
             <StatusPillBadge status={staff.rollup.status} count={worstCount} size="sm" />
@@ -106,20 +114,20 @@ export default function StaffDetailPage(): JSX.Element {
         <Card title="Contact">
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-gray-500">Email</dt>
+              <dt className="text-ink-500">Email</dt>
               <dd>{staff.email || '—'}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-gray-500">Phone</dt>
+              <dt className="text-ink-500">Phone</dt>
               <dd>{formatPhone(staff.phone) || '—'}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-gray-500">Preferred channel</dt>
+              <dt className="text-ink-500">Preferred channel</dt>
               <dd className="capitalize">{staff.preferredChannel}</dd>
             </div>
             {staff.archivedAt && (
-              <div className="flex justify-between gap-4 pt-2 border-t border-gray-100">
-                <dt className="text-gray-500">Archived</dt>
+              <div className="flex justify-between gap-4 pt-2 border-t border-line-soft">
+                <dt className="text-ink-500">Archived</dt>
                 <dd>{formatDate(staff.archivedAt)}</dd>
               </div>
             )}
@@ -144,7 +152,7 @@ export default function StaffDetailPage(): JSX.Element {
         </Card>
 
         <Card title="What Sarah sees on her phone" className="lg:col-span-2">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-ink-700">
             Your staff member can upload from their phone using this private link. We never
             email it on its own — share it from this screen so you stay in control.
           </p>
@@ -191,11 +199,11 @@ export default function StaffDetailPage(): JSX.Element {
           padded={false}
         >
           {staff.requiredDocuments.length === 0 ? (
-            <div className="px-5 py-6 text-sm text-gray-500">
+            <div className="px-5 py-6 text-sm text-ink-500">
               No required documents are configured for this role yet.
             </div>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-line-soft">
               {staff.requiredDocuments.map((req) => (
                 <RequirementRow
                   key={req.docKind}
@@ -210,14 +218,14 @@ export default function StaffDetailPage(): JSX.Element {
 
         {staff.otherDocuments.length > 0 && (
           <Card title="Other documents" padded={false}>
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-line-soft">
               {staff.otherDocuments.map((d) => (
                 <li key={d.id} className="px-5 py-3 flex justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <FileText className="h-4 w-4 text-gray-400" />
+                    <FileText className="h-4 w-4 text-ink-400" />
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">{d.title || d.kind}</div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-sm font-medium text-ink-900 truncate">{d.title || d.kind}</div>
+                      <div className="text-xs text-ink-500">
                         {d.expiresOn ? `Expires ${formatDate(d.expiresOn)}` : 'No expiration'}
                         {d.source ? ` · ${d.source}` : ''}
                       </div>
@@ -231,16 +239,16 @@ export default function StaffDetailPage(): JSX.Element {
 
         <Card title="Activity">
           {staff.activity.length === 0 ? (
-            <p className="text-sm text-gray-500">Nothing here yet. Uploads and reminders will show up as they happen.</p>
+            <p className="text-sm text-ink-500">Nothing here yet. Uploads and reminders will show up as they happen.</p>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-line-soft">
               {staff.activity.map((ev) => (
                 <li key={ev.id} className="py-2.5 text-sm flex justify-between gap-4">
                   <div>
-                    <div className="text-gray-900">{ev.summary}</div>
-                    {ev.detail && <div className="text-xs text-gray-500">{ev.detail}</div>}
+                    <div className="text-ink-900">{ev.summary}</div>
+                    {ev.detail && <div className="text-xs text-ink-500">{ev.detail}</div>}
                   </div>
-                  <div className="text-xs text-gray-500 whitespace-nowrap">
+                  <div className="text-xs text-ink-500 whitespace-nowrap">
                     {formatDate(ev.createdAt)}
                   </div>
                 </li>
@@ -295,8 +303,8 @@ function RequirementRow({
   return (
     <li className={`px-5 py-3 flex flex-wrap items-center gap-3 justify-between ${faded ? 'opacity-80' : ''}`}>
       <div className="min-w-0">
-        <div className="text-sm font-medium text-gray-900">{req.label}</div>
-        <div className="text-xs text-gray-500 mt-0.5">
+        <div className="text-sm font-medium text-ink-900">{req.label}</div>
+        <div className="text-xs text-ink-500 mt-0.5">
           {req.expiresOn ? `Expires ${formatDate(req.expiresOn)}` : ''}
           {req.expiresOn && req.source ? ' · ' : ''}
           {req.source}
@@ -382,12 +390,14 @@ function SendReminderModal({
           ]}
         />
         <div>
-          <label className="block text-sm font-medium text-gray-800 mb-1">Note (optional)</label>
+          <label className="block text-sm font-medium text-ink-800 mb-1.5">
+            Add a note <span className="text-ink-400 font-normal">(optional)</span>
+          </label>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
-            className="block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 focus:outline-none"
+            className="block w-full rounded-lb-sm border border-line px-3.5 py-2.5 text-sm placeholder:text-ink-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 focus:outline-none"
             placeholder="Hi Sarah — your CPR card expires next month. Snap a photo of the new one when you have a sec."
           />
         </div>

@@ -15,10 +15,9 @@ import { ROLE_LABEL, type StaffListRow } from '@/api/staff';
 import { fullName, formatPhone } from '@/lib/format';
 import { toast } from '@/components/common/Toast';
 
-// REQ-004 staff list page. The status pill is the most important element
-// on the screen — we surface it prominently in its own column. Filtering
-// by role and status, search by name. The "Add a staff member" CTA lives
-// top-right as the primary brand button.
+// REQ-004 / REQ-012d staff list page. The status pill is the most important
+// element on the screen — we surface it in its own column. Filter by role
+// and status, search by name. "Add a staff member" CTA lives top-right.
 
 const ROLE_OPTIONS = [
   { value: '', label: 'All roles' },
@@ -31,6 +30,12 @@ const STATUS_OPTIONS = [
   { value: 'missing', label: 'Missing or awaiting' },
   { value: 'expired', label: 'Expired or expiring' },
 ];
+
+const CHANNEL_LABEL: Record<string, string> = {
+  email: 'Email',
+  sms: 'Text',
+  both: 'Email + text',
+};
 
 export default function Staff(): JSX.Element {
   const [statusFilter, setStatusFilter] = useState<'' | 'passing' | 'missing' | 'expired'>('');
@@ -52,9 +57,12 @@ export default function Staff(): JSX.Element {
     return rows;
   }, [staff, roleFilter, query]);
 
+  const hasFilter = Boolean(query || roleFilter || statusFilter);
+
   return (
     <div>
       <PageHeader
+        eyebrow="Personnel files"
         title="Staff"
         description="Your team. We'll keep their files inspection-ready."
         actions={
@@ -64,8 +72,8 @@ export default function Staff(): JSX.Element {
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-3 items-end">
-        <div className="max-w-sm flex-1 min-w-[180px]">
+      <div className="mb-5 flex flex-wrap gap-3 items-end">
+        <div className="max-w-sm flex-1 min-w-[200px]">
           <Input
             placeholder="Search by name"
             leftIcon={<Search className="h-4 w-4" />}
@@ -89,38 +97,43 @@ export default function Staff(): JSX.Element {
 
       {isLoading ? (
         <Card padded>
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="skeleton h-10 w-full" />
+              <div key={i} className="skeleton h-12 w-full" />
             ))}
           </div>
         </Card>
       ) : isError ? (
-        <Card padded>
-          <div className="flex items-start gap-3 text-critical-700">
-            <AlertTriangle className="h-5 w-5 mt-0.5" />
-            <div>
-              <div className="font-medium">We couldn't load your staff just now.</div>
-              <div className="text-sm text-gray-600">
-                {error instanceof Error ? error.message : 'Please try again.'}
-              </div>
-              <Button className="mt-3" size="sm" variant="secondary" onClick={() => refetch()}>
-                Try again
-              </Button>
+        <div
+          className="rounded-lb border border-critical-200 bg-critical-50/70 p-5 flex items-start gap-3"
+          role="alert"
+        >
+          <AlertTriangle className="h-5 w-5 mt-0.5 text-critical-600 shrink-0" />
+          <div className="flex-1">
+            <div className="font-semibold text-critical-700">
+              We couldn't load your staff just now
             </div>
+            <div className="text-sm text-ink-700 mt-1 leading-relaxed">
+              {error instanceof Error
+                ? error.message
+                : 'Check your internet and try again in a moment.'}
+            </div>
+            <Button className="mt-3" size="sm" variant="secondary" onClick={() => refetch()}>
+              Try again
+            </Button>
           </div>
-        </Card>
+        </div>
       ) : visible.length === 0 ? (
         <EmptyState
-          icon={<Users className="h-5 w-5 text-gray-500" />}
-          title="No staff yet"
+          icon={<Users className="h-6 w-6" />}
+          title={hasFilter ? 'No matches' : 'No staff yet'}
           description={
-            query || roleFilter || statusFilter
-              ? 'No matches. Try a different search or filter.'
+            hasFilter
+              ? 'No staff match that search or filter. Try a different one.'
               : "Add your first staff member to get started. We'll keep their files inspection-ready."
           }
           action={
-            !query && !roleFilter && !statusFilter ? (
+            !hasFilter ? (
               <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAddOpen(true)}>
                 Add a staff member
               </Button>
@@ -132,16 +145,16 @@ export default function Staff(): JSX.Element {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
-                  <th className="px-5 py-3 font-medium">Name</th>
-                  <th className="px-5 py-3 font-medium">Role</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium">Phone</th>
-                  <th className="px-5 py-3 font-medium">Email</th>
-                  <th className="px-5 py-3 font-medium">Channel</th>
+                <tr className="text-left border-b border-line-soft text-xs uppercase tracking-[0.1em] text-ink-500">
+                  <th className="px-6 py-3.5 font-semibold">Name</th>
+                  <th className="px-6 py-3.5 font-semibold">Role</th>
+                  <th className="px-6 py-3.5 font-semibold">Status</th>
+                  <th className="px-6 py-3.5 font-semibold">Phone</th>
+                  <th className="px-6 py-3.5 font-semibold">Email</th>
+                  <th className="px-6 py-3.5 font-semibold">Channel</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line-soft">
                 {visible.map((s) => {
                   const worstCount =
                     s.rollup.expired ||
@@ -150,25 +163,29 @@ export default function Staff(): JSX.Element {
                     s.rollup.awaitingUpload ||
                     0;
                   return (
-                    <tr key={s.id} className="hover:bg-surface-muted">
-                      <td className="px-5 py-3">
+                    <tr key={s.id} className="hover:bg-surface-sunken/50 transition-colors">
+                      <td className="px-6 py-3.5">
                         <Link
                           to={`/staff/${s.id}`}
-                          className="font-medium text-gray-900 hover:text-brand-700"
+                          className="font-medium text-ink-900 hover:text-brand-700"
                         >
                           {fullName(s.firstName, s.lastName)}
                         </Link>
                       </td>
-                      <td className="px-5 py-3 text-gray-600">
+                      <td className="px-6 py-3.5 text-ink-700">
                         {ROLE_LABEL[s.role] ?? s.role.replace(/_/g, ' ')}
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-6 py-3.5">
                         <StatusPillBadge status={s.rollup.status} count={worstCount} />
                       </td>
-                      <td className="px-5 py-3 text-gray-600">{formatPhone(s.phone) || '—'}</td>
-                      <td className="px-5 py-3 text-gray-600">{s.email || '—'}</td>
-                      <td className="px-5 py-3 text-gray-500 capitalize">
-                        {s.preferredChannel}
+                      <td className="px-6 py-3.5 text-ink-700">
+                        {formatPhone(s.phone) || <span className="text-ink-400">—</span>}
+                      </td>
+                      <td className="px-6 py-3.5 text-ink-700">
+                        {s.email || <span className="text-ink-400">—</span>}
+                      </td>
+                      <td className="px-6 py-3.5 text-ink-500">
+                        {CHANNEL_LABEL[s.preferredChannel] ?? s.preferredChannel}
                       </td>
                     </tr>
                   );
@@ -184,8 +201,8 @@ export default function Staff(): JSX.Element {
   );
 }
 
-// AddStaffModal is the "+ Add a staff member" dialog. Keeps form-state
-// local; on success invalidates the list query and shows a calm toast.
+// AddStaffModal — "+ Add a staff member" dialog. Keeps form-state local;
+// on success invalidates the list query and shows a calm toast.
 function AddStaffModal({ open, onClose }: { open: boolean; onClose: () => void }): JSX.Element {
   const { mutateAsync, isPending } = useCreateStaff();
   const [first, setFirst] = useState('');
@@ -218,7 +235,11 @@ function AddStaffModal({ open, onClose }: { open: boolean; onClose: () => void }
       setPhone('');
       setHireDate('');
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Something went wrong on our end.');
+      setSubmitError(
+        err instanceof Error
+          ? err.message
+          : 'Something went wrong on our end. Please try again in a minute.',
+      );
     }
   }
 
@@ -239,7 +260,7 @@ function AddStaffModal({ open, onClose }: { open: boolean; onClose: () => void }
         </>
       }
     >
-      <form id="add-staff-form" onSubmit={onSubmit} className="grid grid-cols-2 gap-3" noValidate>
+      <form id="add-staff-form" onSubmit={onSubmit} className="grid grid-cols-2 gap-4" noValidate>
         <Input
           label="First name"
           value={first}
@@ -295,7 +316,12 @@ function AddStaffModal({ open, onClose }: { open: boolean; onClose: () => void }
           />
         </div>
         {submitError && (
-          <div className="col-span-2 text-sm text-critical-700">{submitError}</div>
+          <div
+            className="col-span-2 rounded-lb-sm bg-critical-50 px-4 py-3 text-sm text-critical-700 ring-1 ring-critical-200"
+            role="alert"
+          >
+            {submitError}
+          </div>
         )}
       </form>
     </Modal>

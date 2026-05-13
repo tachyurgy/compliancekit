@@ -61,28 +61,36 @@ export default function ChildDetail(): JSX.Element {
   if (isError || !data) {
     return (
       <div>
-        <Link to="/children" className="inline-flex items-center gap-1 text-sm text-gray-600 mb-4">
+        <Link
+          to="/children"
+          className="inline-flex items-center gap-1 text-sm font-medium text-ink-700 hover:text-ink-900 mb-5"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to children
         </Link>
-        <Card padded>
-          <div className="flex items-start gap-3 text-critical-700">
-            <AlertTriangle className="h-5 w-5 mt-0.5" />
-            <div>
-              <div className="font-medium">Couldn't load this child</div>
-              <div className="text-sm text-gray-600">
-                {error instanceof Error ? error.message : 'The profile may have been removed.'}
-              </div>
-              <Button
-                className="mt-3"
-                size="sm"
-                variant="secondary"
-                onClick={() => refetch()}
-              >
-                Retry
-              </Button>
+        <div
+          className="rounded-lb border border-critical-200 bg-critical-50/70 p-5 flex items-start gap-3"
+          role="alert"
+        >
+          <AlertTriangle className="h-5 w-5 mt-0.5 text-critical-600 shrink-0" />
+          <div className="flex-1">
+            <div className="font-semibold text-critical-700">
+              We couldn't load this child
             </div>
+            <div className="text-sm text-ink-700 mt-1 leading-relaxed">
+              {error instanceof Error
+                ? error.message
+                : 'The profile may have been removed.'}
+            </div>
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="secondary"
+              onClick={() => refetch()}
+            >
+              Try again
+            </Button>
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
@@ -91,7 +99,7 @@ export default function ChildDetail(): JSX.Element {
     <div>
       <Link
         to="/children"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mb-4"
+        className="inline-flex items-center gap-1 text-sm font-medium text-ink-700 hover:text-ink-900 mb-5"
       >
         <ArrowLeft className="h-4 w-4" /> Back to children
       </Link>
@@ -111,13 +119,20 @@ export default function ChildDetail(): JSX.Element {
         }
       />
 
-      {/* Allergy strip — coral background per brand-voice.md, calm tone. Only
-          rendered when allergies are present so we don't take up valuable
-          dashboard real estate. */}
+      {/* Allergy strip — coral on cream per brand-voice.md, calm not alarming.
+          Only rendered when allergies are present so it doesn't take up
+          valuable real estate on every child page. */}
       {(data as { allergies?: string }).allergies && (
-        <div className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 ring-1 ring-rose-200">
-          <span className="text-sm font-medium text-rose-900">
-            <span aria-hidden>⚠</span> Allergies: {(data as { allergies?: string }).allergies}
+        <div
+          className="mb-5 rounded-lb bg-critical-50/80 px-4 py-3 ring-1 ring-critical-200 flex items-start gap-2.5"
+          role="note"
+        >
+          <AlertTriangle
+            className="h-4 w-4 mt-0.5 text-critical-600 shrink-0"
+            aria-hidden
+          />
+          <span className="text-sm font-medium text-critical-700">
+            Allergies — {(data as { allergies?: string }).allergies}
           </span>
         </div>
       )}
@@ -149,16 +164,16 @@ export default function ChildDetail(): JSX.Element {
           className="lg:col-span-2"
         >
           {data.immunizations.length === 0 ? (
-            <p className="text-sm text-gray-500">No immunization records on file.</p>
+            <p className="text-sm text-ink-500">No immunization records on file.</p>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-line-soft">
               {data.immunizations.map((i) => (
                 <li key={i.vaccine} className="py-2.5 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Syringe className="h-4 w-4 text-gray-400" />
+                    <Syringe className="h-4 w-4 text-ink-400" />
                     <div>
-                      <div className="text-sm text-gray-900">{i.vaccine}</div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-sm text-ink-900">{i.vaccine}</div>
+                      <div className="text-xs text-ink-500">
                         {i.lastDose
                           ? `Last dose ${formatDate(i.lastDose)}`
                           : 'No dose recorded'}
@@ -176,7 +191,13 @@ export default function ChildDetail(): JSX.Element {
                             : 'neutral'
                     }
                   >
-                    {i.status === 'exempt' ? 'Exempt' : i.status.replace(/_/g, ' ')}
+                    {i.status === 'up_to_date'
+                      ? 'Up to date'
+                      : i.status === 'due_soon'
+                        ? 'Due soon'
+                        : i.status === 'overdue'
+                          ? 'Overdue'
+                          : 'Exempt'}
                   </Badge>
                 </li>
               ))}
@@ -188,9 +209,9 @@ export default function ChildDetail(): JSX.Element {
       <div className="mt-6">
         <Card title="Required documents" description="What the state inspector expects on file.">
           {data.requiredDocs.length === 0 ? (
-            <p className="text-sm text-gray-500">No required documents configured.</p>
+            <p className="text-sm text-ink-500">No required documents configured.</p>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-line-soft">
               {data.requiredDocs.map((doc) => (
                 <li
                   key={doc.id}
@@ -199,8 +220,8 @@ export default function ChildDetail(): JSX.Element {
                   <div className="flex items-start gap-3">
                     <DocStatusIcon status={doc.status} />
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{doc.label}</div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-sm font-medium text-ink-900">{doc.label}</div>
+                      <div className="text-xs text-ink-500">
                         <FileText className="inline h-3 w-3 mr-1" />
                         {doc.documentType}
                         {doc.dueDate && <span> · due {formatDate(doc.dueDate)}</span>}
@@ -217,7 +238,13 @@ export default function ChildDetail(): JSX.Element {
                             : 'critical'
                       }
                     >
-                      {doc.status}
+                      {doc.status === 'complete'
+                        ? 'On file'
+                        : doc.status === 'pending'
+                          ? 'Awaiting upload'
+                          : doc.status === 'expired'
+                            ? 'Expired'
+                            : 'Missing'}
                     </Badge>
                     {doc.documentId && (
                       <Link to={`/documents/${doc.documentId}`}>
@@ -253,11 +280,11 @@ function Row({
 }): JSX.Element {
   return (
     <div className="flex items-center justify-between gap-4">
-      <dt className="text-gray-500 inline-flex items-center gap-1.5">
+      <dt className="text-ink-500 inline-flex items-center gap-1.5">
         {icon}
         {label}
       </dt>
-      <dd className="text-gray-900">{value}</dd>
+      <dd className="text-ink-900">{value}</dd>
     </div>
   );
 }

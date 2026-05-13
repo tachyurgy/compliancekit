@@ -7,12 +7,18 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   icon?: ReactNode;
 }
 
+// Pill palette aligned to operator brand:
+//   compliant  → sage tints (calm, not lime)
+//   warning    → amber (expiring soon)
+//   critical   → coral, not red (per brand-voice — "let's fix this")
+//   neutral    → cream + ink (matches surface)
+//   info       → sky tint (used for "awaiting upload")
 const variants: Record<Variant, string> = {
   compliant: 'bg-brand-50 text-brand-700 ring-brand-200',
-  warning: 'bg-caution-50 text-caution-600 ring-caution-400/50',
-  critical: 'bg-critical-50 text-critical-700 ring-critical-500/40',
-  neutral: 'bg-gray-50 text-gray-700 ring-gray-200',
-  info: 'bg-blue-50 text-blue-700 ring-blue-200',
+  warning: 'bg-caution-50 text-caution-700 ring-caution-400/50',
+  critical: 'bg-critical-50 text-critical-700 ring-critical-200',
+  neutral: 'bg-surface-sunken text-ink-700 ring-line',
+  info: 'bg-[#eaf2f7] text-[#3a6b8a] ring-[#cdd9e2]',
 };
 
 export default function Badge({
@@ -24,7 +30,7 @@ export default function Badge({
 }: BadgeProps): JSX.Element {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset ${variants[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset ${variants[variant]} ${className}`}
       {...rest}
     >
       {icon}

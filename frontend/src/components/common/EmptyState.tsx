@@ -8,6 +8,9 @@ interface EmptyStateProps {
   className?: string;
 }
 
+// Warm, encouraging empty state. Cream background, sage icon halo,
+// generous whitespace — never the "nothing here yet" cold-page feeling.
+// Title should be the encouraging line from brand-voice.md.
 export default function EmptyState({
   icon,
   title,
@@ -17,18 +20,23 @@ export default function EmptyState({
 }: EmptyStateProps): JSX.Element {
   return (
     <div
-      className={`text-center py-12 px-6 border border-dashed border-gray-200 rounded-lg bg-surface-muted ${className}`}
+      className={`text-center py-16 px-6 rounded-lb border border-line bg-surface-sunken/60 ${className}`}
     >
       {icon && (
-        <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-white shadow-card grid place-items-center text-gray-500">
+        <div
+          className="mx-auto mb-5 h-14 w-14 rounded-full bg-white shadow-card grid place-items-center text-brand-600 ring-1 ring-brand-100"
+          aria-hidden
+        >
           {icon}
         </div>
       )}
-      <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+      <h3 className="font-display text-xl text-ink-900">{title}</h3>
       {description && (
-        <div className="mt-2 text-sm text-gray-600 max-w-md mx-auto">{description}</div>
+        <div className="mt-3 text-sm text-ink-700 leading-relaxed max-w-md mx-auto">
+          {description}
+        </div>
       )}
-      {action && <div className="mt-4 flex justify-center">{action}</div>}
+      {action && <div className="mt-6 flex justify-center">{action}</div>}
     </div>
   );
 }

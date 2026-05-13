@@ -1,7 +1,6 @@
-/* REQ-012 / REQ-013: pull Fraunces in so the dashboard ScoreHero numeral
-   and the brand-voice serif moments (kiosk welcome, drill roster header,
-   score band copy) render with the same display face the marketing site
-   uses. Variable font, three weights — small payload. */
+/* REQ-012a — Fraunces (display serif for hero numerals and headings) +
+   Inter (UI + body). Variable font, three weights of Fraunces, four of
+   Inter — small payload, matches the marketing site exactly. */
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
@@ -15,9 +14,18 @@
     height: 100%;
   }
   body {
+    /* Cream body background pulled from marketing --bg so the operator app
+       feels like the same product the user just signed up on. */
+    background-color: theme('colors.surface.muted');
+    color: theme('colors.ink.900');
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2 {
+    font-family: theme('fontFamily.display');
+    letter-spacing: -0.02em;
+    font-weight: 500;
   }
   :focus-visible {
     outline: 2px solid theme('colors.brand.600');
@@ -28,16 +36,30 @@
 
 @layer components {
   .card {
-    @apply bg-white rounded-lg shadow-card border border-gray-100;
+    @apply bg-white rounded-lb border border-line shadow-card;
   }
   .page-container {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6;
   }
+  /* Tiny uppercase label, copper underline — matches marketing .eyebrow.
+     Use sparingly for section markers ("Today", "This week"). */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-warm-600;
+  }
+  .eyebrow::before {
+    content: "";
+    display: inline-block;
+    width: 18px;
+    height: 1px;
+    background-color: theme('colors.warm.500');
+  }
 }
 
-/* Loading skeleton utility */
 @layer utilities {
   .skeleton {
-    @apply bg-gray-200 animate-pulse rounded;
+    @apply bg-line-soft animate-pulse rounded;
+  }
+  .font-display {
+    font-family: theme('fontFamily.display');
   }
 }

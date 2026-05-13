@@ -12,10 +12,11 @@ import { STATUS_PILL_LABEL } from '@/api/staff';
 
 const variantFor: Record<StatusPill, string> = {
   on_file: 'bg-brand-50 text-brand-700 ring-brand-200',
-  expiring_soon: 'bg-caution-50 text-caution-600 ring-caution-400/50',
-  expired: 'bg-critical-50 text-critical-700 ring-critical-500/40',
-  missing: 'bg-gray-100 text-gray-700 ring-gray-300',
-  awaiting_upload: 'bg-blue-50 text-blue-700 ring-blue-200',
+  expiring_soon: 'bg-caution-50 text-caution-700 ring-caution-400/50',
+  expired: 'bg-critical-50 text-critical-700 ring-critical-200',
+  // Per brand-voice: "Missing" = gray pill with coral dot (warns without alarming).
+  missing: 'bg-surface-sunken text-ink-700 ring-line',
+  awaiting_upload: 'bg-[#eaf2f7] text-[#3a6b8a] ring-[#cdd9e2]',
 };
 
 interface Props {
@@ -34,7 +35,7 @@ export default function StatusPillBadge({ status, count, size = 'md' }: Props): 
       className={`inline-flex items-center gap-1.5 rounded-full font-medium ring-1 ring-inset ${variantFor[status]} ${sizing}`}
     >
       {status === 'missing' && (
-        <span className="h-1.5 w-1.5 rounded-full bg-critical-500" aria-hidden />
+        <span className="h-1.5 w-1.5 rounded-full bg-critical-600" aria-hidden />
       )}
       {label}
     </span>

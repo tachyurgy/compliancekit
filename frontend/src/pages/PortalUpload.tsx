@@ -1,5 +1,6 @@
 /**
- * /u/:token — Levelbrook unified upload portal (REQ-005 + REQ-006 + REQ-008).
+ * /u/:token — Levelbrook unified upload portal (REQ-005 / REQ-006 / REQ-008
+ * / REQ-012e).
  *
  * The single mobile-first portal for both staff and parent magic-link uploads.
  * Branch on the backend's `kind` field in the welcome payload — copy and
@@ -8,15 +9,27 @@
  * Three-screen flow:
  *   1. Welcome      — name + facility + status pills + "Add a document"
  *   2. Upload       — three explicit buttons (camera / gallery / PDF)
- *   3. Confirm      — OCR confirmation card (REQ-006)
+ *   3. Reading      — calm loading state while OCR runs
+ *   4. Confirm      — OCR confirmation card (REQ-006)
+ *   5. Done         — calm thank-you + "Add another document"
  *
- * Design follows brand-voice.md: warm yellow, 7th-grade copy, no jargon.
- * No login required. The token IS the auth.
+ * The token IS the auth. No login required.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Camera, ImageIcon, FileText, CheckCircle2, AlertCircle, Sparkles, ArrowLeft } from 'lucide-react';
+import {
+  Camera,
+  ImageIcon,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  ArrowLeft,
+} from 'lucide-react';
 
+import Button from '@/components/common/Button';
+import Select from '@/components/common/Select';
+import BrandMark from '@/components/common/BrandMark';
 import { isLikelyBase62Token } from '@/lib/base62';
 
 const API_BASE: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
@@ -83,9 +96,8 @@ export default function PortalUpload(): JSX.Element {
     let cancelled = false;
     void (async () => {
       try {
-        const path = '/portal/parent';
         // We try parent first; if 403 we fall back to /portal/staff.
-        let r = await fetch(`${API_BASE}${path}?t=${encodeURIComponent(token!)}`, {
+        let r = await fetch(`${API_BASE}/portal/parent?t=${encodeURIComponent(token!)}`, {
           credentials: 'omit',
         });
         if (r.status === 403) {
@@ -98,14 +110,18 @@ export default function PortalUpload(): JSX.Element {
           setError(
             r.status === 401 || r.status === 410
               ? "This upload link doesn't work — ask your director for a new one."
-              : 'Something went wrong on our end.',
+              : 'Something went wrong on our end. Please try again in a minute.',
           );
           return;
         }
         const j = (await r.json()) as PortalSession;
         if (!cancelled) setSession(j);
       } catch {
-        if (!cancelled) setError("We couldn't reach Levelbrook just now. Check your internet and try again.");
+        if (!cancelled) {
+          setError(
+            "We couldn't reach Levelbrook just now. Check your internet and try again.",
+          );
+        }
       }
     })();
     return () => {
@@ -116,13 +132,19 @@ export default function PortalUpload(): JSX.Element {
   if (!validToken || error) {
     return (
       <PortalShell>
-        <div className="rounded-2xl bg-white p-6 text-center shadow-md ring-1 ring-amber-100">
-          <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full bg-amber-50">
-            <AlertCircle className="h-5 w-5 text-amber-600" />
+        <div className="rounded-lb bg-white p-7 text-center shadow-card border border-line">
+          <div
+            className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-critical-50 ring-1 ring-critical-100"
+            aria-hidden
+          >
+            <AlertCircle className="h-6 w-6 text-critical-600" />
           </div>
-          <h1 className="text-lg font-semibold text-ink-900">This upload link doesn&apos;t work</h1>
-          <p className="mt-1 text-sm text-ink-700">
-            {error ?? 'Ask your director for a new one — they can send it from your page.'}
+          <h1 className="font-display text-xl text-ink-900">
+            This upload link doesn&apos;t work
+          </h1>
+          <p className="mt-2 text-sm text-ink-700 leading-relaxed">
+            {error ??
+              'Ask your director for a new one — they can send it from your page.'}
           </p>
         </div>
       </PortalShell>
@@ -132,23 +154,23 @@ export default function PortalUpload(): JSX.Element {
   if (!session) {
     return (
       <PortalShell>
-        <div className="rounded-2xl bg-white p-6 text-center shadow-md">
-          <div className="mx-auto h-6 w-24 animate-pulse rounded-full bg-amber-100" />
-          <p className="mt-3 text-sm text-ink-500">Loading your page…</p>
+        <div className="rounded-lb bg-white p-7 text-center shadow-card border border-line">
+          <div className="mx-auto h-6 w-28 animate-pulse rounded-full bg-line-soft" />
+          <p className="mt-4 text-sm text-ink-500">Loading your page…</p>
         </div>
       </PortalShell>
     );
   }
 
-  const firstName = session.kind === 'parent_upload' ? session.child?.first_name : session.staff?.first_name;
+  const firstName =
+    session.kind === 'parent_upload'
+      ? session.child?.first_name
+      : session.staff?.first_name;
 
   return (
     <PortalShell>
       {screen === 'welcome' && (
-        <Welcome
-          session={session}
-          onAddDoc={() => setScreen('upload')}
-        />
+        <Welcome session={session} onAddDoc={() => setScreen('upload')} />
       )}
       {screen === 'upload' && (
         <UploadScreen
@@ -159,7 +181,6 @@ export default function PortalUpload(): JSX.Element {
           onBack={() => setScreen('welcome')}
           onUploaded={async (resp) => {
             setScreen('reading');
-            // call finalize
             try {
               const r = await fetch(
                 `${API_BASE}/portal/upload/${encodeURIComponent(resp.document_id)}/finalize?t=${encodeURIComponent(
@@ -169,7 +190,9 @@ export default function PortalUpload(): JSX.Element {
                   method: 'POST',
                   credentials: 'omit',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(resp.parts ? { parts: resp.parts.map((p) => p.storage_key) } : {}),
+                  body: JSON.stringify(
+                    resp.parts ? { parts: resp.parts.map((p) => p.storage_key) } : {},
+                  ),
                 },
               );
               if (!r.ok) throw new Error('finalize failed');
@@ -207,26 +230,30 @@ export default function PortalUpload(): JSX.Element {
   );
 }
 
-// ---- Shell + headers ------------------------------------------------------
+// ---- Shell ----------------------------------------------------------------
 
 function PortalShell({ children }: { children: React.ReactNode }): JSX.Element {
   return (
     <div
-      className="min-h-screen"
-      style={{ background: 'linear-gradient(180deg, #fff8e1 0%, #fef9ec 100%)' }}
+      className="min-h-screen bg-surface-muted"
+      style={{
+        backgroundImage:
+          'radial-gradient(ellipse 90% 50% at 50% 0%, rgba(13,111,94,0.06), transparent 60%),' +
+          'radial-gradient(ellipse 60% 40% at 100% 100%, rgba(197,119,74,0.06), transparent 60%)',
+      }}
     >
-      <header className="bg-white/80 backdrop-blur border-b border-amber-100">
-        <div className="mx-auto max-w-md px-4 h-14 flex items-center gap-2">
-          <div className="grid h-7 w-7 place-items-center rounded-full bg-amber-300 text-amber-900 font-black">
-            L
-          </div>
-          <span className="font-semibold text-ink-900">Levelbrook</span>
+      <header className="bg-white/80 backdrop-blur border-b border-line-soft sticky top-0 z-10">
+        <div className="mx-auto max-w-md px-4 h-14 flex items-center">
+          <BrandMark size="sm" />
         </div>
       </header>
-      <main className="mx-auto max-w-md px-4 py-6">{children}</main>
-      <footer className="mx-auto max-w-md px-4 py-6 text-center text-xs text-ink-500">
+      <main className="mx-auto max-w-md px-4 py-7">{children}</main>
+      <footer className="mx-auto max-w-md px-4 py-8 text-center text-xs text-ink-500 leading-relaxed">
         Need help? Email{' '}
-        <a className="text-amber-700 underline" href="mailto:levelbrookteam@gmail.com">
+        <a
+          className="font-medium text-brand-700 hover:underline"
+          href="mailto:levelbrookteam@gmail.com"
+        >
           levelbrookteam@gmail.com
         </a>
       </footer>
@@ -247,9 +274,7 @@ function Welcome({
   const childFirst = session.child?.first_name ?? '';
   const staffFirst = session.staff?.first_name ?? '';
 
-  const heading = isParent
-    ? "Hi! 👋"
-    : `Hi ${staffFirst}! 👋`;
+  const heading = isParent ? 'Welcome' : `Hi ${staffFirst}`;
   const sub = isParent
     ? `You're ${childFirst}'s parent at ${session.provider.name}. We need a few forms to keep their file complete. This takes about 2 minutes.`
     : `${session.provider.name} asked for a few documents to keep your file complete. This takes about 2 minutes.`;
@@ -260,31 +285,45 @@ function Welcome({
   const missing = (counts.missing ?? 0) + (counts.expired ?? 0);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-ink-900">{heading}</h1>
-        <p className="mt-2 text-base text-ink-700 leading-relaxed">{sub}</p>
+        <h1 className="font-display text-3xl text-ink-900 leading-tight tracking-tight">
+          {heading}
+        </h1>
+        <p className="mt-3 text-base text-ink-700 leading-relaxed">{sub}</p>
       </div>
 
-      <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-amber-100">
-        <div className="text-xs font-medium uppercase tracking-wider text-amber-700">
-          {isParent ? 'For ' + childFirst : 'Your file'}
+      <div className="rounded-lb bg-white p-5 shadow-card border border-line">
+        <div className="eyebrow">
+          {isParent ? `For ${childFirst}` : 'Your file'}
         </div>
-        <div className="mt-1 text-base font-semibold text-ink-900">{session.provider.name}</div>
+        <div className="mt-3 text-base font-semibold text-ink-900">
+          {session.provider.name}
+        </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <Pill tone="green" label="On file" value={onFile} />
-          <Pill tone="amber" label="Expiring soon" value={expiringSoon} />
-          <Pill tone="coral" label="Missing" value={missing} />
+        <div className="mt-5 grid grid-cols-3 gap-2.5">
+          <Pill tone="ok" label="On file" value={onFile} />
+          <Pill tone="caution" label="Expiring" value={expiringSoon} />
+          <Pill tone="missing" label="Missing" value={missing} />
         </div>
 
         {session.required_documents.length > 0 && (
-          <ul className="mt-4 divide-y divide-amber-50">
+          <ul className="mt-5 divide-y divide-line-soft">
             {session.required_documents.map((d) => (
-              <li key={d.id} className="flex items-center justify-between py-2.5">
-                <div className="pr-3 text-sm text-ink-800">
+              <li
+                key={d.id}
+                className="flex items-center justify-between py-3 gap-3"
+              >
+                <div className="text-sm text-ink-800 min-w-0">
                   {d.label}
-                  {d.required && <span className="ml-1 text-coral-600" aria-label="required">*</span>}
+                  {d.required && (
+                    <span
+                      className="ml-1 text-critical-600"
+                      aria-label="required"
+                    >
+                      *
+                    </span>
+                  )}
                 </div>
                 <StatusPill status={d.status} />
               </li>
@@ -293,42 +332,72 @@ function Welcome({
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onAddDoc}
-        className="w-full rounded-2xl bg-amber-300 hover:bg-amber-400 active:bg-amber-500 px-4 py-4 text-base font-semibold text-amber-950 shadow-md transition focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2"
-      >
+      <Button size="lg" fullWidth onClick={onAddDoc}>
         Add a document
-      </button>
+      </Button>
     </div>
   );
 }
 
-function Pill({ tone, label, value }: { tone: 'green' | 'amber' | 'coral'; label: string; value: number }): JSX.Element {
+function Pill({
+  tone,
+  label,
+  value,
+}: {
+  tone: 'ok' | 'caution' | 'missing';
+  label: string;
+  value: number;
+}): JSX.Element {
   const map = {
-    green: 'bg-brand-50 text-brand-800 ring-brand-100',
-    amber: 'bg-amber-50 text-amber-800 ring-amber-200',
-    coral: 'bg-critical-50 text-critical-700 ring-critical-100',
+    ok: 'bg-brand-50 text-brand-800 ring-brand-100',
+    caution: 'bg-caution-50 text-caution-700 ring-caution-100',
+    missing: 'bg-critical-50 text-critical-700 ring-critical-100',
   } as const;
   return (
-    <div className={`rounded-xl px-2 py-2 text-center ring-1 ${map[tone]}`}>
-      <div className="text-lg font-bold">{value}</div>
-      <div className="text-[10px] uppercase tracking-wider font-medium">{label}</div>
+    <div className={`rounded-lb-sm px-2 py-2.5 text-center ring-1 ${map[tone]}`}>
+      <div className="text-xl font-bold leading-none">{value}</div>
+      <div className="mt-1 text-[10px] uppercase tracking-[0.1em] font-semibold">
+        {label}
+      </div>
     </div>
   );
 }
 
-function StatusPill({ status }: { status: PortalRequiredDoc['status'] }): JSX.Element {
-  const map: Record<PortalRequiredDoc['status'], { label: string; className: string }> = {
-    on_file: { label: 'On file', className: 'bg-brand-50 text-brand-700 ring-brand-100' },
-    expiring_soon: { label: 'Expiring soon', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
-    expired: { label: 'Expired', className: 'bg-critical-50 text-critical-700 ring-critical-100' },
-    missing: { label: 'Missing', className: 'bg-surface-sunken text-ink-700 ring-line' },
-    awaiting_upload: { label: 'Awaiting upload', className: 'bg-sky-50 text-sky-700 ring-sky-100' },
+function StatusPill({
+  status,
+}: {
+  status: PortalRequiredDoc['status'];
+}): JSX.Element {
+  const map: Record<
+    PortalRequiredDoc['status'],
+    { label: string; className: string }
+  > = {
+    on_file: {
+      label: 'On file',
+      className: 'bg-brand-50 text-brand-700 ring-brand-100',
+    },
+    expiring_soon: {
+      label: 'Expiring soon',
+      className: 'bg-caution-50 text-caution-700 ring-caution-100',
+    },
+    expired: {
+      label: 'Expired',
+      className: 'bg-critical-50 text-critical-700 ring-critical-100',
+    },
+    missing: {
+      label: 'Missing',
+      className: 'bg-surface-sunken text-ink-700 ring-line',
+    },
+    awaiting_upload: {
+      label: 'Awaiting upload',
+      className: 'bg-[#eaf2f7] text-[#3a6b8a] ring-[#cdd9e2]',
+    },
   };
   const { label, className } = map[status];
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ring-1 ${className}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ring-1 ring-inset ${className} whitespace-nowrap`}
+    >
       {label}
     </span>
   );
@@ -369,35 +438,42 @@ function UploadScreen({
   onUploaded: (r: UploadResponse) => void;
 }): JSX.Element {
   const [busy, setBusy] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
 
-  const docKinds = session.kind === 'parent_upload' ? COMMON_PARENT_DOC_KINDS : COMMON_STAFF_DOC_KINDS;
+  const docKinds =
+    session.kind === 'parent_upload'
+      ? COMMON_PARENT_DOC_KINDS
+      : COMMON_STAFF_DOC_KINDS;
 
   const handleFiles = async (files: FileList | null, multi: boolean) => {
     if (!files || files.length === 0) return;
     setBusy(true);
+    setUploadError(null);
     try {
       const arr = Array.from(files);
       const pdfMode = arr[0].type === 'application/pdf';
       const wantMulti = multi && arr.length > 1 && !pdfMode;
 
-      const presignResp = await fetch(`${API_BASE}/portal/upload?t=${encodeURIComponent(token)}`, {
-        method: 'POST',
-        credentials: 'omit',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          kind: docKind,
-          mime_type: pdfMode ? 'application/pdf' : 'image/jpeg',
-          multi_page: wantMulti ? arr.length : 0,
-        }),
-      });
+      const presignResp = await fetch(
+        `${API_BASE}/portal/upload?t=${encodeURIComponent(token)}`,
+        {
+          method: 'POST',
+          credentials: 'omit',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            kind: docKind,
+            mime_type: pdfMode ? 'application/pdf' : 'image/jpeg',
+            multi_page: wantMulti ? arr.length : 0,
+          }),
+        },
+      );
       if (!presignResp.ok) throw new Error('presign failed');
       const presigned = (await presignResp.json()) as UploadResponse;
 
       if (wantMulti && presigned.parts) {
-        // PUT each photo to its presigned URL.
         await Promise.all(
           presigned.parts.map((part, i) =>
             fetch(part.upload_url, {
@@ -410,53 +486,53 @@ function UploadScreen({
       } else if (presigned.upload_url) {
         await fetch(presigned.upload_url, {
           method: 'PUT',
-          headers: { 'Content-Type': pdfMode ? 'application/pdf' : 'image/jpeg' },
+          headers: {
+            'Content-Type': pdfMode ? 'application/pdf' : 'image/jpeg',
+          },
           body: arr[0],
         });
       }
 
       onUploaded(presigned);
     } catch {
-      alert("We couldn't upload that file. Please try again.");
+      setUploadError(
+        "We couldn't upload that file. Please check your internet and try again.",
+      );
       setBusy(false);
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center gap-1 text-sm text-ink-700 hover:text-ink-900"
+        className="inline-flex items-center gap-1 text-sm font-medium text-ink-700 hover:text-ink-900"
       >
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
       <div>
-        <h1 className="text-2xl font-bold text-ink-900">Add your document</h1>
-        <p className="mt-1 text-base text-ink-700">
+        <h1 className="font-display text-3xl text-ink-900 leading-tight tracking-tight">
+          Add your document
+        </h1>
+        <p className="mt-2 text-base text-ink-700 leading-relaxed">
           Snap a photo, or grab one from your phone — whichever&apos;s easier.
         </p>
       </div>
 
-      <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-amber-100">
-        <label className="block text-sm font-medium text-ink-900">What is this?</label>
-        <select
-          className="mt-2 block w-full rounded-xl border border-amber-200 bg-amber-50/40 px-3 py-3 text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-300"
+      <div className="rounded-lb bg-white p-5 shadow-card border border-line">
+        <Select
+          label="What is this?"
           value={docKind}
           onChange={(e) => onChangeDocKind(e.target.value)}
-        >
-          {docKinds.map((k) => (
-            <option key={k.value} value={k.value}>
-              {k.label}
-            </option>
-          ))}
-        </select>
+          options={docKinds}
+        />
       </div>
 
       <div className="space-y-3">
         <UploadButton
           icon={<Camera className="h-6 w-6" />}
-          label="📷 Take a photo"
+          label="Take a photo"
           subLabel="Front and back if it has them. We'll stitch them together."
           disabled={busy}
           onClick={() => cameraRef.current?.click()}
@@ -476,7 +552,7 @@ function UploadScreen({
 
         <UploadButton
           icon={<ImageIcon className="h-6 w-6" />}
-          label="🖼 Choose from your photos"
+          label="Choose from your photos"
           subLabel="Pick a photo you already took."
           disabled={busy}
           onClick={() => galleryRef.current?.click()}
@@ -494,7 +570,7 @@ function UploadScreen({
 
         <UploadButton
           icon={<FileText className="h-6 w-6" />}
-          label="📄 Upload a PDF"
+          label="Upload a PDF"
           subLabel="If your provider sent you a PDF."
           disabled={busy}
           onClick={() => pdfRef.current?.click()}
@@ -512,7 +588,22 @@ function UploadScreen({
       </div>
 
       {busy && (
-        <p className="text-center text-sm text-ink-500">Uploading…</p>
+        <p
+          className="text-center text-sm text-ink-700 inline-flex items-center justify-center gap-2 w-full"
+          role="status"
+        >
+          <span className="h-2 w-2 rounded-full bg-brand-500 animate-pulse" />
+          Uploading…
+        </p>
+      )}
+
+      {uploadError && (
+        <div
+          className="rounded-lb-sm bg-critical-50 px-4 py-3 text-sm text-critical-700 ring-1 ring-critical-200"
+          role="alert"
+        >
+          {uploadError}
+        </div>
       )}
     </div>
   );
@@ -536,15 +627,22 @@ function UploadButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full items-center gap-4 rounded-2xl bg-white px-4 py-4 text-left shadow-md ring-1 ring-amber-100 transition hover:bg-amber-50 active:bg-amber-100 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-amber-500"
-      style={{ minHeight: 64 }}
+      className="flex w-full items-center gap-4 rounded-lb bg-white px-4 py-4 text-left shadow-card border border-line transition-all hover:border-brand-200 hover:shadow-elevated active:scale-[0.99] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+      style={{ minHeight: 72 }}
     >
-      <span className="grid h-12 w-12 place-items-center rounded-xl bg-amber-100 text-amber-800">
+      <span
+        className="grid h-12 w-12 place-items-center rounded-lb-sm bg-brand-50 text-brand-700 ring-1 ring-brand-100 shrink-0"
+        aria-hidden
+      >
         {icon}
       </span>
-      <span className="flex-1">
-        <span className="block text-base font-semibold text-ink-900">{label}</span>
-        <span className="block text-xs text-ink-500">{subLabel}</span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-base font-semibold text-ink-900">
+          {label}
+        </span>
+        <span className="block text-xs text-ink-500 mt-0.5 leading-snug">
+          {subLabel}
+        </span>
       </span>
     </button>
   );
@@ -554,19 +652,24 @@ function UploadButton({
 
 function ReadingScreen(): JSX.Element {
   return (
-    <div className="rounded-2xl bg-white p-6 text-center shadow-md ring-1 ring-amber-100">
-      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-amber-100">
-        <Sparkles className="h-6 w-6 text-amber-700 animate-pulse" />
+    <div className="rounded-lb bg-white p-7 text-center shadow-card border border-line">
+      <div
+        className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-warm-50 ring-1 ring-warm-100"
+        aria-hidden
+      >
+        <Sparkles className="h-6 w-6 text-warm-600 animate-pulse" />
       </div>
-      <h2 className="text-lg font-semibold text-ink-900">Got it — give us a second to read this.</h2>
-      <p className="mt-1 text-sm text-ink-700">
+      <h2 className="font-display text-xl text-ink-900">
+        Got it — give us a second to read this.
+      </h2>
+      <p className="mt-2 text-sm text-ink-700 leading-relaxed">
         Levelbrook AI is checking the document type and expiration date.
       </p>
     </div>
   );
 }
 
-// ---- Confirmation card ----------------------------------------------------
+// ---- Confirmation screen --------------------------------------------------
 
 function ConfirmScreen({
   token,
@@ -600,26 +703,37 @@ function ConfirmScreen({
   );
 }
 
-function DoneScreen({ firstName, onAnother }: { firstName: string; onAnother: () => void }): JSX.Element {
+function DoneScreen({
+  firstName,
+  onAnother,
+}: {
+  firstName: string;
+  onAnother: () => void;
+}): JSX.Element {
   return (
-    <div className="rounded-2xl bg-white p-6 text-center shadow-md ring-1 ring-brand-100">
-      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-brand-100">
+    <div className="rounded-lb bg-white p-7 text-center shadow-card border border-line">
+      <div
+        className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-brand-50 ring-1 ring-brand-100"
+        aria-hidden
+      >
         <CheckCircle2 className="h-7 w-7 text-brand-700" />
       </div>
-      <h2 className="text-xl font-bold text-ink-900">All done — thanks{firstName ? ', ' + firstName : ''}!</h2>
-      <p className="mt-1 text-sm text-ink-700">We&apos;ll let your director know.</p>
-      <button
-        type="button"
-        onClick={onAnother}
-        className="mt-4 w-full rounded-2xl bg-amber-300 hover:bg-amber-400 px-4 py-3 text-sm font-semibold text-amber-950"
-      >
-        Add another document
-      </button>
+      <h2 className="font-display text-2xl text-ink-900 tracking-tight">
+        All done{firstName ? `, ${firstName}` : ''}.
+      </h2>
+      <p className="mt-2 text-sm text-ink-700 leading-relaxed">
+        Thanks for sending that over — we&apos;ll let your director know.
+      </p>
+      <div className="mt-6">
+        <Button fullWidth variant="secondary" onClick={onAnother}>
+          Add another document
+        </Button>
+      </div>
     </div>
   );
 }
 
-// ---- The OCR confirmation card (also used in manager dashboard) -----------
+// ---- OCR confirmation card -----------------------------------------------
 
 export interface OcrConfirmPayload {
   document_type: string;
@@ -650,6 +764,7 @@ export function OcrConfirmationCard({
   const [touchedDate, setTouchedDate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showDoc, setShowDoc] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Confidence buckets: high (≥0.9), medium (0.6–0.9), low (<0.6).
   const lowConfidence = confidence > 0 && confidence < 0.6;
@@ -658,12 +773,15 @@ export function OcrConfirmationCard({
   const canConfirm = !lowConfidence || (touchedKind && touchedDate);
 
   const submit = async (acceptedExtraction: boolean) => {
+    setSubmitError(null);
     if (!docKind && !doesNotExpire) {
-      alert('Please pick a document type.');
+      setSubmitError('Please pick a document type before saving.');
       return;
     }
     if (!doesNotExpire && !expDate) {
-      alert('Please pick an expiration date, or check "This document doesn\'t expire."');
+      setSubmitError(
+        "Please pick an expiration date, or check \"This document doesn't expire.\"",
+      );
       return;
     }
     setBusy(true);
@@ -674,6 +792,10 @@ export function OcrConfirmationCard({
         does_not_expire: doesNotExpire,
         accepted_extraction: acceptedExtraction,
       });
+    } catch {
+      setSubmitError(
+        "Something went wrong on our end. Please try again in a minute.",
+      );
     } finally {
       setBusy(false);
     }
@@ -681,16 +803,24 @@ export function OcrConfirmationCard({
 
   return (
     <div className="space-y-4">
-      {/* Banner — never dismissible. Verbatim from REQ-006. */}
-      <div className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+      {/* REQ-006 banner — never dismissible. Amber (caution) signals
+          "please review", not "warning". */}
+      <div
+        className="rounded-lb bg-caution-50 p-4 ring-1 ring-caution-200"
+        role="status"
+      >
         <div className="flex items-start gap-3">
-          <Sparkles className="mt-0.5 h-5 w-5 flex-none text-amber-700" />
-          <div className="text-sm text-amber-900 leading-relaxed">
-            Levelbrook AI read this document for you. Please check the type and expiration date below — AI can make
-            mistakes, so a quick double-check keeps your file accurate.
+          <Sparkles className="mt-0.5 h-5 w-5 flex-none text-caution-700" aria-hidden />
+          <div className="text-sm text-caution-700 leading-relaxed">
+            <span className="text-ink-800">
+              Levelbrook AI read this document for you. Please check the type
+              and expiration date below — AI can make mistakes, so a quick
+              double-check keeps your file accurate.
+            </span>
             {lowConfidence && (
-              <p className="mt-2 font-medium">
-                We weren&apos;t sure about this one. Please correct anything that looks off, then tap {submitLabel}.
+              <p className="mt-2 font-semibold text-caution-700">
+                We weren&apos;t sure about this one. Please correct anything
+                that looks off, then tap {submitLabel}.
               </p>
             )}
           </div>
@@ -698,20 +828,26 @@ export function OcrConfirmationCard({
       </div>
 
       {/* Field 1: Document type */}
-      <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-line-soft">
-        <label className="block text-sm font-semibold text-ink-900">Document type</label>
+      <div className="rounded-lb bg-white p-5 shadow-card border border-line">
+        <label
+          htmlFor="ocr-doc-kind"
+          className="block text-sm font-semibold text-ink-900"
+        >
+          Document type
+        </label>
         <div className="mt-2 flex items-center gap-2">
           <input
+            id="ocr-doc-kind"
             type="text"
             value={docKind}
             onChange={(e) => {
               setDocKind(e.target.value);
               setTouchedKind(true);
             }}
-            className="block w-full rounded-xl border border-line px-3 py-3 text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-300"
+            className="block w-full rounded-lb-sm border border-line bg-white px-3.5 py-3 text-base text-ink-900 placeholder:text-ink-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
           />
           {mediumConfidence && (
-            <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
+            <span className="whitespace-nowrap rounded-full bg-caution-100 px-2.5 py-1 text-xs font-semibold text-caution-700">
               Please review
             </span>
           )}
@@ -719,23 +855,29 @@ export function OcrConfirmationCard({
       </div>
 
       {/* Field 2: Expiration */}
-      <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-line-soft">
-        <label className="block text-sm font-semibold text-ink-900">This document expires on</label>
+      <div className="rounded-lb bg-white p-5 shadow-card border border-line">
+        <label
+          htmlFor="ocr-exp-date"
+          className="block text-sm font-semibold text-ink-900"
+        >
+          This document expires on
+        </label>
         {!doesNotExpire && (
           <input
+            id="ocr-exp-date"
             type="date"
             value={expDate}
             onChange={(e) => {
               setExpDate(e.target.value);
               setTouchedDate(true);
             }}
-            className="mt-2 block w-full rounded-xl border border-line px-3 py-3 text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-300"
+            className="mt-2 block w-full rounded-lb-sm border border-line bg-white px-3.5 py-3 text-base text-ink-900 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
           />
         )}
-        <label className="mt-3 flex items-center gap-2 text-sm text-ink-700">
+        <label className="mt-4 flex items-center gap-2.5 text-sm text-ink-800">
           <input
             type="checkbox"
-            className="h-5 w-5 rounded border-line text-amber-600 focus:ring-amber-500"
+            className="h-5 w-5 rounded border-line text-brand-600 focus:ring-brand-500"
             checked={doesNotExpire}
             onChange={(e) => {
               setDoesNotExpire(e.target.checked);
@@ -746,11 +888,11 @@ export function OcrConfirmationCard({
         </label>
       </div>
 
-      {/* See the document accordion */}
+      {/* See the document accordion (manager mode) */}
       {documentURL && (
-        <details className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-line-soft">
+        <details className="rounded-lb bg-white p-5 shadow-card border border-line">
           <summary
-            className="cursor-pointer text-sm font-medium text-ink-700"
+            className="cursor-pointer text-sm font-medium text-ink-700 hover:text-ink-900"
             onClick={() => setShowDoc((s) => !s)}
           >
             {showDoc ? 'Hide the document' : 'See the document'}
@@ -759,30 +901,41 @@ export function OcrConfirmationCard({
             <iframe
               title="document preview"
               src={documentURL}
-              className="h-96 w-full rounded-xl border border-line"
+              className="h-96 w-full rounded-lb-sm border border-line"
             />
           </div>
         </details>
       )}
 
-      {/* Buttons — stacked on mobile (Looks right on top), side-by-side on >= sm. */}
+      {submitError && (
+        <div
+          className="rounded-lb-sm bg-critical-50 px-4 py-3 text-sm text-critical-700 ring-1 ring-critical-200"
+          role="alert"
+        >
+          {submitError}
+        </div>
+      )}
+
+      {/* Buttons — "Looks right" on top on mobile, side-by-side on >= sm. */}
       <div className="flex flex-col gap-3 sm:flex-row-reverse">
-        <button
-          type="button"
-          disabled={busy || !canConfirm}
+        <Button
+          size="lg"
+          fullWidth
+          disabled={!canConfirm}
+          loading={busy}
           onClick={() => void submit(true)}
-          className="flex-1 rounded-2xl bg-amber-300 hover:bg-amber-400 active:bg-amber-500 px-4 py-4 text-base font-semibold text-amber-950 shadow-md disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitLabel}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          size="lg"
+          fullWidth
+          variant="secondary"
           disabled={busy}
           onClick={() => void submit(false)}
-          className="flex-1 rounded-2xl bg-white px-4 py-4 text-base font-semibold text-ink-700 ring-1 ring-line hover:bg-surface-sunken"
         >
           Fix this
-        </button>
+        </Button>
       </div>
     </div>
   );

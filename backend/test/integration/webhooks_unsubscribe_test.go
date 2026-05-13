@@ -121,13 +121,19 @@ func TestSESWebhook_Complaint_OptsOut(t *testing.T) {
 	}
 }
 
-func TestSESWebhook_SubscriptionConfirmation_200OK(t *testing.T) {
+// TestSESWebhook_SubscriptionConfirmation_403: the legit SNS subscription was
+// confirmed manually on 2026-05-12 and the handler now refuses any
+// SubscriptionConfirmation that arrives through the bounce endpoint — either
+// it's AWS replaying a confirmed message or somebody trying to trick us into
+// subscribing to a hostile topic. Test pinned to 403 so the security choice
+// can't silently regress to 200.
+func TestSESWebhook_SubscriptionConfirmation_403(t *testing.T) {
 	h := NewHarness(t)
 	body := []byte(`{"Type":"SubscriptionConfirmation","TopicArn":"arn:x","SubscribeURL":"https://sns.example/confirm"}`)
 	resp, _ := http.Post(h.URL("/webhooks/ses/bounce"), "application/json", bytes.NewReader(body))
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", resp.StatusCode)
 	}
 }
 

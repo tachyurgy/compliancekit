@@ -1,6 +1,7 @@
-import { Navigate, Route, Routes, useLocation, Link } from 'react-router-dom';
-import { ShieldCheck, Check } from 'lucide-react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Check } from 'lucide-react';
 
+import BrandMark from '@/components/common/BrandMark';
 import StepState from './steps/StepState';
 import StepLicenseType from './steps/StepLicenseType';
 import StepFacility from './steps/StepFacility';
@@ -24,25 +25,25 @@ function ProgressBar(): JSX.Element {
         return (
           <li key={step.path} className="flex items-center gap-2">
             <div
-              className={`h-7 w-7 rounded-full text-xs font-medium grid place-items-center ${
+              className={`h-8 w-8 rounded-full text-xs font-semibold grid place-items-center transition-colors ${
                 complete
-                  ? 'bg-brand-600 text-white'
+                  ? 'bg-brand-600 text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)]'
                   : active
                     ? 'bg-brand-50 text-brand-700 ring-2 ring-brand-600'
-                    : 'bg-gray-100 text-gray-500'
+                    : 'bg-surface-sunken text-ink-500'
               }`}
             >
-              {complete ? <Check className="h-3.5 w-3.5" /> : idx + 1}
+              {complete ? <Check className="h-4 w-4" /> : idx + 1}
             </div>
             <span
               className={`text-sm whitespace-nowrap ${
-                active ? 'text-gray-900 font-medium' : 'text-gray-500'
+                active ? 'text-ink-900 font-medium' : 'text-ink-500'
               }`}
             >
               {step.label}
             </span>
             {idx < WIZARD_STEPS.length - 1 && (
-              <span className="mx-2 h-px w-8 bg-gray-200 hidden md:block" />
+              <span className="mx-2 h-px w-8 bg-line hidden md:block" />
             )}
           </li>
         );
@@ -54,12 +55,9 @@ function ProgressBar(): JSX.Element {
 export default function OnboardingWizard(): JSX.Element {
   return (
     <div className="min-h-screen bg-surface-muted">
-      <header className="bg-white border-b border-gray-100">
+      <header className="bg-white border-b border-line">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center">
-          <Link to="/" className="flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-brand-600" />
-            <span className="font-semibold">Levelbrook</span>
-          </Link>
+          <BrandMark to="/" size="md" />
         </div>
       </header>
       <div className="max-w-3xl mx-auto px-6 py-8">

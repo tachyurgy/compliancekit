@@ -1,23 +1,17 @@
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { ShieldCheck, AlertCircle } from 'lucide-react';
+import { AlertCircle, Lock } from 'lucide-react';
 
 import Button from '@/components/common/Button';
+import BrandMark from '@/components/common/BrandMark';
 import { billingApi, type CheckoutPlan } from '@/api/billing';
 import { ApiError } from '@/api/client';
 
 /**
  * REQ-002 #3: choose annual ($948/yr) — default — vs monthly ($99/mo).
- *
- * Single CTA: "Start trial — no charge today" → POST
- * /api/billing/checkout-session → window.location.assign(url) to Stripe
- * hosted Checkout. Success URL on the backend is /onboarding/legal.
- *
- * Visual notes (per active/product/brand-voice.md and CLAUDE.md):
- *   - annual is selected by default with a small "Save ~$240/yr" badge
- *   - monthly stays visible, never below the fold
- *   - enterprise hint is a plain mailto: link, no Calendly, no Contact Sales
+ * Single CTA: "Start trial — no charge today" → Stripe Checkout.
+ * Success URL on the backend is /onboarding/legal.
  */
 export default function OnboardingCheckout(): JSX.Element {
   const [searchParams] = useSearchParams();
@@ -41,34 +35,37 @@ export default function OnboardingCheckout(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-surface-muted">
-      <header className="px-6 py-5 border-b border-gray-100 bg-white">
-        <Link to="/" className="flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-brand-600" />
-          <span className="font-semibold text-lg">Levelbrook</span>
-        </Link>
+      <header className="border-b border-line bg-white">
+        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center">
+          <BrandMark to="/" size="md" />
+        </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-12">
+      <main className="max-w-2xl mx-auto px-6 py-14">
         <div className="text-center">
-          <h1 className="text-3xl font-semibold text-gray-900">
-            Pick your plan
+          <span className="eyebrow">Step 1 of 3 — pick your plan</span>
+          <h1 className="mt-4 font-display text-4xl text-ink-900 tracking-tight">
+            Pick a plan.
           </h1>
-          <p className="mt-2 text-base text-gray-600">
+          <p className="mt-3 text-base text-ink-700 leading-relaxed">
             14 days free, no charge today. Cancel any time.
           </p>
         </div>
 
         {canceled && (
-          <div className="mt-6 rounded-lg bg-caution-50 border border-caution-100 p-4 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-caution-600 mt-0.5" />
-            <p className="text-sm text-gray-800">
+          <div
+            className="mt-7 rounded-lb-sm bg-caution-50 border border-caution-100 p-4 flex items-start gap-3"
+            role="status"
+          >
+            <AlertCircle className="h-5 w-5 text-caution-700 mt-0.5 shrink-0" />
+            <p className="text-sm text-ink-800 leading-relaxed">
               No charge — you canceled before adding your card. Pick a plan
               below to start your trial.
             </p>
           </div>
         )}
 
-        <div className="mt-8 space-y-3">
+        <div className="mt-9 space-y-3">
           <PlanOption
             id="annual_948"
             selected={plan === 'annual_948'}
@@ -87,35 +84,38 @@ export default function OnboardingCheckout(): JSX.Element {
         </div>
 
         {error && (
-          <p className="mt-4 text-sm text-red-600" role="alert">
+          <p
+            className="mt-5 rounded-lb-sm bg-critical-50 px-4 py-3 text-sm text-critical-700 ring-1 ring-critical-200"
+            role="alert"
+          >
             {error}
           </p>
         )}
 
-        <div className="mt-8">
+        <div className="mt-9">
           <Button
-            className="w-full"
+            fullWidth
             size="lg"
             loading={checkout.isPending}
             onClick={() => checkout.mutate()}
           >
             Start trial — no charge today
           </Button>
-          <p className="mt-3 text-xs text-center text-gray-500">
-            We use Stripe to handle payment. We never see your card number.
+          <p className="mt-3 text-xs text-center text-ink-500 inline-flex items-center justify-center gap-1.5 w-full">
+            <Lock className="h-3 w-3" aria-hidden />
+            Stripe handles your card. We never see the number.
           </p>
         </div>
 
-        <div className="mt-10 pt-6 border-t border-gray-100 text-center">
-          <p className="text-sm text-gray-600">
-            For multi-site or 100+ kids, email{' '}
+        <div className="mt-12 pt-7 border-t border-line text-center">
+          <p className="text-sm text-ink-700">
+            Multi-site or 100+ kids?{' '}
             <a
               href="mailto:levelbrookteam@gmail.com"
-              className="text-brand-600 hover:underline"
+              className="font-medium text-brand-700 hover:underline"
             >
               levelbrookteam@gmail.com
             </a>
-            .
           </p>
         </div>
       </main>
@@ -144,38 +144,32 @@ function PlanOption({
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full text-left rounded-xl border-2 p-5 transition-colors ${
+      className={`w-full text-left rounded-lb border-2 p-5 transition-all ${
         selected
           ? 'border-brand-600 bg-brand-50/40 shadow-card'
-          : 'border-gray-200 bg-white hover:border-gray-300'
+          : 'border-line bg-white hover:border-brand-200 hover:shadow-card'
       }`}
       aria-pressed={selected}
     >
       <div className="flex items-start gap-4">
         <span
-          className={`mt-1 h-5 w-5 shrink-0 rounded-full border-2 ${
-            selected
-              ? 'border-brand-600 bg-brand-600'
-              : 'border-gray-300 bg-white'
+          className={`mt-1 h-5 w-5 shrink-0 rounded-full border-2 grid place-items-center ${
+            selected ? 'border-brand-600 bg-brand-600' : 'border-line bg-white'
           }`}
           aria-hidden
         >
-          {selected && (
-            <span className="block h-full w-full rounded-full bg-white scale-50" />
-          )}
+          {selected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
         </span>
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-lg font-semibold text-gray-900">
-              {heading}
-            </span>
+            <span className="text-lg font-semibold text-ink-900">{heading}</span>
             {badge && (
-              <span className="inline-block text-xs font-medium px-2 py-0.5 rounded-full bg-caution-100 text-caution-600">
+              <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-warm-50 text-warm-600 ring-1 ring-warm-100">
                 {badge}
               </span>
             )}
           </div>
-          <p className="mt-1 text-sm text-gray-600">{sub}</p>
+          <p className="mt-1 text-sm text-ink-700">{sub}</p>
         </div>
       </div>
       <input type="radio" name="plan" value={id} checked={selected} readOnly hidden />

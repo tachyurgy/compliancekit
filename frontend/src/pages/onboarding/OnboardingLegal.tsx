@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { ShieldCheck } from 'lucide-react';
 
 import Button from '@/components/common/Button';
+import BrandMark from '@/components/common/BrandMark';
 import Input from '@/components/common/Input';
 import { legalApi } from '@/api/legal';
 import { ApiError } from '@/api/client';
@@ -49,53 +49,53 @@ export default function OnboardingLegal(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-surface-muted">
-      <header className="px-6 py-5 border-b border-gray-100 bg-white">
-        <Link to="/" className="flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-brand-600" />
-          <span className="font-semibold text-lg">Levelbrook</span>
-        </Link>
+      <header className="border-b border-line bg-white">
+        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center">
+          <BrandMark to="/" size="md" />
+        </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-10">
+      <main className="max-w-3xl mx-auto px-6 py-12">
         <div>
-          <h1 className="text-3xl font-semibold text-gray-900">
+          <span className="eyebrow">Step 2 of 3 — paperwork</span>
+          <h1 className="mt-4 font-display text-4xl text-ink-900 tracking-tight leading-tight">
             Two quick agreements before you upload anything.
           </h1>
-          <p className="mt-2 text-base text-gray-600">
+          <p className="mt-3 text-base text-ink-700 leading-relaxed">
             These protect your records and ours. They're written in plain English.
           </p>
         </div>
 
-        <section className="mt-8 card p-6">
+        <section className="mt-8 bg-white rounded-lb border border-line shadow-card p-6">
           <details open>
-            <summary className="cursor-pointer text-lg font-semibold text-gray-900">
+            <summary className="cursor-pointer text-lg font-semibold text-ink-900">
               Terms of Service
             </summary>
-            <article className="prose prose-sm mt-4 max-w-none text-gray-800 whitespace-pre-wrap">
+            <article className="prose prose-sm mt-4 max-w-none text-ink-800 whitespace-pre-wrap">
               {tosMarkdown}
             </article>
           </details>
         </section>
 
-        <section className="mt-4 card p-6">
+        <section className="mt-4 bg-white rounded-lb border border-line shadow-card p-6">
           <details open>
-            <summary className="cursor-pointer text-lg font-semibold text-gray-900">
+            <summary className="cursor-pointer text-lg font-semibold text-ink-900">
               Data Processing Addendum
             </summary>
-            <article className="prose prose-sm mt-4 max-w-none text-gray-800 whitespace-pre-wrap">
+            <article className="prose prose-sm mt-4 max-w-none text-ink-800 whitespace-pre-wrap">
               {dpaMarkdown}
             </article>
           </details>
         </section>
 
-        <section className="mt-6 card p-6">
-          <h2 className="text-lg font-semibold text-gray-900">Sign here</h2>
-          <p className="mt-1 text-sm text-gray-600">
+        <section className="mt-6 bg-white rounded-lb border border-line shadow-card p-6">
+          <h2 className="text-lg font-semibold text-ink-900">Sign here</h2>
+          <p className="mt-1.5 text-sm text-ink-700 leading-relaxed">
             Type your full legal name. Tick both boxes. We'll record this with
             today's date, your IP, and your browser — that's how an electronic
             signature works.
           </p>
-          <div className="mt-4 space-y-4">
+          <div className="mt-5 space-y-4">
             <Input
               label="Your full legal name"
               autoComplete="name"
@@ -103,21 +103,19 @@ export default function OnboardingLegal(): JSX.Element {
               onChange={(e) => setTypedName(e.target.value)}
               placeholder={user?.fullName ?? 'Maria L. Rodriguez'}
             />
-            <label className="flex items-start gap-3 text-sm text-gray-800">
+            <label className="flex items-start gap-3 text-sm text-ink-800">
               <input
                 type="checkbox"
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                className="mt-0.5 h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
                 checked={authorized}
                 onChange={(e) => setAuthorized(e.target.checked)}
               />
-              <span>
-                I am authorized to sign on behalf of my facility.
-              </span>
+              <span>I am authorized to sign on behalf of my facility.</span>
             </label>
-            <label className="flex items-start gap-3 text-sm text-gray-800">
+            <label className="flex items-start gap-3 text-sm text-ink-800">
               <input
                 type="checkbox"
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                className="mt-0.5 h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
                 checked={agree}
                 onChange={(e) => setAgree(e.target.checked)}
               />
@@ -128,13 +126,16 @@ export default function OnboardingLegal(): JSX.Element {
             </label>
 
             {error && (
-              <p className="text-sm text-red-600" role="alert">
+              <p
+                className="rounded-lb-sm bg-critical-50 px-4 py-3 text-sm text-critical-700 ring-1 ring-critical-200"
+                role="alert"
+              >
                 {error}
               </p>
             )}
 
             <Button
-              className="w-full"
+              fullWidth
               size="lg"
               disabled={!canSubmit}
               loading={sign.isPending}
@@ -142,7 +143,7 @@ export default function OnboardingLegal(): JSX.Element {
             >
               Sign and continue
             </Button>
-            <p className="text-xs text-gray-500 text-center">
+            <p className="text-xs text-ink-500 text-center">
               By clicking, you agree both documents apply to your account.
             </p>
           </div>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Check, ShieldCheck, Plus, Trash2 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Check, Plus, Trash2 } from 'lucide-react';
+
+import BrandMark from '@/components/common/BrandMark';
 
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
@@ -80,12 +82,9 @@ export default function FacilityWizard(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-surface-muted">
-      <header className="bg-white border-b border-gray-100">
+      <header className="bg-white border-b border-line">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center">
-          <Link to="/" className="flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-brand-600" />
-            <span className="font-semibold">Levelbrook</span>
-          </Link>
+          <BrandMark to="/" size="md" />
         </div>
       </header>
 

@@ -89,10 +89,17 @@ func (h *SESWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	switch env.Type {
 	case "SubscriptionConfirmation":
-		// Log loudly. A human confirms by hitting SubscribeURL.
-		h.Log.Info("ses webhook: subscription confirmation received",
-			"topic", env.TopicArn, "subscribe_url", env.SubscribeURL)
-		w.WriteHeader(http.StatusOK)
+		// The legit SNS subscription was confirmed manually on 2026-05-12.
+		// We never need to confirm another one through this endpoint — if
+		// the topic is ever rebuilt, the operator subscribes a fresh URL
+		// or temporarily enables a separate one-shot confirm endpoint. So
+		// any SubscriptionConfirmation arriving here today is either AWS
+		// resending the original (already confirmed, idempotent on their
+		// side) or an attempt to trick us into subscribing to a hostile
+		// topic. Refuse, log loudly, do not echo the SubscribeURL to logs.
+		h.Log.Warn("ses webhook: unexpected SubscriptionConfirmation — refused",
+			"topic", env.TopicArn, "message_id", env.MessageID)
+		w.WriteHeader(http.StatusForbidden)
 		return
 	case "UnsubscribeConfirmation":
 		h.Log.Info("ses webhook: unsubscribe confirmation", "topic", env.TopicArn)

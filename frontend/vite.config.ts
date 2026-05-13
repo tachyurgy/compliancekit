@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -39,5 +39,18 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
     target: 'es2020',
+  },
+  test: {
+    // jsdom for any test that mounts a React component; pure-JS tests
+    // work fine under it too. globals: true lets specs use describe/it
+    // without imports, matching what teammates already see in Vitest
+    // tutorials and lowering the bar to add the next test.
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    css: false,
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // Exclude the Playwright e2e suite — it has its own runner.
+    exclude: ['node_modules', 'e2e', 'dist'],
   },
 });

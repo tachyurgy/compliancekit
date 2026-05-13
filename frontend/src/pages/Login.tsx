@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { ShieldCheck } from 'lucide-react';
 
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
+import AuthShell from '@/components/common/AuthShell';
 import { emailSchema } from '@/lib/validation';
 import { zodResolver } from '@/lib/zodResolver';
 import { providersApi } from '@/api/providers';
@@ -57,76 +57,72 @@ export default function Login(): JSX.Element {
       const msg =
         err instanceof ApiError
           ? err.status === 401
-            ? 'Email or password is incorrect.'
+            ? "That email or password didn't match. Try again, or use Forgot password."
             : err.message
-          : 'Something went wrong. Please try again.';
+          : "Something went wrong on our end. Please try again in a minute.";
       setSubmitError(msg);
     }
   });
 
   return (
-    <div className="min-h-screen grid place-items-center bg-surface-muted p-6">
-      <div className="w-full max-w-md">
-        <Link to="/" className="flex items-center gap-2 mb-6">
-          <ShieldCheck className="h-6 w-6 text-brand-600" />
-          <span className="font-semibold text-lg">Levelbrook</span>
-        </Link>
-        <div className="card p-6">
-          <h1 className="text-xl font-semibold text-gray-900">Sign in</h1>
-          <p className="mt-1 text-sm text-gray-600">Welcome back.</p>
+    <AuthShell
+      title="Welcome back"
+      description="Sign in to keep your center inspection-ready."
+      footer={
+        <>
+          New to Levelbrook?{' '}
+          <Link to="/signup" className="font-medium text-brand-700 hover:underline">
+            Create your account
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={onSubmit} className="space-y-5" noValidate>
+        <Input
+          label="Email"
+          type="email"
+          autoComplete="email"
+          error={errors.email?.message}
+          {...register('email')}
+        />
+        <Input
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          error={errors.password?.message}
+          {...register('password')}
+        />
 
-          <form onSubmit={onSubmit} className="mt-5 space-y-4" noValidate>
-            <Input
-              label="Email"
-              type="email"
-              autoComplete="email"
-              error={errors.email?.message}
-              {...register('email')}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <label className="inline-flex items-center gap-2 text-sm text-ink-800">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+              {...register('rememberMe')}
             />
-            <Input
-              label="Password"
-              type="password"
-              autoComplete="current-password"
-              error={errors.password?.message}
-              {...register('password')}
-            />
-
-            <div className="flex items-center justify-between">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                  {...register('rememberMe')}
-                />
-                Remember me on this device
-              </label>
-              <Link
-                to="/forgot-password"
-                className="text-sm text-brand-600 hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            {submitError ? (
-              <p className="text-sm text-red-600" role="alert">
-                {submitError}
-              </p>
-            ) : null}
-
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? 'Signing in…' : 'Sign in'}
-            </Button>
-          </form>
-
-          <p className="mt-6 text-center text-sm text-gray-600">
-            Don't have an account?{' '}
-            <Link to="/signup" className="text-brand-600 hover:underline">
-              Create one
-            </Link>
-          </p>
+            Remember me on this device
+          </label>
+          <Link
+            to="/forgot-password"
+            className="text-sm font-medium text-brand-700 hover:underline"
+          >
+            Forgot password?
+          </Link>
         </div>
-      </div>
-    </div>
+
+        {submitError ? (
+          <p
+            className="rounded-lb-sm bg-critical-50 px-4 py-3 text-sm text-critical-700 ring-1 ring-critical-200"
+            role="alert"
+          >
+            {submitError}
+          </p>
+        ) : null}
+
+        <Button type="submit" fullWidth loading={isSubmitting}>
+          {isSubmitting ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

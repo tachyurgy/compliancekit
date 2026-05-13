@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
-import { ShieldCheck } from 'lucide-react';
 
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
+import AuthShell from '@/components/common/AuthShell';
 import { zodResolver } from '@/lib/zodResolver';
 import { authApi } from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -13,19 +13,10 @@ import { providersApi } from '@/api/providers';
 import { useSession } from '@/hooks/useSession';
 
 /**
- * REQ-011 / REQ-034 reset-password.
- *
- * /reset-password/:token. On success the backend establishes a session
- * cookie, so we just hydrate the session store and head to /dashboard.
- *
- * Brand-voice copy lives in REQ-034:
- *   - "Pick at least 12 characters." (verbatim, matches the backend message).
- *   - "These don't match — please retype." for confirm-mismatch.
- *   - 400/401 with a "This reset link …" message from the API → the link is
- *     invalid, expired, or already used; show the dedicated "This link doesn't
- *     work anymore" panel with a Send a new link CTA pointing back at
- *     /forgot-password. (The handler currently 400s on token problems; we
- *     also accept 401 in case it tightens later.)
+ * REQ-011 / REQ-034 reset-password. /reset-password/:token. On success the
+ * backend sets a session cookie; we hydrate the session store and head to
+ * /dashboard. Token-related failures swap the form for the dedicated
+ * "This link doesn't work anymore" panel.
  */
 const FormSchema = z
   .object({
@@ -52,7 +43,6 @@ export default function ResetPassword(): JSX.Element {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(FormSchema), mode: 'onChange' });
 
-  // Live strength hint as the user types.
   const passwordValue = useWatch({ control, name: 'password' }) ?? '';
   const passwordLen = passwordValue.length;
 
@@ -75,11 +65,6 @@ export default function ResetPassword(): JSX.Element {
         replace: true,
       });
     } catch (err) {
-      // Token-related failures from /api/auth/reset-password mean the link is
-      // bad / expired / already used. Swap the form for the dedicated
-      // "link doesn't work" panel so the user has a single clear next action.
-      // The current backend returns 400 with a "This reset link …" message;
-      // we also accept 401 in case the contract tightens.
       if (err instanceof ApiError) {
         const tokenIssue =
           err.status === 401 ||
@@ -97,85 +82,71 @@ export default function ResetPassword(): JSX.Element {
     }
   });
 
-  return (
-    <div className="min-h-screen grid place-items-center bg-surface-muted p-6">
-      <div className="w-full max-w-md">
-        <Link to="/" className="flex items-center gap-2 mb-6">
-          <ShieldCheck className="h-6 w-6 text-brand-600" />
-          <span className="font-semibold text-lg">Levelbrook</span>
-        </Link>
-        <div className="card p-6">
-          {linkDead ? (
-            <div className="text-center">
-              <h1 className="text-xl font-semibold text-gray-900">
-                This link doesn't work anymore
-              </h1>
-              <p className="mt-2 text-sm text-gray-600">
-                Reset links are good for 30 minutes — yours has expired or
-                already been used. Request a fresh one and we'll email it
-                right over.
-              </p>
-              <Link
-                to="/forgot-password"
-                className="mt-6 inline-flex w-full justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-              >
-                Send a new link
-              </Link>
-              <Link
-                to="/login"
-                className="mt-4 inline-block text-sm text-gray-600 hover:underline"
-              >
-                Back to sign in
-              </Link>
-            </div>
-          ) : (
-            <>
-              <h1 className="text-xl font-semibold text-gray-900">Pick a new password</h1>
-              <p className="mt-1 text-sm text-gray-600">
-                12 characters or more. We'll sign you in once it's set.
-              </p>
-              <form onSubmit={onSubmit} className="mt-5 space-y-4" noValidate>
-                <div>
-                  <Input
-                    label="New password"
-                    type="password"
-                    autoComplete="new-password"
-                    error={errors.password?.message}
-                    {...register('password')}
-                  />
-                  {/* Live strength hint — only shown once the user starts typing. */}
-                  {passwordLen > 0 && !errors.password ? (
-                    <p
-                      className={`mt-1 text-xs ${
-                        passwordLen >= 12 ? 'text-green-700' : 'text-gray-500'
-                      }`}
-                    >
-                      {passwordLen >= 12
-                        ? "Looks good."
-                        : `${passwordLen}/12 characters`}
-                    </p>
-                  ) : null}
-                </div>
-                <Input
-                  label="Confirm new password"
-                  type="password"
-                  autoComplete="new-password"
-                  error={errors.confirm?.message}
-                  {...register('confirm')}
-                />
-                {submitError ? (
-                  <p className="text-sm text-red-600" role="alert">
-                    {submitError}
-                  </p>
-                ) : null}
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving…' : 'Save and sign in'}
-                </Button>
-              </form>
-            </>
-          )}
+  if (linkDead) {
+    return (
+      <AuthShell title="This link doesn't work anymore">
+        <p className="text-sm text-ink-700 leading-relaxed">
+          Reset links are good for 30 minutes — yours has expired or already
+          been used. Request a fresh one and we'll email it right over.
+        </p>
+        <div className="mt-7 space-y-3">
+          <Link to="/forgot-password" className="block">
+            <Button fullWidth>Send a new link</Button>
+          </Link>
+          <Link
+            to="/login"
+            className="block text-center text-sm font-medium text-ink-700 hover:underline"
+          >
+            Back to sign in
+          </Link>
         </div>
-      </div>
-    </div>
+      </AuthShell>
+    );
+  }
+
+  return (
+    <AuthShell
+      title="Pick a new password"
+      description="12 characters or more. We'll sign you in once it's set."
+    >
+      <form onSubmit={onSubmit} className="space-y-5" noValidate>
+        <div>
+          <Input
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            error={errors.password?.message}
+            {...register('password')}
+          />
+          {passwordLen > 0 && !errors.password ? (
+            <p
+              className={`mt-1.5 text-xs font-medium ${
+                passwordLen >= 12 ? 'text-brand-700' : 'text-ink-500'
+              }`}
+            >
+              {passwordLen >= 12 ? 'Looks good.' : `${passwordLen}/12 characters`}
+            </p>
+          ) : null}
+        </div>
+        <Input
+          label="Confirm new password"
+          type="password"
+          autoComplete="new-password"
+          error={errors.confirm?.message}
+          {...register('confirm')}
+        />
+        {submitError ? (
+          <p
+            className="rounded-lb-sm bg-critical-50 px-4 py-3 text-sm text-critical-700 ring-1 ring-critical-200"
+            role="alert"
+          >
+            {submitError}
+          </p>
+        ) : null}
+        <Button type="submit" fullWidth loading={isSubmitting}>
+          {isSubmitting ? 'Saving…' : 'Save and sign in'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

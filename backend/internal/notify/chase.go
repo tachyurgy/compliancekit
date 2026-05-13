@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/tachyurgy/compliancekit/backend/internal/dbtime"
 	"github.com/tachyurgy/compliancekit/backend/internal/magiclink"
 )
 
@@ -179,13 +180,23 @@ SELECT * FROM candidates`, windowFloor, windowEnd)
 	var batch []row
 	for rows.Next() {
 		var r row
-		if err := rows.Scan(&r.d.DocID, &r.d.ProviderID, &r.d.DocTitle, &r.d.ExpiresAt,
+		// documents.expires_at is TEXT (migration 000004); modernc.org/sqlite
+		// won't auto-parse it into a time.Time without TIMESTAMP affinity. Go
+		// through dbtime.NullTime so production rows with real expiration
+		// dates don't silently get dropped from the chase batch.
+		var expires dbtime.NullTime
+		if err := rows.Scan(&r.d.DocID, &r.d.ProviderID, &r.d.DocTitle, &expires,
 			&r.d.SubjectKind, &r.d.SubjectID, &r.d.ProviderName, &r.d.ProviderTZ,
 			&r.d.ProviderOwnerEmail,
 			&r.d.RecipEmail, &r.d.RecipPhone, &r.d.RecipName, &r.d.ChildFirstName,
 			&r.d.ChildLastName, &r.d.PreferredChannel); err != nil {
 			return fmt.Errorf("chase: scan: %w", err)
 		}
+		if !expires.Valid {
+			// Should be filtered by the WHERE clause, but defensively skip.
+			continue
+		}
+		r.d.ExpiresAt = expires.Time
 		batch = append(batch, r)
 	}
 

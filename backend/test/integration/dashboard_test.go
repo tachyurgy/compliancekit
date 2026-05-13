@@ -191,10 +191,12 @@ func TestDashboard_AcceptsDocumentsLoad(t *testing.T) {
 	client, providerID, userID := h.AuthAs(t, "CA")
 	_ = userID
 
-	// Insert a facility license using the handler's vocabulary. The
-	// dashboard's loadDocs SELECT uses subject_kind/subject_id/storage_*
-	// columns that don't exist — so the documents load path will likely
-	// 500. We tolerate both 200 and 500 here and log.
+	// Insert a facility license using the handler's vocabulary. The legacy
+	// 000004 schema declared every timestamp column as TEXT, so a row written
+	// with CURRENT_TIMESTAMP gets the "YYYY-MM-DD HH:MM:SS" format the
+	// modernc.org/sqlite driver refuses to auto-parse into time.Time.
+	// dashboard.loadDocs and documents.List now scan via dbtime.NullTime so
+	// this row reads back cleanly and the dashboard returns 200.
 	docID := base62.NewID()[:22]
 	_, err := h.DB.Exec(`
 		INSERT INTO documents (id, provider_id, owner_kind, owner_id, doc_type, s3_key, uploaded_via, created_at, updated_at)
@@ -209,8 +211,8 @@ func TestDashboard_AcceptsDocumentsLoad(t *testing.T) {
 		t.Fatalf("GET: %v", err)
 	}
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("unexpected status %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 (dbtime.NullTime now handles CURRENT_TIMESTAMP rows), got %d", resp.StatusCode)
 	}
 }
 

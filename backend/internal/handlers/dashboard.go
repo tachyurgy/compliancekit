@@ -7,6 +7,7 @@ import (
 	"database/sql"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/compliance"
+	"github.com/tachyurgy/compliancekit/backend/internal/dbtime"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
 	"github.com/tachyurgy/compliancekit/backend/internal/models"
@@ -180,12 +181,34 @@ func (h *DashboardHandler) loadDocs(r *http.Request, pid string) (map[string][]m
 	for rows.Next() {
 		var d models.Document
 		var kind string
+		// SQLite TEXT columns: scan timestamps into dbtime.NullTime to
+		// tolerate the CURRENT_TIMESTAMP "YYYY-MM-DD HH:MM:SS" format the
+		// modernc.org/sqlite driver refuses to auto-parse into time.Time.
+		var issued, expires, lastChase, created, updated, deleted dbtime.NullTime
 		if err := rows.Scan(&d.ID, &d.ProviderID, &d.SubjectKind, &d.SubjectID, &kind, &d.Title,
 			&d.StorageBucket, &d.StorageKey, &d.MIMEType, &d.SizeBytes,
-			&d.IssuedAt, &d.ExpiresAt, &d.OCRConfidence, &d.OCRSource,
-			&d.UploadedBy, &d.UploadedVia, &d.LastChaseSentAt,
-			&d.CreatedAt, &d.UpdatedAt, &d.DeletedAt); err != nil {
+			&issued, &expires, &d.OCRConfidence, &d.OCRSource,
+			&d.UploadedBy, &d.UploadedVia, &lastChase,
+			&created, &updated, &deleted); err != nil {
 			return nil, err
+		}
+		if issued.Valid {
+			t := issued.Time
+			d.IssuedAt = &t
+		}
+		if expires.Valid {
+			t := expires.Time
+			d.ExpiresAt = &t
+		}
+		if lastChase.Valid {
+			t := lastChase.Time
+			d.LastChaseSentAt = &t
+		}
+		d.CreatedAt = created.ValueOrZero()
+		d.UpdatedAt = updated.ValueOrZero()
+		if deleted.Valid {
+			t := deleted.Time
+			d.DeletedAt = &t
 		}
 		d.Kind = models.DocumentKind(kind)
 		key := d.SubjectKind + "|" + d.SubjectID + "|" + kind

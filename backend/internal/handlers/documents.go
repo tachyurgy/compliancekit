@@ -13,6 +13,7 @@ import (
 
 	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
+	"github.com/tachyurgy/compliancekit/backend/internal/dbtime"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
 	"github.com/tachyurgy/compliancekit/backend/internal/models"
@@ -520,13 +521,35 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var d models.Document
 		var kind string
+		// Mirror dashboard.loadDocs: SQLite TEXT timestamps need dbtime.NullTime
+		// because modernc.org/sqlite refuses to auto-parse them into time.Time
+		// when the column lacks TIMESTAMP affinity (000004 declared them TEXT).
+		var issued, expires, lastChase, created, updated, deleted dbtime.NullTime
 		if err := rows.Scan(&d.ID, &d.ProviderID, &d.SubjectKind, &d.SubjectID, &kind, &d.Title,
 			&d.StorageBucket, &d.StorageKey, &d.MIMEType, &d.SizeBytes,
-			&d.IssuedAt, &d.ExpiresAt, &d.OCRConfidence, &d.OCRSource,
-			&d.UploadedBy, &d.UploadedVia, &d.LastChaseSentAt,
-			&d.CreatedAt, &d.UpdatedAt, &d.DeletedAt); err != nil {
+			&issued, &expires, &d.OCRConfidence, &d.OCRSource,
+			&d.UploadedBy, &d.UploadedVia, &lastChase,
+			&created, &updated, &deleted); err != nil {
 			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 			return
+		}
+		if issued.Valid {
+			t := issued.Time
+			d.IssuedAt = &t
+		}
+		if expires.Valid {
+			t := expires.Time
+			d.ExpiresAt = &t
+		}
+		if lastChase.Valid {
+			t := lastChase.Time
+			d.LastChaseSentAt = &t
+		}
+		d.CreatedAt = created.ValueOrZero()
+		d.UpdatedAt = updated.ValueOrZero()
+		if deleted.Valid {
+			t := deleted.Time
+			d.DeletedAt = &t
 		}
 		d.Kind = models.DocumentKind(kind)
 		out = append(out, d)

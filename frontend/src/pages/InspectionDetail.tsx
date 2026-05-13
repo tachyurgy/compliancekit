@@ -41,7 +41,7 @@ function severityVariant(s: Severity): 'critical' | 'warning' | 'neutral' {
 function answerIcon(a: Answer | null): JSX.Element | null {
   if (a === 'pass') return <CheckCircle2 className="h-4 w-4 text-brand-600" />;
   if (a === 'fail') return <XCircle className="h-4 w-4 text-critical-600" />;
-  if (a === 'na') return <MinusCircle className="h-4 w-4 text-gray-500" />;
+  if (a === 'na') return <MinusCircle className="h-4 w-4 text-ink-500" />;
   return null;
 }
 
@@ -73,13 +73,13 @@ function DomainBar({ d }: { d: DomainBreakdown }): JSX.Element {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-sm">
-        <span className="font-medium text-gray-800">{d.name}</span>
-        <span className="text-gray-500 text-xs">
+        <span className="font-medium text-ink-800">{d.name}</span>
+        <span className="text-ink-500 text-xs">
           {d.passed} pass &middot; {d.failed} fail{d.na ? ` · ${d.na} N/A` : ''}
           {d.unanswered ? ` · ${d.unanswered} unanswered` : ''}
         </span>
       </div>
-      <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
+      <div className="flex h-2 rounded-full overflow-hidden bg-surface-sunken">
         <div className="bg-brand-500" style={{ width: `${passPct}%` }} />
         <div className="bg-critical-500" style={{ width: `${failPct}%` }} />
       </div>
@@ -123,31 +123,31 @@ function SummaryView({ detail }: { detail: RunDetail }): JSX.Element {
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="text-3xl font-semibold text-gray-900">{score}</div>
-              <div className="text-xs text-gray-500">of 100</div>
+              <div className="text-3xl font-semibold text-ink-900">{score}</div>
+              <div className="text-xs text-ink-500">of 100</div>
             </div>
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-semibold text-gray-900">Inspection complete</h2>
-            <p className="text-sm text-gray-600 mt-1 max-w-lg">
+            <h2 className="text-xl font-semibold text-ink-900">Inspection complete</h2>
+            <p className="text-sm text-ink-700 mt-1 max-w-lg">
               {score >= 90
                 ? "You're inspection-ready. Fix the items below to lock in a perfect score."
                 : score >= 70
                   ? 'You have real work to do before the state shows up. Prioritize the critical citations.'
                   : "This would not go well with a real inspector. Start with the critical items below."}
             </p>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-600">
+            <div className="mt-3 flex flex-wrap gap-3 text-xs text-ink-700">
               <div>
-                <span className="font-semibold text-gray-900">{detail.run.items_passed}</span> passed
+                <span className="font-semibold text-ink-900">{detail.run.items_passed}</span> passed
               </div>
               <div>
-                <span className="font-semibold text-gray-900">{detail.run.items_failed}</span> failed
+                <span className="font-semibold text-ink-900">{detail.run.items_failed}</span> failed
               </div>
               <div>
-                <span className="font-semibold text-gray-900">{detail.run.items_na}</span> N/A
+                <span className="font-semibold text-ink-900">{detail.run.items_na}</span> N/A
               </div>
               <div>
-                <span className="font-semibold text-gray-900">{detail.run.total_items}</span> total
+                <span className="font-semibold text-ink-900">{detail.run.total_items}</span> total
               </div>
             </div>
             <div className="mt-4">
@@ -175,12 +175,12 @@ function SummaryView({ detail }: { detail: RunDetail }): JSX.Element {
         padded
       >
         {citations.length === 0 ? (
-          <div className="text-sm text-gray-600 flex items-center gap-2">
+          <div className="text-sm text-ink-700 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-brand-600" />
             No failed items. Nothing for an inspector to cite.
           </div>
         ) : (
-          <ul className="divide-y divide-gray-100 -mx-5">
+          <ul className="divide-y divide-line-soft -mx-5">
             {citations.map((c) => (
               <li key={c.item_id} className="px-5 py-3 flex items-start gap-3">
                 <Flag className="h-4 w-4 mt-0.5 text-critical-600 flex-shrink-0" />
@@ -189,14 +189,14 @@ function SummaryView({ detail }: { detail: RunDetail }): JSX.Element {
                     <Badge variant={severityVariant(c.severity)}>
                       {severityLabel(c.severity)}
                     </Badge>
-                    <span className="text-xs text-gray-500">{c.domain}</span>
+                    <span className="text-xs text-ink-500">{c.domain}</span>
                   </div>
-                  <div className="text-sm text-gray-900 mt-1">{c.question}</div>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-sm text-ink-900 mt-1">{c.question}</div>
+                  <div className="text-xs text-ink-500 mt-1">
                     {c.reference} &middot; {c.form_ref}
                   </div>
                   {c.note ? (
-                    <div className="text-xs text-gray-600 mt-1 italic">Note: {c.note}</div>
+                    <div className="text-xs text-ink-700 mt-1 italic">Note: {c.note}</div>
                   ) : null}
                 </div>
               </li>
@@ -262,7 +262,7 @@ function Wizard({ detail }: { detail: RunDetail }): JSX.Element {
   if (!current) {
     return (
       <Card padded>
-        <div className="text-sm text-gray-600">Checklist is empty for this state.</div>
+        <div className="text-sm text-ink-700">Checklist is empty for this state.</div>
       </Card>
     );
   }
@@ -300,21 +300,21 @@ function Wizard({ detail }: { detail: RunDetail }): JSX.Element {
       <Card padded>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <div className="text-xs uppercase tracking-wide text-gray-500">
+            <div className="text-xs uppercase tracking-wide text-ink-500">
               Domain {domainInfo.position} of {domainInfo.total}
             </div>
-            <div className="text-lg font-semibold text-gray-900">{domainInfo.name}</div>
+            <div className="text-lg font-semibold text-ink-900">{domainInfo.name}</div>
           </div>
           <div className="text-right">
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-ink-500">
               Question {index + 1} of {items.length}
             </div>
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-ink-700">
               {answeredCount} answered &middot; {progressPct}% complete
             </div>
           </div>
         </div>
-        <div className="mt-3 h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div className="mt-3 h-2 rounded-full bg-surface-sunken overflow-hidden">
           <div
             className="h-2 bg-brand-500 transition-all"
             style={{ width: `${progressPct}%` }}
@@ -328,12 +328,12 @@ function Wizard({ detail }: { detail: RunDetail }): JSX.Element {
           <Badge variant={severityVariant(current.severity)}>
             {severityLabel(current.severity)}
           </Badge>
-          <span className="text-xs text-gray-500">{current.form_ref}</span>
-          <span className="text-xs text-gray-400">&middot;</span>
-          <span className="text-xs text-gray-500">{current.reference}</span>
+          <span className="text-xs text-ink-500">{current.form_ref}</span>
+          <span className="text-xs text-ink-400">&middot;</span>
+          <span className="text-xs text-ink-500">{current.reference}</span>
         </div>
 
-        <p className="text-lg sm:text-xl text-gray-900 leading-snug font-medium">
+        <p className="text-lg sm:text-xl text-ink-900 leading-snug font-medium">
           {current.question}
         </p>
 
@@ -373,17 +373,17 @@ function Wizard({ detail }: { detail: RunDetail }): JSX.Element {
 
         {/* Note + evidence */}
         <div className="mt-6">
-          <label className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+          <label className="text-xs font-medium text-ink-700 uppercase tracking-wide">
             Note (optional)
           </label>
           <textarea
-            className="mt-1 w-full rounded-md border border-gray-200 text-sm p-2 min-h-[72px]"
+            className="mt-1 w-full rounded-md border border-line text-sm p-2 min-h-[72px]"
             placeholder={currentResponse?.note || 'Anything you want the inspector to see or you want to remember'}
             value={noteDraft}
             onChange={(e) => setNoteDraft(e.target.value)}
           />
           {currentResponse ? (
-            <div className="mt-2 text-xs text-gray-500 flex items-center gap-2">
+            <div className="mt-2 text-xs text-ink-500 flex items-center gap-2">
               {answerIcon(currentResponse.answer)}
               Currently answered <span className="font-medium">{currentResponse.answer.toUpperCase()}</span>
               {currentResponse.note ? ` — "${currentResponse.note}"` : ''}
@@ -454,7 +454,7 @@ export default function InspectionDetail(): JSX.Element {
             <AlertTriangle className="h-5 w-5 mt-0.5" />
             <div>
               <div className="font-medium">Couldn't load this inspection</div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-ink-700">
                 {error instanceof Error ? error.message : 'Unknown error.'}
               </div>
               <div className="mt-3 flex gap-2">

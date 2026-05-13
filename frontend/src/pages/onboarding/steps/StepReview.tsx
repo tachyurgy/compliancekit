@@ -88,7 +88,7 @@ export default function StepReview(): JSX.Element {
         </div>
       )}
 
-      <dl className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
+      <dl className="divide-y divide-line-soft border border-line-soft rounded-lg">
         <Row label="State" value={wizard.stateCode} />
         <Row
           label="License type"
@@ -145,8 +145,8 @@ export default function StepReview(): JSX.Element {
 function Row({ label, value }: { label: string; value: string | null | undefined }): JSX.Element {
   return (
     <div className="grid grid-cols-3 gap-4 px-4 py-3">
-      <dt className="text-sm text-gray-500 col-span-1">{label}</dt>
-      <dd className="col-span-2 text-sm text-gray-900">
+      <dt className="text-sm text-ink-500 col-span-1">{label}</dt>
+      <dd className="col-span-2 text-sm text-ink-900">
         {value ? value : <span className="text-critical-600">Missing</span>}
       </dd>
     </div>

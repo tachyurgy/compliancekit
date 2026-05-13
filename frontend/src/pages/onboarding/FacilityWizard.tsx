@@ -141,15 +141,15 @@ function ProgressBar({ current, onJump }: { current: StepKey; onJump: (k: StepKe
                   ? 'bg-brand-600 text-white'
                   : active
                     ? 'bg-brand-50 text-brand-700 ring-2 ring-brand-600'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    : 'bg-surface-sunken text-ink-500 hover:bg-line'
               }`}
             >
               {complete ? <Check className="h-3.5 w-3.5" /> : idx + 1}
             </button>
-            <span className={`text-sm whitespace-nowrap ${active ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
+            <span className={`text-sm whitespace-nowrap ${active ? 'text-ink-900 font-medium' : 'text-ink-500'}`}>
               {s.label.replace(/^\d\s/, '')}
             </span>
-            {idx < STEPS.length - 1 && <span className="mx-2 h-px w-8 bg-gray-200 hidden md:block" />}
+            {idx < STEPS.length - 1 && <span className="mx-2 h-px w-8 bg-line hidden md:block" />}
           </li>
         );
       })}
@@ -349,19 +349,19 @@ function CapacityStep({
 function YesNo({ label, value, onChange }: { label: React.ReactNode; value: boolean; onChange: (b: boolean) => void }): JSX.Element {
   return (
     <div className="space-y-1">
-      <div className="block text-sm font-medium text-gray-800">{label}</div>
-      <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 gap-1">
+      <div className="block text-sm font-medium text-ink-800">{label}</div>
+      <div className="inline-flex rounded-lg border border-line bg-white p-1 gap-1">
         <button
           type="button"
           onClick={() => onChange(true)}
-          className={`px-4 py-1.5 rounded-md text-sm ${value ? 'bg-brand-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+          className={`px-4 py-1.5 rounded-md text-sm ${value ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-surface-sunken'}`}
         >
           Yes
         </button>
         <button
           type="button"
           onClick={() => onChange(false)}
-          className={`px-4 py-1.5 rounded-md text-sm ${!value ? 'bg-brand-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+          className={`px-4 py-1.5 rounded-md text-sm ${!value ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-surface-sunken'}`}
         >
           No
         </button>
@@ -426,12 +426,12 @@ function PeopleStep({
           disabled
         />
         <div className="sm:col-span-2">
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-sm text-ink-700">
             <input
               type="checkbox"
               checked={sameAsOwner}
               onChange={(e) => setSameAsOwner(e.target.checked)}
-              className="rounded border-gray-300 text-brand-600 focus:ring-brand-600"
+              className="rounded border-line text-brand-600 focus:ring-brand-600"
             />
             Same as owner
           </label>
@@ -510,7 +510,7 @@ function RoomsStep({
       ) : (
         <>
           {rooms.length === 0 && (
-            <p className="text-sm text-gray-500 mb-3">No rooms yet. Add your first one below.</p>
+            <p className="text-sm text-ink-500 mb-3">No rooms yet. Add your first one below.</p>
           )}
           <ul className="space-y-3">
             {rooms.map((r) => (
@@ -571,7 +571,7 @@ function RoomsStep({
                     onClick={() => remove(r.id)}
                     aria-label="Remove room"
                   >
-                    <Trash2 className="h-4 w-4 text-gray-500" />
+                    <Trash2 className="h-4 w-4 text-ink-500" />
                   </Button>
                 </div>
               </li>
@@ -589,7 +589,7 @@ function RoomsStep({
         </>
       )}
 
-      <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
+      <div className="flex items-center justify-between pt-6 mt-6 border-t border-line-soft">
         <Button type="button" variant="ghost" onClick={onBack}>Back</Button>
         <div className="flex gap-2">
           <Button type="button" variant="ghost" onClick={onFinish} loading={submitting}>

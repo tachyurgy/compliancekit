@@ -115,8 +115,8 @@ export default function Kiosk(): JSX.Element {
     return (
       <Screen>
         <div className="max-w-md mx-auto text-center">
-          <div className="text-xl text-gray-700 mb-2">{pending.subjectName}</div>
-          <div className="text-sm text-gray-500 mb-6">Type your 4-digit PIN</div>
+          <div className="text-xl text-ink-700 mb-2">{pending.subjectName}</div>
+          <div className="text-sm text-ink-500 mb-6">Type your 4-digit PIN</div>
           <div className="text-5xl font-mono tracking-[0.5em] mb-6">{'•'.repeat(pin.length).padEnd(4, '○')}</div>
           <Numpad
             onDigit={(d) => setPin((p) => (p.length < 4 ? p + d : p))}
@@ -124,7 +124,7 @@ export default function Kiosk(): JSX.Element {
             onSubmit={submitPin}
             canSubmit={pin.length === 4}
           />
-          <button className="mt-8 text-sm text-gray-500 underline" onClick={() => { setMode('welcome'); setPending(null); }}>Cancel</button>
+          <button className="mt-8 text-sm text-ink-500 underline" onClick={() => { setMode('welcome'); setPending(null); }}>Cancel</button>
         </div>
       </Screen>
     );
@@ -140,14 +140,14 @@ export default function Kiosk(): JSX.Element {
   return (
     <Screen>
       <div className="text-center">
-        <div className="text-2xl text-gray-500 font-medium tracking-wider uppercase mb-2">Levelbrook</div>
+        <div className="text-2xl text-ink-500 font-medium tracking-wider uppercase mb-2">Levelbrook</div>
         <div className="text-5xl font-medium mb-2" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>Welcome</div>
-        <div className="text-lg text-gray-600 mb-12">{counts.kids} children · {counts.staff} staff signed in right now</div>
+        <div className="text-lg text-ink-700 mb-12">{counts.kids} children · {counts.staff} staff signed in right now</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
           <BigButton label="Drop off / Pick up" sub="A parent or guardian"
             onClick={() => setMode('pickdrop')} bg="bg-amber-100 hover:bg-amber-200" />
           <BigButton label="Staff clock in / out" sub="A teacher or aide"
-            onClick={() => setMode('staff')} bg="bg-emerald-100 hover:bg-emerald-200" />
+            onClick={() => setMode('staff')} bg="bg-brand-100 hover:bg-brand-200" />
         </div>
       </div>
     </Screen>
@@ -162,7 +162,7 @@ function BigButton({ label, sub, onClick, bg }: { label: string; sub: string; on
   return (
     <button onClick={onClick} className={`${bg} rounded-3xl py-12 px-6 text-left transition shadow-sm`}>
       <div className="text-3xl font-medium mb-2" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>{label}</div>
-      <div className="text-base text-gray-700">{sub}</div>
+      <div className="text-base text-ink-700">{sub}</div>
     </button>
   );
 }
@@ -173,9 +173,9 @@ function Numpad({ onDigit, onClear, onSubmit, canSubmit }: { onDigit: (d: string
       {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
         <button key={d} onClick={() => onDigit(d)} className="aspect-square text-3xl bg-white rounded-2xl shadow-sm hover:bg-amber-50 active:bg-amber-100">{d}</button>
       ))}
-      <button onClick={onClear} className="aspect-square text-base bg-white rounded-2xl shadow-sm text-gray-500">Clear</button>
+      <button onClick={onClear} className="aspect-square text-base bg-white rounded-2xl shadow-sm text-ink-500">Clear</button>
       <button onClick={() => onDigit('0')} className="aspect-square text-3xl bg-white rounded-2xl shadow-sm hover:bg-amber-50 active:bg-amber-100">0</button>
-      <button onClick={onSubmit} disabled={!canSubmit} className="aspect-square text-base bg-emerald-500 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-2xl shadow-sm">Go</button>
+      <button onClick={onSubmit} disabled={!canSubmit} className="aspect-square text-base bg-brand-500 disabled:bg-line disabled:text-ink-400 text-white rounded-2xl shadow-sm">Go</button>
     </div>
   );
 }
@@ -186,10 +186,10 @@ function PairScreen({ onPaired }: { onPaired: (id: string) => void }) {
     <Screen>
       <div className="max-w-md mx-auto text-center">
         <div className="text-3xl mb-3" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>Pair this iPad</div>
-        <div className="text-base text-gray-600 mb-8">In Levelbrook on a manager device, open <span className="font-mono">Settings → Kiosk</span> and tap "Issue session". Paste the code here.</div>
+        <div className="text-base text-ink-700 mb-8">In Levelbrook on a manager device, open <span className="font-mono">Settings → Kiosk</span> and tap "Issue session". Paste the code here.</div>
         <input value={code} onChange={(e) => setCode(e.target.value.trim())}
           placeholder="paste the kiosk code"
-          className="w-full text-center font-mono tracking-wider text-xl px-4 py-3 rounded-xl border border-gray-300 bg-white" />
+          className="w-full text-center font-mono tracking-wider text-xl px-4 py-3 rounded-xl border border-line bg-white" />
         <button onClick={() => code && onPaired(code)} className="mt-6 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-medium">
           Pair this iPad
         </button>
@@ -216,7 +216,7 @@ function PickDropScreen({ sessionId, onPick, onBack }: { sessionId: string; onPi
   return (
     <Screen>
       <div className="max-w-md mx-auto">
-        <button onClick={onBack} className="text-sm text-gray-500 underline mb-4">← back</button>
+        <button onClick={onBack} className="text-sm text-ink-500 underline mb-4">← back</button>
         <div className="text-2xl mb-4" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>
           {direction === 'in' ? 'Drop off a child' : 'Pick up a child'}
         </div>
@@ -224,12 +224,12 @@ function PickDropScreen({ sessionId, onPick, onBack }: { sessionId: string; onPi
           <button onClick={() => setDirection('in')} className={`flex-1 py-2 rounded-lg ${direction === 'in' ? 'bg-amber-200' : 'bg-white'}`}>Drop off</button>
           <button onClick={() => setDirection('out')} className={`flex-1 py-2 rounded-lg ${direction === 'out' ? 'bg-amber-200' : 'bg-white'}`}>Pick up</button>
         </div>
-        <label className="block text-sm text-gray-600 mb-1">Child name</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white mb-4" placeholder="e.g. Theo" />
-        <label className="block text-sm text-gray-600 mb-1">Child ID</label>
-        <input value={subjectId} onChange={(e) => setSubjectId(e.target.value.trim())} className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white mb-4 font-mono text-xs" placeholder="paste from manager dashboard" />
-        <label className="block text-sm text-gray-600 mb-1">Your name (the adult here today)</label>
-        <input value={adultName} onChange={(e) => setAdultName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white mb-6" placeholder="e.g. Patricia M." />
+        <label className="block text-sm text-ink-700 mb-1">Child name</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-line bg-white mb-4" placeholder="e.g. Theo" />
+        <label className="block text-sm text-ink-700 mb-1">Child ID</label>
+        <input value={subjectId} onChange={(e) => setSubjectId(e.target.value.trim())} className="w-full px-4 py-3 rounded-xl border border-line bg-white mb-4 font-mono text-xs" placeholder="paste from manager dashboard" />
+        <label className="block text-sm text-ink-700 mb-1">Your name (the adult here today)</label>
+        <input value={adultName} onChange={(e) => setAdultName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-line bg-white mb-6" placeholder="e.g. Patricia M." />
         <button
           disabled={!subjectId || !adultName || !name}
           onClick={() => onPick({
@@ -238,7 +238,7 @@ function PickDropScreen({ sessionId, onPick, onBack }: { sessionId: string; onPi
             droppedOffBy: direction === 'in' ? adultName : undefined,
             pickedUpBy: direction === 'out' ? adultName : undefined,
           })}
-          className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-medium">
+          className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-line disabled:text-ink-400 text-white rounded-xl font-medium">
           Continue to PIN
         </button>
       </div>
@@ -254,25 +254,25 @@ function StaffScreen({ sessionId, onPick, onBack }: { sessionId: string; onPick:
   return (
     <Screen>
       <div className="max-w-md mx-auto">
-        <button onClick={onBack} className="text-sm text-gray-500 underline mb-4">← back</button>
+        <button onClick={onBack} className="text-sm text-ink-500 underline mb-4">← back</button>
         <div className="text-2xl mb-4" style={{ fontFamily: 'Fraunces, Georgia, serif' }}>
           Staff {direction === 'in' ? 'clock in' : 'clock out'}
         </div>
         <div className="flex gap-2 mb-4">
-          <button onClick={() => setDirection('in')} className={`flex-1 py-2 rounded-lg ${direction === 'in' ? 'bg-emerald-200' : 'bg-white'}`}>Clock in</button>
-          <button onClick={() => setDirection('out')} className={`flex-1 py-2 rounded-lg ${direction === 'out' ? 'bg-emerald-200' : 'bg-white'}`}>Clock out</button>
+          <button onClick={() => setDirection('in')} className={`flex-1 py-2 rounded-lg ${direction === 'in' ? 'bg-brand-200' : 'bg-white'}`}>Clock in</button>
+          <button onClick={() => setDirection('out')} className={`flex-1 py-2 rounded-lg ${direction === 'out' ? 'bg-brand-200' : 'bg-white'}`}>Clock out</button>
         </div>
-        <label className="block text-sm text-gray-600 mb-1">Your name</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white mb-4" placeholder="e.g. Sarah" />
-        <label className="block text-sm text-gray-600 mb-1">Staff ID</label>
-        <input value={subjectId} onChange={(e) => setSubjectId(e.target.value.trim())} className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white mb-6 font-mono text-xs" placeholder="paste from manager dashboard" />
+        <label className="block text-sm text-ink-700 mb-1">Your name</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-line bg-white mb-4" placeholder="e.g. Sarah" />
+        <label className="block text-sm text-ink-700 mb-1">Staff ID</label>
+        <input value={subjectId} onChange={(e) => setSubjectId(e.target.value.trim())} className="w-full px-4 py-3 rounded-xl border border-line bg-white mb-6 font-mono text-xs" placeholder="paste from manager dashboard" />
         <button
           disabled={!subjectId || !name}
           onClick={() => onPick({
             kind: direction === 'in' ? 'staff_in' : 'staff_out',
             subjectId, subjectName: name,
           })}
-          className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-medium">
+          className="w-full py-3 bg-brand-500 hover:bg-emerald-600 disabled:bg-line disabled:text-ink-400 text-white rounded-xl font-medium">
           Continue to PIN
         </button>
       </div>

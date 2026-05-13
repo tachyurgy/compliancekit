@@ -53,7 +53,7 @@ export default function Operations(): JSX.Element {
         description="Log drills, track wall postings, and verify staff:child ratios. These feed directly into your compliance score."
       />
 
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-100">
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-line-soft">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -65,7 +65,7 @@ export default function Operations(): JSX.Element {
               className={`inline-flex items-center gap-2 px-4 py-2 -mb-px border-b-2 text-sm font-medium transition-colors ${
                 active
                   ? 'border-brand-600 text-brand-700'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
+                  : 'border-transparent text-ink-700 hover:text-ink-900'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -154,7 +154,7 @@ function DrillsTab(): JSX.Element {
                 className={`rounded-lg border p-3 text-sm ${
                   overdue
                     ? 'border-critical-200 bg-critical-50'
-                    : 'border-gray-100 bg-white'
+                    : 'border-line-soft bg-white'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -165,12 +165,12 @@ function DrillsTab(): JSX.Element {
                     <Badge variant="compliant">Current</Badge>
                   )}
                 </div>
-                <div className="mt-1 text-xs text-gray-600">
+                <div className="mt-1 text-xs text-ink-700">
                   {last
                     ? `Last run ${formatRelativeDays(last.drill_date)} (${formatDate(last.drill_date)})`
                     : 'Never logged'}
                 </div>
-                <div className="mt-0.5 text-xs text-gray-500">
+                <div className="mt-0.5 text-xs text-ink-500">
                   Expected cadence: every {cadence}d
                 </div>
               </div>
@@ -206,7 +206,7 @@ function DrillsTab(): JSX.Element {
         </Card>
       ) : drills.length === 0 ? (
         <EmptyState
-          icon={<Flame className="h-5 w-5 text-gray-500" />}
+          icon={<Flame className="h-5 w-5 text-ink-500" />}
           title="No drills logged yet"
           description="Log your next fire or lockdown drill to start the cadence clock."
           action={
@@ -223,7 +223,7 @@ function DrillsTab(): JSX.Element {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
+                <tr className="text-left border-b border-line-soft text-xs uppercase tracking-wide text-ink-500">
                   <th className="px-5 py-3 font-medium">Kind</th>
                   <th className="px-5 py-3 font-medium">Date</th>
                   <th className="px-5 py-3 font-medium">Duration</th>
@@ -231,21 +231,21 @@ function DrillsTab(): JSX.Element {
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line-soft">
                 {drills.map((d) => (
                   <tr key={d.id} className="hover:bg-surface-muted">
-                    <td className="px-5 py-3 font-medium text-gray-900 capitalize">
+                    <td className="px-5 py-3 font-medium text-ink-900 capitalize">
                       {drillLabel(d.drill_kind)}
                     </td>
-                    <td className="px-5 py-3 text-gray-600">
+                    <td className="px-5 py-3 text-ink-700">
                       {formatDate(d.drill_date)}
                     </td>
-                    <td className="px-5 py-3 text-gray-600">
+                    <td className="px-5 py-3 text-ink-700">
                       {d.duration_seconds
                         ? formatDuration(d.duration_seconds)
                         : '—'}
                     </td>
-                    <td className="px-5 py-3 text-gray-600 max-w-md truncate">
+                    <td className="px-5 py-3 text-ink-700 max-w-md truncate">
                       {d.notes || '—'}
                     </td>
                     <td className="px-5 py-3 text-right">
@@ -257,7 +257,7 @@ function DrillsTab(): JSX.Element {
                             deleteMutation.mutate(d.id);
                           }
                         }}
-                        className="p-1 rounded text-gray-400 hover:text-critical-600 hover:bg-critical-50"
+                        className="p-1 rounded text-ink-400 hover:text-critical-600 hover:bg-critical-50"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -366,14 +366,14 @@ function DrillModal({
           hint="Optional — from alarm start to all-clear."
         />
         <div>
-          <label className="block text-sm font-medium text-gray-800 mb-1">
+          <label className="block text-sm font-medium text-ink-800 mb-1">
             Notes
           </label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            className="block w-full rounded-lg border border-gray-200 bg-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-opacity-20 focus:border-brand-600"
+            className="block w-full rounded-lg border border-line bg-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-opacity-20 focus:border-brand-600"
             placeholder="Who led it, which room, anything that didn't go to plan."
           />
         </div>
@@ -453,10 +453,10 @@ function PostingsTab(): JSX.Element {
       <Card padded className="mb-6">
         <div className="flex items-center justify-between gap-4 mb-2">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">
+            <h3 className="text-base font-semibold text-ink-900">
               Wall postings progress
             </h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-ink-700">
               {postedCount} of {requiredItems.length} required items posted.
             </p>
           </div>
@@ -466,7 +466,7 @@ function PostingsTab(): JSX.Element {
             <Badge variant="warning">In progress</Badge>
           )}
         </div>
-        <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-2 w-full rounded-full bg-surface-sunken overflow-hidden">
           <div
             className={`h-full transition-all ${
               progress === 100 ? 'bg-brand-600' : 'bg-caution-500'
@@ -477,7 +477,7 @@ function PostingsTab(): JSX.Element {
       </Card>
 
       <Card padded={false}>
-        <ul className="divide-y divide-gray-100">
+        <ul className="divide-y divide-line-soft">
           {items.map((item) => (
             <PostingRow
               key={item.key}
@@ -520,7 +520,7 @@ function PostingRow({
         className={`mt-0.5 h-6 w-6 flex-shrink-0 rounded-full border-2 grid place-items-center transition-colors ${
           posted
             ? 'bg-brand-600 border-brand-600 text-white'
-            : 'border-gray-300 hover:border-brand-400'
+            : 'border-line hover:border-brand-400'
         }`}
       >
         {posted ? (
@@ -531,10 +531,10 @@ function PostingRow({
       </button>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-gray-900">{item.label}</span>
+          <span className="font-medium text-ink-900">{item.label}</span>
           {!item.required && <Badge variant="neutral">Optional</Badge>}
         </div>
-        <div className="text-xs text-gray-500 mt-0.5">
+        <div className="text-xs text-ink-500 mt-0.5">
           {posted
             ? `Posted ${formatDate(item.posted_at!)}`
             : 'Not yet posted'}
@@ -625,7 +625,7 @@ function RatioTab(): JSX.Element {
                     ? rr.in_ratio
                       ? 'border-brand-200 bg-brand-50'
                       : 'border-critical-200 bg-critical-50'
-                    : 'border-gray-100 bg-white'
+                    : 'border-line-soft bg-white'
                 }`}
               >
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -681,7 +681,7 @@ function RatioTab(): JSX.Element {
                   />
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-ink-700">
                     {rr ? (
                       rr.in_ratio ? (
                         <Badge variant="compliant">
@@ -701,7 +701,7 @@ function RatioTab(): JSX.Element {
                     <button
                       type="button"
                       onClick={() => removeRoom(r._id)}
-                      className="text-sm text-gray-500 hover:text-critical-600 inline-flex items-center gap-1"
+                      className="text-sm text-ink-500 hover:text-critical-600 inline-flex items-center gap-1"
                     >
                       <Trash2 className="h-4 w-4" /> Remove
                     </button>
@@ -747,14 +747,14 @@ function RatioTab(): JSX.Element {
         >
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr className="text-left text-xs uppercase tracking-wide text-ink-500">
                 <th className="py-2 font-medium">Room</th>
                 <th className="py-2 font-medium">Cap</th>
                 <th className="py-2 font-medium">Actual</th>
                 <th className="py-2 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line-soft">
               {result.rooms.map((r, i) => (
                 <tr key={`${r.label}-${i}`}>
                   <td className="py-2">{r.label}</td>

@@ -44,8 +44,8 @@ export default function SettingsKiosk(): JSX.Element {
       />
 
       <section className="card p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900">Pair an iPad</h2>
-        <p className="text-sm text-gray-600 mt-1">
+        <h2 className="text-lg font-semibold text-ink-900">Pair an iPad</h2>
+        <p className="text-sm text-ink-700 mt-1">
           Open <span className="font-mono">app.levelbrook.com/kiosk</span> on the iPad. Tap "Issue session"
           here, then paste the code on the iPad. The code is good for 4 hours; after that, issue a new one.
         </p>
@@ -54,37 +54,37 @@ export default function SettingsKiosk(): JSX.Element {
           {sessionId && (
             <div className="flex flex-col">
               <code className="text-base bg-amber-50 px-3 py-2 rounded font-mono">{sessionId}</code>
-              <span className="text-xs text-gray-500 mt-1">Expires {new Date(expiresAt).toLocaleString()}</span>
+              <span className="text-xs text-ink-500 mt-1">Expires {new Date(expiresAt).toLocaleString()}</span>
             </div>
           )}
         </div>
       </section>
 
       <section className="card p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900">Parent PINs</h2>
-        <p className="text-sm text-gray-600 mt-1">Generate a fresh 4-digit PIN for every enrolled child's parent. Show these once — Levelbrook does not store the digits, only a hash.</p>
+        <h2 className="text-lg font-semibold text-ink-900">Parent PINs</h2>
+        <p className="text-sm text-ink-700 mt-1">Generate a fresh 4-digit PIN for every enrolled child's parent. Show these once — Levelbrook does not store the digits, only a hash.</p>
         <Button className="mt-4" onClick={() => rotate('child')} disabled={busy === 'parents'}>
           {busy === 'parents' ? 'Rotating…' : 'Generate parent PINs'}
         </Button>
         {parentPins && (
-          <div className="mt-4 max-h-64 overflow-auto border border-gray-100 rounded-lg p-3 text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+          <div className="mt-4 max-h-64 overflow-auto border border-line-soft rounded-lg p-3 text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
             {Object.entries(parentPins).map(([id, pin]) => (
-              <div key={id} className="flex justify-between"><span className="font-mono text-xs text-gray-400">{id.slice(0, 8)}</span><span className="font-mono">{pin}</span></div>
+              <div key={id} className="flex justify-between"><span className="font-mono text-xs text-ink-400">{id.slice(0, 8)}</span><span className="font-mono">{pin}</span></div>
             ))}
           </div>
         )}
       </section>
 
       <section className="card p-6">
-        <h2 className="text-lg font-semibold text-gray-900">Staff PINs</h2>
-        <p className="text-sm text-gray-600 mt-1">Generate fresh 4-digit clock-in PINs for everyone on staff.</p>
+        <h2 className="text-lg font-semibold text-ink-900">Staff PINs</h2>
+        <p className="text-sm text-ink-700 mt-1">Generate fresh 4-digit clock-in PINs for everyone on staff.</p>
         <Button className="mt-4" onClick={() => rotate('staff')} disabled={busy === 'staff'}>
           {busy === 'staff' ? 'Rotating…' : 'Generate staff PINs'}
         </Button>
         {staffPins && (
-          <div className="mt-4 max-h-64 overflow-auto border border-gray-100 rounded-lg p-3 text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+          <div className="mt-4 max-h-64 overflow-auto border border-line-soft rounded-lg p-3 text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
             {Object.entries(staffPins).map(([id, pin]) => (
-              <div key={id} className="flex justify-between"><span className="font-mono text-xs text-gray-400">{id.slice(0, 8)}</span><span className="font-mono">{pin}</span></div>
+              <div key={id} className="flex justify-between"><span className="font-mono text-xs text-ink-400">{id.slice(0, 8)}</span><span className="font-mono">{pin}</span></div>
             ))}
           </div>
         )}

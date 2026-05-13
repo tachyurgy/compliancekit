@@ -90,7 +90,7 @@ export default function Documents(): JSX.Element {
 
       <Card padded className="mb-4">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-ink-500">
             <Filter className="h-4 w-4" /> Filters
           </div>
           <div className="w-40">
@@ -136,7 +136,7 @@ export default function Documents(): JSX.Element {
             <AlertTriangle className="h-5 w-5 mt-0.5" />
             <div>
               <div className="font-medium">Couldn't load documents</div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-ink-700">
                 {error instanceof Error ? error.message : 'Please try again.'}
               </div>
               <Button className="mt-3" size="sm" variant="secondary" onClick={() => refetch()}>
@@ -147,7 +147,7 @@ export default function Documents(): JSX.Element {
         </Card>
       ) : documents.length === 0 ? (
         <EmptyState
-          icon={<FileText className="h-5 w-5 text-gray-500" />}
+          icon={<FileText className="h-5 w-5 text-ink-500" />}
           title="No documents yet"
           description="Upload a policy, inspection report, or signed form to get started."
         />
@@ -155,17 +155,17 @@ export default function Documents(): JSX.Element {
         <div className="space-y-6">
           {grouped.map(([type, docs]) => (
             <Card key={type} title={type.replace(/_/g, ' ')} padded={false}>
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-line-soft">
                 {docs.map((doc) => (
                   <li key={doc.id} className="px-5 py-3 flex items-center justify-between">
                     <div>
                       <Link
                         to={`/documents/${doc.id}`}
-                        className="text-sm font-medium text-gray-900 hover:text-brand-700"
+                        className="text-sm font-medium text-ink-900 hover:text-brand-700"
                       >
                         {doc.label}
                       </Link>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-ink-500">
                         {doc.fileName ?? 'No file'}
                         {doc.sizeBytes != null && (
                           <span> · {formatBytes(doc.sizeBytes)}</span>

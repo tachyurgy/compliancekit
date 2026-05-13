@@ -37,14 +37,14 @@ export default function StepState(): JSX.Element {
               className={`text-left p-4 rounded-lg border transition-colors ${
                 active
                   ? 'border-brand-600 bg-brand-50 ring-2 ring-brand-600/20'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-line hover:border-line'
               }`}
             >
               <MapPin
-                className={`h-5 w-5 mb-2 ${active ? 'text-brand-600' : 'text-gray-400'}`}
+                className={`h-5 w-5 mb-2 ${active ? 'text-brand-600' : 'text-ink-400'}`}
               />
-              <div className="font-medium text-gray-900">{opt.title}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{opt.subtitle}</div>
+              <div className="font-medium text-ink-900">{opt.title}</div>
+              <div className="text-xs text-ink-500 mt-0.5">{opt.subtitle}</div>
             </button>
           );
         })}

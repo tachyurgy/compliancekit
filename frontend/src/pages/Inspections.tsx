@@ -78,7 +78,7 @@ export default function Inspections(): JSX.Element {
             <AlertTriangle className="h-5 w-5 mt-0.5" />
             <div>
               <div className="font-medium">Couldn't load inspections</div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-ink-700">
                 {error instanceof Error ? error.message : 'Try again in a moment.'}
               </div>
               <Button
@@ -94,7 +94,7 @@ export default function Inspections(): JSX.Element {
         </Card>
       ) : runs.length === 0 ? (
         <EmptyState
-          icon={<ClipboardCheck className="h-5 w-5 text-gray-500" />}
+          icon={<ClipboardCheck className="h-5 w-5 text-ink-500" />}
           title="You've never run a mock inspection"
           description="Stop hoping the inspector goes easy on you. Run one now — we'll score you with the same rubric the state uses."
           action={
@@ -113,7 +113,7 @@ export default function Inspections(): JSX.Element {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
+                <tr className="text-left border-b border-line-soft text-xs uppercase tracking-wide text-ink-500">
                   <th className="px-5 py-3 font-medium">Started</th>
                   <th className="px-5 py-3 font-medium">State</th>
                   <th className="px-5 py-3 font-medium">Progress</th>
@@ -121,25 +121,25 @@ export default function Inspections(): JSX.Element {
                   <th className="px-5 py-3 font-medium">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line-soft">
                 {runs.map((run) => (
                   <tr
                     key={run.id}
                     className="hover:bg-surface-muted cursor-pointer"
                     onClick={() => navigate(`/inspections/${run.id}`)}
                   >
-                    <td className="px-5 py-3 text-gray-700">
+                    <td className="px-5 py-3 text-ink-700">
                       {formatTimestamp(run.started_at)}
                     </td>
-                    <td className="px-5 py-3 text-gray-600">
+                    <td className="px-5 py-3 text-ink-700">
                       {run.state} &middot; {run.form_ref}
                     </td>
-                    <td className="px-5 py-3 text-gray-600">{progressLabel(run)}</td>
+                    <td className="px-5 py-3 text-ink-700">{progressLabel(run)}</td>
                     <td className="px-5 py-3">
                       {run.score != null ? (
                         <Badge variant={scoreVariant(run.score)}>{run.score}</Badge>
                       ) : (
-                        <span className="text-gray-400 text-xs">—</span>
+                        <span className="text-ink-400 text-xs">—</span>
                       )}
                     </td>
                     <td className="px-5 py-3">

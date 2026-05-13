@@ -10,7 +10,6 @@ import {
   LogOut,
   Menu,
   X,
-  ShieldCheck,
   ClipboardCheck,
   FlaskConical,
   ScrollText,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import { useSession } from '@/hooks/useSession';
+import BrandMark from './BrandMark';
 import ToastViewport from './Toast';
 
 interface NavItem {
@@ -52,16 +52,13 @@ export default function Layout(): JSX.Element {
   return (
     <div className="min-h-screen bg-surface-muted">
       {/* Mobile top bar */}
-      <div className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 bg-white border-b border-gray-100">
-        <Link to="/dashboard" className="flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-brand-600" />
-          <span className="font-semibold">Levelbrook</span>
-        </Link>
+      <div className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 bg-white border-b border-line-soft">
+        <BrandMark to="/dashboard" size="sm" />
         <button
           type="button"
           onClick={() => setMobileOpen((v) => !v)}
           aria-label="Toggle navigation"
-          className="p-2 rounded-md text-gray-700 hover:bg-gray-100"
+          className="p-2 rounded-md text-ink-700 hover:bg-surface-sunken"
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -72,12 +69,11 @@ export default function Layout(): JSX.Element {
         <aside
           className={`${
             mobileOpen ? 'block' : 'hidden'
-          } lg:block fixed lg:sticky top-0 lg:top-0 left-0 z-20 lg:z-auto h-screen w-64 bg-white border-r border-gray-100 flex-shrink-0`}
+          } lg:block fixed lg:sticky top-0 lg:top-0 left-0 z-20 lg:z-auto h-screen w-64 bg-white border-r border-line-soft flex-shrink-0`}
         >
           <div className="h-full flex flex-col">
-            <div className="hidden lg:flex items-center gap-2 px-5 h-16 border-b border-gray-100">
-              <ShieldCheck className="h-6 w-6 text-brand-600" />
-              <span className="font-semibold text-gray-900">Levelbrook</span>
+            <div className="hidden lg:flex items-center px-5 h-16 border-b border-line-soft">
+              <BrandMark to="/dashboard" size="md" />
             </div>
             <nav className="flex-1 p-3 space-y-1">
               {NAV_ITEMS.map((item) => (
@@ -89,7 +85,7 @@ export default function Layout(): JSX.Element {
                     `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-brand-50 text-brand-700'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        : 'text-ink-700 hover:bg-surface-sunken'
                     }`
                   }
                 >
@@ -98,7 +94,7 @@ export default function Layout(): JSX.Element {
                 </NavLink>
               ))}
             </nav>
-            <div className="p-3 border-t border-gray-100 space-y-2">
+            <div className="p-3 border-t border-line-soft space-y-2">
               {/* Inspector Mode (REQ-009): one tap from anywhere in the
                   operator UI. Persistent — the owner wants this to be the
                   single most visible button on the screen. */}
@@ -111,9 +107,9 @@ export default function Layout(): JSX.Element {
                 <span>Open Inspector View</span>
               </Link>
               {user && (
-                <div className="px-3 pb-1 pt-2 border-t border-gray-100">
-                  <p className="text-xs text-gray-500">Signed in as</p>
-                  <p className="text-sm font-medium text-gray-800 truncate">
+                <div className="px-3 pb-1 pt-2 border-t border-line-soft">
+                  <p className="text-xs text-ink-500">Signed in as</p>
+                  <p className="text-sm font-medium text-ink-800 truncate">
                     {user.fullName ?? user.email}
                   </p>
                 </div>
@@ -121,7 +117,7 @@ export default function Layout(): JSX.Element {
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-ink-700 hover:bg-surface-sunken"
               >
                 <LogOut className="h-4 w-4" />
                 <span>Sign out</span>

@@ -40,7 +40,7 @@ export default function SettingsSecurity(): JSX.Element {
     <div>
       <Link
         to="/settings"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mb-4"
+        className="inline-flex items-center gap-1 text-sm text-ink-700 hover:text-ink-900 mb-4"
       >
         <ArrowLeft className="h-4 w-4" /> Back to settings
       </Link>
@@ -56,10 +56,10 @@ export default function SettingsSecurity(): JSX.Element {
           {(sessions ?? []).map((s) => (
             <Card key={s.id} padded>
               <div className="flex items-start gap-3">
-                <Laptop className="h-5 w-5 text-gray-400 mt-1" />
+                <Laptop className="h-5 w-5 text-ink-400 mt-1" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-ink-900">
                       {summarizeUserAgent(s.user_agent)}
                     </span>
                     {s.is_current && (
@@ -68,7 +68,7 @@ export default function SettingsSecurity(): JSX.Element {
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-ink-500">
                     IP {s.ip || '—'} · last active{' '}
                     {new Date(s.last_seen_at).toLocaleString()}
                   </p>
@@ -78,7 +78,7 @@ export default function SettingsSecurity(): JSX.Element {
           ))}
           {sessions && sessions.length === 0 && (
             <Card padded>
-              <p className="text-sm text-gray-600">No active sessions.</p>
+              <p className="text-sm text-ink-700">No active sessions.</p>
             </Card>
           )}
 
@@ -86,10 +86,10 @@ export default function SettingsSecurity(): JSX.Element {
             <div className="flex items-start gap-3">
               <ShieldAlert className="h-5 w-5 text-critical-600 mt-0.5" />
               <div className="flex-1">
-                <div className="font-medium text-gray-900">
+                <div className="font-medium text-ink-900">
                   Sign out everywhere
                 </div>
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-ink-700">
                   Revokes every session, including this one. You'll need to
                   sign in again.
                 </p>

@@ -18,13 +18,13 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   return (
     <div className="space-y-1">
       {label && (
-        <label htmlFor={inputId} className="block text-sm font-medium text-gray-800">
+        <label htmlFor={inputId} className="block text-sm font-medium text-ink-800">
           {label}
         </label>
       )}
       <div className="relative">
         {leftIcon && (
-          <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+          <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-ink-400">
             {leftIcon}
           </span>
         )}
@@ -38,13 +38,13 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           } ${
             error
               ? 'border-critical-500 focus:border-critical-600 focus:ring-critical-500'
-              : 'border-gray-200 focus:border-brand-600 focus:ring-brand-600'
-          } focus:outline-none focus:ring-2 focus:ring-opacity-20 placeholder:text-gray-400 ${className}`}
+              : 'border-line focus:border-brand-600 focus:ring-brand-600'
+          } focus:outline-none focus:ring-2 focus:ring-opacity-20 placeholder:text-ink-400 ${className}`}
           {...rest}
         />
       </div>
       {hint && !error && (
-        <p id={`${inputId}-hint`} className="text-xs text-gray-500">
+        <p id={`${inputId}-hint`} className="text-xs text-ink-500">
           {hint}
         </p>
       )}

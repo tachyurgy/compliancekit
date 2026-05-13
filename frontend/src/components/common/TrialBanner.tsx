@@ -34,7 +34,7 @@ export default function TrialBanner(): JSX.Element | null {
   return (
     <div className="mb-4 flex items-center gap-3 rounded-xl border border-caution-100 bg-caution-50 px-4 py-3">
       <Sparkles className="h-5 w-5 shrink-0 text-caution-600" aria-hidden />
-      <div className="flex-1 text-sm text-gray-800">
+      <div className="flex-1 text-sm text-ink-800">
         <span className="font-medium">Trial ends {formatted}</span> — your card
         is on file.{' '}
         <Link

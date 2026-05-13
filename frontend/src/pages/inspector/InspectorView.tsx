@@ -130,9 +130,9 @@ const STANDARD_FINDINGS: { line: string; class: string; text: string }[] = [
 
 function StatusChip({ status }: { status: StatusPill }): JSX.Element {
   const palette: Record<StatusPill, string> = {
-    'On file': 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    'On file': 'bg-brand-50 text-brand-800 border-brand-200',
     'Expiring soon': 'bg-amber-50 text-amber-900 border-amber-200',
-    Expired: 'bg-rose-50 text-rose-900 border-rose-200',
+    Expired: 'bg-critical-50 text-critical-700 border-critical-200',
     Missing: 'bg-stone-100 text-stone-700 border-stone-300',
   };
   return (

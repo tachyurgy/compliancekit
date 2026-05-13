@@ -18,7 +18,7 @@ export default function LoadingSpinner({
   className = '',
 }: LoadingSpinnerProps): JSX.Element {
   return (
-    <div className={`inline-flex items-center gap-2 text-gray-500 ${className}`} role="status">
+    <div className={`inline-flex items-center gap-2 text-ink-500 ${className}`} role="status">
       <Loader2 className={`${sizes[size]} animate-spin text-brand-600`} aria-hidden />
       <span className="text-sm">{label}</span>
     </div>

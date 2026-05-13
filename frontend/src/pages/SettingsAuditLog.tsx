@@ -107,7 +107,7 @@ export default function SettingsAuditLog(): JSX.Element {
     <div>
       <Link
         to="/settings"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mb-4"
+        className="inline-flex items-center gap-1 text-sm text-ink-700 hover:text-ink-900 mb-4"
       >
         <ArrowLeft className="h-4 w-4" /> Back to settings
       </Link>
@@ -171,7 +171,7 @@ export default function SettingsAuditLog(): JSX.Element {
         </Card>
       ) : items.length === 0 ? (
         <Card padded>
-          <div className="flex items-center gap-3 text-gray-600">
+          <div className="flex items-center gap-3 text-ink-700">
             <ScrollText className="h-5 w-5" />
             <span>No audit events match these filters.</span>
           </div>
@@ -181,7 +181,7 @@ export default function SettingsAuditLog(): JSX.Element {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <tr className="bg-surface-sunken text-left text-xs uppercase tracking-wide text-ink-500">
                   <th className="px-4 py-3 w-8"></th>
                   <th className="px-4 py-3">Timestamp</th>
                   <th className="px-4 py-3">Actor</th>
@@ -206,7 +206,7 @@ export default function SettingsAuditLog(): JSX.Element {
             </table>
           </div>
           {hasMore && (
-            <div className="p-4 border-t border-gray-100 flex justify-center">
+            <div className="p-4 border-t border-line-soft flex justify-center">
               <Button
                 size="sm"
                 variant="secondary"
@@ -236,28 +236,28 @@ function AuditRow({
   return (
     <>
       <tr
-        className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
+        className="border-t border-line-soft hover:bg-surface-sunken cursor-pointer"
         onClick={onToggle}
       >
-        <td className="px-4 py-3 text-gray-400">
+        <td className="px-4 py-3 text-ink-400">
           {open ? (
             <ChevronDown className="h-4 w-4" />
           ) : (
             <ChevronRight className="h-4 w-4" />
           )}
         </td>
-        <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+        <td className="px-4 py-3 whitespace-nowrap text-ink-700">
           {formatTimestamp(item.created_at)}
         </td>
-        <td className="px-4 py-3 text-gray-900">{actorLabel}</td>
+        <td className="px-4 py-3 text-ink-900">{actorLabel}</td>
         <td className="px-4 py-3">
-          <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{item.action}</code>
+          <code className="text-xs bg-surface-sunken px-2 py-0.5 rounded">{item.action}</code>
         </td>
-        <td className="px-4 py-3 text-gray-700">{targetLabel}</td>
-        <td className="px-4 py-3 text-gray-500 text-xs font-mono">{item.ip || '—'}</td>
+        <td className="px-4 py-3 text-ink-700">{targetLabel}</td>
+        <td className="px-4 py-3 text-ink-500 text-xs font-mono">{item.ip || '—'}</td>
       </tr>
       {open && (
-        <tr className="bg-gray-50 border-t border-gray-100">
+        <tr className="bg-surface-sunken border-t border-line-soft">
           <td></td>
           <td colSpan={5} className="px-4 py-3">
             <dl className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
@@ -274,10 +274,10 @@ function AuditRow({
               )}
             </dl>
             <div className="mt-3">
-              <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+              <div className="text-xs text-ink-500 uppercase tracking-wide mb-1">
                 Metadata
               </div>
-              <pre className="text-xs bg-white border border-gray-200 rounded p-3 overflow-x-auto whitespace-pre-wrap break-words">
+              <pre className="text-xs bg-white border border-line rounded p-3 overflow-x-auto whitespace-pre-wrap break-words">
                 {JSON.stringify(item.metadata ?? {}, null, 2)}
               </pre>
             </div>
@@ -299,8 +299,8 @@ function DetailRow({
 }): JSX.Element {
   return (
     <div className="flex gap-2">
-      <dt className="text-gray-500 min-w-[90px]">{label}:</dt>
-      <dd className={`text-gray-900 ${mono ? 'font-mono break-all' : ''}`}>{value}</dd>
+      <dt className="text-ink-500 min-w-[90px]">{label}:</dt>
+      <dd className={`text-ink-900 ${mono ? 'font-mono break-all' : ''}`}>{value}</dd>
     </div>
   );
 }

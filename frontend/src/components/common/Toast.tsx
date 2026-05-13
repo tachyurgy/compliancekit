@@ -59,14 +59,14 @@ export default function ToastViewport(): JSX.Element | null {
         <div
           key={t.id}
           role="status"
-          className="flex items-start gap-3 bg-white rounded-lg shadow-elevated border border-gray-100 px-4 py-3"
+          className="flex items-start gap-3 bg-white rounded-lg shadow-elevated border border-line-soft px-4 py-3"
         >
           <div>{iconByVariant[t.variant]}</div>
-          <p className="text-sm text-gray-800 flex-1">{t.message}</p>
+          <p className="text-sm text-ink-800 flex-1">{t.message}</p>
           <button
             onClick={() => dismiss(t.id)}
             aria-label="Dismiss"
-            className="text-gray-400 hover:text-gray-600"
+            className="text-ink-400 hover:text-ink-700"
           >
             <X className="h-4 w-4" />
           </button>

@@ -46,34 +46,34 @@ export default function Modal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-ink-900/40 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden
       />
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative w-full ${sizes[size]} bg-white rounded-lg shadow-elevated`}
+        className={`relative w-full ${sizes[size]} bg-white rounded-lb shadow-elevated border border-line`}
       >
         <button
           type="button"
           aria-label="Close"
           onClick={onClose}
-          className="absolute top-3 right-3 p-1 rounded-md text-gray-500 hover:bg-gray-100"
+          className="absolute top-3 right-3 p-1 rounded-md text-ink-500 hover:bg-surface-sunken"
         >
           <X className="h-4 w-4" />
         </button>
         {(title || description) && (
-          <div className="px-5 pt-5 pb-3 border-b border-gray-100">
-            {title && <h2 className="text-lg font-semibold text-gray-900">{title}</h2>}
+          <div className="px-5 pt-5 pb-3 border-b border-line-soft">
+            {title && <h2 className="text-lg font-semibold text-ink-900">{title}</h2>}
             {description && (
-              <p className="mt-1 text-sm text-gray-600">{description}</p>
+              <p className="mt-1 text-sm text-ink-700">{description}</p>
             )}
           </div>
         )}
         <div className="px-5 py-4">{children}</div>
         {footer && (
-          <div className="px-5 py-3 border-t border-gray-100 bg-surface-muted flex justify-end gap-2 rounded-b-lg">
+          <div className="px-5 py-3 border-t border-line-soft bg-surface-muted flex justify-end gap-2 rounded-b-lg">
             {footer}
           </div>
         )}

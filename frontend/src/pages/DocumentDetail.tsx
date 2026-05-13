@@ -35,7 +35,7 @@ export default function DocumentDetail(): JSX.Element {
   if (isError || !data) {
     return (
       <div>
-        <Link to="/documents" className="inline-flex items-center gap-1 text-sm text-gray-600 mb-4">
+        <Link to="/documents" className="inline-flex items-center gap-1 text-sm text-ink-700 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to documents
         </Link>
         <Card padded>
@@ -43,7 +43,7 @@ export default function DocumentDetail(): JSX.Element {
             <AlertTriangle className="h-5 w-5 mt-0.5" />
             <div>
               <div className="font-medium">Couldn't load document</div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-ink-700">
                 {error instanceof Error ? error.message : 'Please try again.'}
               </div>
               <Button className="mt-3" size="sm" variant="secondary" onClick={() => refetch()}>
@@ -60,7 +60,7 @@ export default function DocumentDetail(): JSX.Element {
     <div>
       <Link
         to="/documents"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mb-4"
+        className="inline-flex items-center gap-1 text-sm text-ink-700 hover:text-ink-900 mb-4"
       >
         <ArrowLeft className="h-4 w-4" /> Back to documents
       </Link>
@@ -116,10 +116,10 @@ export default function DocumentDetail(): JSX.Element {
             <iframe
               src={data.previewUrl}
               title={data.label}
-              className="w-full h-[560px] rounded-lg border border-gray-100 bg-white"
+              className="w-full h-[560px] rounded-lg border border-line-soft bg-white"
             />
           ) : (
-            <div className="h-[320px] rounded-lg border border-dashed border-gray-200 grid place-items-center text-sm text-gray-500">
+            <div className="h-[320px] rounded-lg border border-dashed border-line grid place-items-center text-sm text-ink-500">
               No preview available for this file type.
             </div>
           )}
@@ -128,14 +128,14 @@ export default function DocumentDetail(): JSX.Element {
 
       {data.signatureRequests.length > 0 && (
         <Card title="Signature requests" className="mt-6">
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-line-soft">
             {data.signatureRequests.map((sr) => (
               <li key={sr.id} className="py-3 flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-sm font-medium text-ink-900">
                     {sr.signerName ?? sr.signerEmail}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-ink-500">
                     Sent {formatTimestamp(sr.sentAt)}
                     {sr.signedAt && <span> · Signed {formatTimestamp(sr.signedAt)}</span>}
                   </div>
@@ -177,8 +177,8 @@ export default function DocumentDetail(): JSX.Element {
 function Row({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
   return (
     <div className="flex items-center justify-between gap-4">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className="text-gray-900">{children}</dd>
+      <dt className="text-ink-500">{label}</dt>
+      <dd className="text-ink-900">{children}</dd>
     </div>
   );
 }

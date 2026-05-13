@@ -98,7 +98,7 @@ export default function Settings(): JSX.Element {
             </Link>
           }
         >
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-ink-700">
             View your plan, update payment method, and access past invoices.
           </p>
         </Card>
@@ -114,7 +114,7 @@ export default function Settings(): JSX.Element {
             </Link>
           }
         >
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-ink-700">
             Admin-only. Events are retained for 7 years for compliance and
             inspection readiness.
           </p>
@@ -189,8 +189,8 @@ function DataRetentionCard(): JSX.Element {
         <div>
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <div className="text-sm font-medium text-gray-900">Export all my data</div>
-              <p className="mt-1 text-xs text-gray-600">
+              <div className="text-sm font-medium text-ink-900">Export all my data</div>
+              <p className="mt-1 text-xs text-ink-700">
                 A ZIP containing every database record and uploaded file tied to
                 your facility. We'll email you a download link when it's ready.
               </p>
@@ -209,12 +209,12 @@ function DataRetentionCard(): JSX.Element {
           {listLoading ? (
             <div className="mt-3"><LoadingSpinner /></div>
           ) : exports && exports.length > 0 ? (
-            <ul className="mt-4 divide-y divide-gray-100 border border-gray-100 rounded-lg">
+            <ul className="mt-4 divide-y divide-line-soft border border-line-soft rounded-lg">
               {exports.map((e) => (
                 <li key={e.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <ExportStatusBadge status={e.status} />
-                    <span className="text-gray-600 truncate">
+                    <span className="text-ink-700 truncate">
                       {new Date(e.started_at).toLocaleString()}
                     </span>
                   </div>
@@ -233,7 +233,7 @@ function DataRetentionCard(): JSX.Element {
                   ) : (
                     <button
                       type="button"
-                      className="text-gray-500 hover:text-gray-700"
+                      className="text-ink-500 hover:text-ink-700"
                       onClick={() => refetchList()}
                     >
                       Refresh
@@ -245,13 +245,13 @@ function DataRetentionCard(): JSX.Element {
           ) : null}
         </div>
 
-        <div className="border-t border-gray-100 pt-4">
+        <div className="border-t border-line-soft pt-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <div className="text-sm font-medium text-gray-900">
+              <div className="text-sm font-medium text-ink-900">
                 Cancel subscription and request deletion
               </div>
-              <p className="mt-1 text-xs text-gray-600">
+              <p className="mt-1 text-xs text-ink-700">
                 Sets a 90-day grace clock. During the grace window your data is
                 frozen but recoverable by contacting support. After 90 days,
                 every record and file is permanently deleted.
@@ -342,7 +342,7 @@ function ExportStatusBadge({ status }: { status: DataExport['status'] }): JSX.El
       );
     case 'running':
       return (
-        <span className="inline-flex items-center gap-1 text-gray-700">
+        <span className="inline-flex items-center gap-1 text-ink-700">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Building
         </span>
@@ -350,7 +350,7 @@ function ExportStatusBadge({ status }: { status: DataExport['status'] }): JSX.El
     case 'requested':
     default:
       return (
-        <span className="inline-flex items-center gap-1 text-gray-500">
+        <span className="inline-flex items-center gap-1 text-ink-500">
           <Clock className="h-3.5 w-3.5" />
           Queued
         </span>
@@ -369,11 +369,11 @@ function Row({
 }): JSX.Element {
   return (
     <div className="flex items-center justify-between gap-4">
-      <dt className="text-gray-500 inline-flex items-center gap-1.5">
+      <dt className="text-ink-500 inline-flex items-center gap-1.5">
         {icon}
         {label}
       </dt>
-      <dd className="text-gray-900">{value}</dd>
+      <dd className="text-ink-900">{value}</dd>
     </div>
   );
 }

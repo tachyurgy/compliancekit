@@ -68,7 +68,7 @@ export default function SettingsBilling(): JSX.Element {
     <div>
       <Link
         to="/settings"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mb-4"
+        className="inline-flex items-center gap-1 text-sm text-ink-700 hover:text-ink-900 mb-4"
       >
         <ArrowLeft className="h-4 w-4" /> Back to settings
       </Link>
@@ -108,13 +108,13 @@ export default function SettingsBilling(): JSX.Element {
         <Card padded>
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-xs text-gray-500 uppercase tracking-wide">
+              <div className="text-xs text-ink-500 uppercase tracking-wide">
                 Current plan
               </div>
-              <div className="mt-1 text-lg font-semibold text-gray-900 capitalize">
+              <div className="mt-1 text-lg font-semibold text-ink-900 capitalize">
                 {subscription.plan}
               </div>
-              <div className="mt-1 text-sm text-gray-600">
+              <div className="mt-1 text-sm text-ink-700">
                 {formatCentsAsUSD(subscription.priceCents)}/mo
                 {subscription.currentPeriodEnd && (
                   <span>
@@ -142,8 +142,8 @@ export default function SettingsBilling(): JSX.Element {
           <div className="flex items-start gap-3">
             <Sparkles className="h-5 w-5 text-brand-600" />
             <div>
-              <div className="font-medium text-gray-900">Start your free trial</div>
-              <p className="text-sm text-gray-600">
+              <div className="font-medium text-ink-900">Start your free trial</div>
+              <p className="text-sm text-ink-700">
                 Pick a plan below. You won't be charged for 14 days.
               </p>
             </div>
@@ -163,9 +163,9 @@ export default function SettingsBilling(): JSX.Element {
                 Most popular
               </div>
             )}
-            <div className="text-lg font-semibold text-gray-900">{plan.name}</div>
-            <div className="mt-1 text-2xl font-semibold text-gray-900">{plan.price}</div>
-            <p className="mt-2 text-sm text-gray-600 flex-1">{plan.description}</p>
+            <div className="text-lg font-semibold text-ink-900">{plan.name}</div>
+            <div className="mt-1 text-2xl font-semibold text-ink-900">{plan.price}</div>
+            <p className="mt-2 text-sm text-ink-700 flex-1">{plan.description}</p>
             <Button
               className="mt-4"
               variant={plan.highlight ? 'primary' : 'secondary'}

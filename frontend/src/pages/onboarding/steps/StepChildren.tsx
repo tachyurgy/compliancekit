@@ -89,7 +89,7 @@ export default function StepChildren(): JSX.Element {
       </div>
 
       <div className="mt-4">
-        <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+        <label className="inline-flex items-center gap-2 text-sm font-medium text-ink-700 cursor-pointer">
           <Upload className="h-4 w-4" />
           <span className="underline underline-offset-2">Or import from CSV</span>
           <input
@@ -103,7 +103,7 @@ export default function StepChildren(): JSX.Element {
             }}
           />
         </label>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-ink-500">
           Expected columns: <code>first_name, last_name, date_of_birth (YYYY-MM-DD), parent_email</code>
         </p>
       </div>
@@ -115,17 +115,17 @@ export default function StepChildren(): JSX.Element {
             description="You can still continue — children can be added anytime from the dashboard."
           />
         ) : (
-          <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg bg-white">
+          <ul className="divide-y divide-line-soft border border-line-soft rounded-lg bg-white">
             {children.map((child, idx) => (
               <li
                 key={`${child.firstName}-${idx}`}
                 className="flex items-center justify-between px-4 py-3"
               >
                 <div>
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-sm font-medium text-ink-900">
                     {child.firstName} {child.lastName}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-ink-500">
                     DOB {child.dateOfBirth}
                     {child.parentEmail && <span> &middot; {child.parentEmail}</span>}
                   </div>
@@ -134,7 +134,7 @@ export default function StepChildren(): JSX.Element {
                   type="button"
                   onClick={() => removeChild(idx)}
                   aria-label="Remove child"
-                  className="p-1 text-gray-400 hover:text-critical-600"
+                  className="p-1 text-ink-400 hover:text-critical-600"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

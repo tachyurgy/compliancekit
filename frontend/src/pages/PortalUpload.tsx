@@ -120,8 +120,8 @@ export default function PortalUpload(): JSX.Element {
           <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full bg-amber-50">
             <AlertCircle className="h-5 w-5 text-amber-600" />
           </div>
-          <h1 className="text-lg font-semibold text-gray-900">This upload link doesn&apos;t work</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-lg font-semibold text-ink-900">This upload link doesn&apos;t work</h1>
+          <p className="mt-1 text-sm text-ink-700">
             {error ?? 'Ask your director for a new one — they can send it from your page.'}
           </p>
         </div>
@@ -134,7 +134,7 @@ export default function PortalUpload(): JSX.Element {
       <PortalShell>
         <div className="rounded-2xl bg-white p-6 text-center shadow-md">
           <div className="mx-auto h-6 w-24 animate-pulse rounded-full bg-amber-100" />
-          <p className="mt-3 text-sm text-gray-500">Loading your page…</p>
+          <p className="mt-3 text-sm text-ink-500">Loading your page…</p>
         </div>
       </PortalShell>
     );
@@ -220,11 +220,11 @@ function PortalShell({ children }: { children: React.ReactNode }): JSX.Element {
           <div className="grid h-7 w-7 place-items-center rounded-full bg-amber-300 text-amber-900 font-black">
             L
           </div>
-          <span className="font-semibold text-gray-900">Levelbrook</span>
+          <span className="font-semibold text-ink-900">Levelbrook</span>
         </div>
       </header>
       <main className="mx-auto max-w-md px-4 py-6">{children}</main>
-      <footer className="mx-auto max-w-md px-4 py-6 text-center text-xs text-gray-500">
+      <footer className="mx-auto max-w-md px-4 py-6 text-center text-xs text-ink-500">
         Need help? Email{' '}
         <a className="text-amber-700 underline" href="mailto:levelbrookteam@gmail.com">
           levelbrookteam@gmail.com
@@ -262,15 +262,15 @@ function Welcome({
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">{heading}</h1>
-        <p className="mt-2 text-base text-gray-700 leading-relaxed">{sub}</p>
+        <h1 className="text-2xl font-bold text-ink-900">{heading}</h1>
+        <p className="mt-2 text-base text-ink-700 leading-relaxed">{sub}</p>
       </div>
 
       <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-amber-100">
         <div className="text-xs font-medium uppercase tracking-wider text-amber-700">
           {isParent ? 'For ' + childFirst : 'Your file'}
         </div>
-        <div className="mt-1 text-base font-semibold text-gray-900">{session.provider.name}</div>
+        <div className="mt-1 text-base font-semibold text-ink-900">{session.provider.name}</div>
 
         <div className="mt-4 grid grid-cols-3 gap-2">
           <Pill tone="green" label="On file" value={onFile} />
@@ -282,7 +282,7 @@ function Welcome({
           <ul className="mt-4 divide-y divide-amber-50">
             {session.required_documents.map((d) => (
               <li key={d.id} className="flex items-center justify-between py-2.5">
-                <div className="pr-3 text-sm text-gray-800">
+                <div className="pr-3 text-sm text-ink-800">
                   {d.label}
                   {d.required && <span className="ml-1 text-coral-600" aria-label="required">*</span>}
                 </div>
@@ -306,9 +306,9 @@ function Welcome({
 
 function Pill({ tone, label, value }: { tone: 'green' | 'amber' | 'coral'; label: string; value: number }): JSX.Element {
   const map = {
-    green: 'bg-emerald-50 text-emerald-800 ring-emerald-100',
+    green: 'bg-brand-50 text-brand-800 ring-brand-100',
     amber: 'bg-amber-50 text-amber-800 ring-amber-200',
-    coral: 'bg-rose-50 text-rose-800 ring-rose-100',
+    coral: 'bg-critical-50 text-critical-700 ring-critical-100',
   } as const;
   return (
     <div className={`rounded-xl px-2 py-2 text-center ring-1 ${map[tone]}`}>
@@ -320,10 +320,10 @@ function Pill({ tone, label, value }: { tone: 'green' | 'amber' | 'coral'; label
 
 function StatusPill({ status }: { status: PortalRequiredDoc['status'] }): JSX.Element {
   const map: Record<PortalRequiredDoc['status'], { label: string; className: string }> = {
-    on_file: { label: 'On file', className: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
+    on_file: { label: 'On file', className: 'bg-brand-50 text-brand-700 ring-brand-100' },
     expiring_soon: { label: 'Expiring soon', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
-    expired: { label: 'Expired', className: 'bg-rose-50 text-rose-700 ring-rose-100' },
-    missing: { label: 'Missing', className: 'bg-gray-100 text-gray-600 ring-gray-200' },
+    expired: { label: 'Expired', className: 'bg-critical-50 text-critical-700 ring-critical-100' },
+    missing: { label: 'Missing', className: 'bg-surface-sunken text-ink-700 ring-line' },
     awaiting_upload: { label: 'Awaiting upload', className: 'bg-sky-50 text-sky-700 ring-sky-100' },
   };
   const { label, className } = map[status];
@@ -427,19 +427,19 @@ function UploadScreen({
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+        className="inline-flex items-center gap-1 text-sm text-ink-700 hover:text-ink-900"
       >
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Add your document</h1>
-        <p className="mt-1 text-base text-gray-700">
+        <h1 className="text-2xl font-bold text-ink-900">Add your document</h1>
+        <p className="mt-1 text-base text-ink-700">
           Snap a photo, or grab one from your phone — whichever&apos;s easier.
         </p>
       </div>
 
       <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-amber-100">
-        <label className="block text-sm font-medium text-gray-900">What is this?</label>
+        <label className="block text-sm font-medium text-ink-900">What is this?</label>
         <select
           className="mt-2 block w-full rounded-xl border border-amber-200 bg-amber-50/40 px-3 py-3 text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-300"
           value={docKind}
@@ -512,7 +512,7 @@ function UploadScreen({
       </div>
 
       {busy && (
-        <p className="text-center text-sm text-gray-500">Uploading…</p>
+        <p className="text-center text-sm text-ink-500">Uploading…</p>
       )}
     </div>
   );
@@ -543,8 +543,8 @@ function UploadButton({
         {icon}
       </span>
       <span className="flex-1">
-        <span className="block text-base font-semibold text-gray-900">{label}</span>
-        <span className="block text-xs text-gray-500">{subLabel}</span>
+        <span className="block text-base font-semibold text-ink-900">{label}</span>
+        <span className="block text-xs text-ink-500">{subLabel}</span>
       </span>
     </button>
   );
@@ -558,8 +558,8 @@ function ReadingScreen(): JSX.Element {
       <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-amber-100">
         <Sparkles className="h-6 w-6 text-amber-700 animate-pulse" />
       </div>
-      <h2 className="text-lg font-semibold text-gray-900">Got it — give us a second to read this.</h2>
-      <p className="mt-1 text-sm text-gray-600">
+      <h2 className="text-lg font-semibold text-ink-900">Got it — give us a second to read this.</h2>
+      <p className="mt-1 text-sm text-ink-700">
         Levelbrook AI is checking the document type and expiration date.
       </p>
     </div>
@@ -602,12 +602,12 @@ function ConfirmScreen({
 
 function DoneScreen({ firstName, onAnother }: { firstName: string; onAnother: () => void }): JSX.Element {
   return (
-    <div className="rounded-2xl bg-white p-6 text-center shadow-md ring-1 ring-emerald-100">
-      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-emerald-100">
-        <CheckCircle2 className="h-7 w-7 text-emerald-700" />
+    <div className="rounded-2xl bg-white p-6 text-center shadow-md ring-1 ring-brand-100">
+      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-brand-100">
+        <CheckCircle2 className="h-7 w-7 text-brand-700" />
       </div>
-      <h2 className="text-xl font-bold text-gray-900">All done — thanks{firstName ? ', ' + firstName : ''}!</h2>
-      <p className="mt-1 text-sm text-gray-600">We&apos;ll let your director know.</p>
+      <h2 className="text-xl font-bold text-ink-900">All done — thanks{firstName ? ', ' + firstName : ''}!</h2>
+      <p className="mt-1 text-sm text-ink-700">We&apos;ll let your director know.</p>
       <button
         type="button"
         onClick={onAnother}
@@ -698,8 +698,8 @@ export function OcrConfirmationCard({
       </div>
 
       {/* Field 1: Document type */}
-      <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-gray-100">
-        <label className="block text-sm font-semibold text-gray-900">Document type</label>
+      <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-line-soft">
+        <label className="block text-sm font-semibold text-ink-900">Document type</label>
         <div className="mt-2 flex items-center gap-2">
           <input
             type="text"
@@ -708,7 +708,7 @@ export function OcrConfirmationCard({
               setDocKind(e.target.value);
               setTouchedKind(true);
             }}
-            className="block w-full rounded-xl border border-gray-200 px-3 py-3 text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-300"
+            className="block w-full rounded-xl border border-line px-3 py-3 text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-300"
           />
           {mediumConfidence && (
             <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
@@ -719,8 +719,8 @@ export function OcrConfirmationCard({
       </div>
 
       {/* Field 2: Expiration */}
-      <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-gray-100">
-        <label className="block text-sm font-semibold text-gray-900">This document expires on</label>
+      <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-line-soft">
+        <label className="block text-sm font-semibold text-ink-900">This document expires on</label>
         {!doesNotExpire && (
           <input
             type="date"
@@ -729,13 +729,13 @@ export function OcrConfirmationCard({
               setExpDate(e.target.value);
               setTouchedDate(true);
             }}
-            className="mt-2 block w-full rounded-xl border border-gray-200 px-3 py-3 text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-300"
+            className="mt-2 block w-full rounded-xl border border-line px-3 py-3 text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-300"
           />
         )}
-        <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+        <label className="mt-3 flex items-center gap-2 text-sm text-ink-700">
           <input
             type="checkbox"
-            className="h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+            className="h-5 w-5 rounded border-line text-amber-600 focus:ring-amber-500"
             checked={doesNotExpire}
             onChange={(e) => {
               setDoesNotExpire(e.target.checked);
@@ -748,9 +748,9 @@ export function OcrConfirmationCard({
 
       {/* See the document accordion */}
       {documentURL && (
-        <details className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-gray-100">
+        <details className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-line-soft">
           <summary
-            className="cursor-pointer text-sm font-medium text-gray-700"
+            className="cursor-pointer text-sm font-medium text-ink-700"
             onClick={() => setShowDoc((s) => !s)}
           >
             {showDoc ? 'Hide the document' : 'See the document'}
@@ -759,7 +759,7 @@ export function OcrConfirmationCard({
             <iframe
               title="document preview"
               src={documentURL}
-              className="h-96 w-full rounded-xl border border-gray-200"
+              className="h-96 w-full rounded-xl border border-line"
             />
           </div>
         </details>
@@ -779,7 +779,7 @@ export function OcrConfirmationCard({
           type="button"
           disabled={busy}
           onClick={() => void submit(false)}
-          className="flex-1 rounded-2xl bg-white px-4 py-4 text-base font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+          className="flex-1 rounded-2xl bg-white px-4 py-4 text-base font-semibold text-ink-700 ring-1 ring-line hover:bg-surface-sunken"
         >
           Fix this
         </button>

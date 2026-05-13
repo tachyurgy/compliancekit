@@ -21,7 +21,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
   return (
     <div className="space-y-1">
       {label && (
-        <label htmlFor={selectId} className="block text-sm font-medium text-gray-800">
+        <label htmlFor={selectId} className="block text-sm font-medium text-ink-800">
           {label}
         </label>
       )}
@@ -32,7 +32,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
         className={`block w-full h-10 rounded-lg border bg-white text-sm px-3 ${
           error
             ? 'border-critical-500 focus:border-critical-600 focus:ring-critical-500'
-            : 'border-gray-200 focus:border-brand-600 focus:ring-brand-600'
+            : 'border-line focus:border-brand-600 focus:ring-brand-600'
         } focus:outline-none focus:ring-2 focus:ring-opacity-20 ${className}`}
         {...rest}
       >
@@ -47,7 +47,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
           </option>
         ))}
       </select>
-      {hint && !error && <p className="text-xs text-gray-500">{hint}</p>}
+      {hint && !error && <p className="text-xs text-ink-500">{hint}</p>}
       {error && <p className="text-xs text-critical-600">{error}</p>}
     </div>
   );

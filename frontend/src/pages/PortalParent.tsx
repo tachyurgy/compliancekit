@@ -77,10 +77,10 @@ export default function PortalParent(): JSX.Element {
   return (
     <PortalShell>
       <div className="text-center">
-        <h1 className="text-xl font-semibold text-gray-900">
+        <h1 className="text-xl font-semibold text-ink-900">
           Welcome, {data.child.firstName}'s family
         </h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm text-ink-700">
           {data.providerName} needs a few documents before {data.child.firstName}'s first day.
         </p>
       </div>
@@ -92,7 +92,7 @@ export default function PortalParent(): JSX.Element {
           ) : (
             <Clock className="h-5 w-5 text-caution-500" />
           )}
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-medium text-ink-900">
             {remaining === 0
               ? 'All required documents received.'
               : `${remaining} item${remaining === 1 ? '' : 's'} remaining`}
@@ -108,14 +108,14 @@ export default function PortalParent(): JSX.Element {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-gray-400" />
-                    <div className="text-sm font-medium text-gray-900">
+                    <FileText className="h-4 w-4 text-ink-400" />
+                    <div className="text-sm font-medium text-ink-900">
                       {doc.label}
                       {doc.required && <span className="text-critical-600">*</span>}
                     </div>
                   </div>
                   {doc.description && (
-                    <p className="mt-1 text-xs text-gray-600">{doc.description}</p>
+                    <p className="mt-1 text-xs text-ink-700">{doc.description}</p>
                   )}
                 </div>
                 <StatusChip status={doc.status} />
@@ -123,7 +123,7 @@ export default function PortalParent(): JSX.Element {
 
               {doc.status !== 'complete' && (
                 <label
-                  className={`mt-3 inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-gray-200 bg-white text-sm font-medium shadow-sm hover:bg-gray-50 cursor-pointer ${
+                  className={`mt-3 inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-line bg-white text-sm font-medium shadow-sm hover:bg-surface-sunken cursor-pointer ${
                     isUploading ? 'opacity-60 pointer-events-none' : ''
                   }`}
                 >
@@ -156,7 +156,7 @@ export default function PortalParent(): JSX.Element {
 function PortalShell({ children }: { children: React.ReactNode }): JSX.Element {
   return (
     <div className="min-h-screen bg-surface-muted">
-      <header className="bg-white border-b border-gray-100">
+      <header className="bg-white border-b border-line-soft">
         <div className="max-w-xl mx-auto px-4 h-14 flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-brand-600" />
           <span className="font-semibold">Levelbrook</span>
@@ -198,8 +198,8 @@ function ErrorState({
       <div className="mx-auto mb-3 h-10 w-10 rounded-full bg-critical-50 grid place-items-center">
         <AlertTriangle className="h-5 w-5 text-critical-600" />
       </div>
-      <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
-      <p className="mt-1 text-sm text-gray-600">{description}</p>
+      <h1 className="text-lg font-semibold text-ink-900">{title}</h1>
+      <p className="mt-1 text-sm text-ink-700">{description}</p>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import Button from '@/components/common/Button';
 import BrandMark from '@/components/common/BrandMark';
 import Input from '@/components/common/Input';
+import MarkdownBox from '@/components/common/MarkdownBox';
 import { legalApi } from '@/api/legal';
 import { ApiError } from '@/api/client';
 // Markdown is bundled via Vite's ?raw import — this is the exact text we
@@ -25,6 +26,7 @@ import { useSession } from '@/hooks/useSession';
 export default function OnboardingLegal(): JSX.Element {
   const navigate = useNavigate();
   const user = useSession((s) => s.user);
+  const rehydrate = useSession((s) => s.rehydrate);
   const [typedName, setTypedName] = useState('');
   const [authorized, setAuthorized] = useState(false);
   const [agree, setAgree] = useState(false);
@@ -33,8 +35,17 @@ export default function OnboardingLegal(): JSX.Element {
   const sign = useMutation({
     mutationFn: () =>
       legalApi.sign({ typedName: typedName.trim(), documentKinds: ['tos', 'dpa'] }),
-    onSuccess: () => {
-      navigate('/onboarding/facility', { replace: true });
+    onSuccess: async () => {
+      // Backend flips onboarding_complete in the same tx as the signatures
+      // (see backend/internal/handlers/legal.go). Refresh the session so the
+      // RequireOnboarded guard lets us into /dashboard immediately.
+      try {
+        await rehydrate();
+      } catch {
+        // Rehydrate failures are non-fatal — the route guard will redirect
+        // and the dashboard load will re-fetch.
+      }
+      navigate('/dashboard', { replace: true });
     },
     onError: (err) => {
       setError(
@@ -67,25 +78,19 @@ export default function OnboardingLegal(): JSX.Element {
         </div>
 
         <section className="mt-8 bg-white rounded-lb border border-line shadow-card p-6">
-          <details open>
-            <summary className="cursor-pointer text-lg font-semibold text-ink-900">
-              Terms of Service
-            </summary>
-            <article className="prose prose-sm mt-4 max-w-none text-ink-800 whitespace-pre-wrap">
-              {tosMarkdown}
-            </article>
-          </details>
+          <h2 className="text-lg font-semibold text-ink-900">Terms of Service</h2>
+          <p className="mt-1 text-xs text-ink-500">Scroll through. Plain English, ~3 minutes.</p>
+          <div className="mt-3">
+            <MarkdownBox source={tosMarkdown} ariaLabel="Terms of Service" />
+          </div>
         </section>
 
         <section className="mt-4 bg-white rounded-lb border border-line shadow-card p-6">
-          <details open>
-            <summary className="cursor-pointer text-lg font-semibold text-ink-900">
-              Data Processing Addendum
-            </summary>
-            <article className="prose prose-sm mt-4 max-w-none text-ink-800 whitespace-pre-wrap">
-              {dpaMarkdown}
-            </article>
-          </details>
+          <h2 className="text-lg font-semibold text-ink-900">Data Processing Addendum</h2>
+          <p className="mt-1 text-xs text-ink-500">Where your records are stored and who can touch them.</p>
+          <div className="mt-3">
+            <MarkdownBox source={dpaMarkdown} ariaLabel="Data Processing Addendum" />
+          </div>
         </section>
 
         <section className="mt-6 bg-white rounded-lb border border-line shadow-card p-6">

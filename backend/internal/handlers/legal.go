@@ -133,6 +133,20 @@ func (h *LegalHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, signed{Kind: k, Version: version, SHA256: sha})
 	}
+	// Flip onboarding_complete in the same tx as the signatures. Signing legal
+	// is the only thing we actually gate access on; facility profile details
+	// are filled out from the dashboard banner whenever the operator gets to
+	// them. Without this stamp the route guard would bounce the user back to
+	// /onboarding and they'd never reach the dashboard hook moment.
+	if _, err := tx.ExecContext(r.Context(), `
+		UPDATE providers
+		   SET onboarding_complete     = 1,
+		       onboarding_completed_at = COALESCE(onboarding_completed_at, CURRENT_TIMESTAMP),
+		       updated_at              = CURRENT_TIMESTAMP
+		 WHERE id = ?`, pid); err != nil {
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
 	if err := tx.Commit(); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return

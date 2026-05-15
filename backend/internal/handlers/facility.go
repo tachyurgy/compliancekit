@@ -266,60 +266,11 @@ func (h *FacilityHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Requ
 		httpx.RenderError(w, r, httpx.ErrUnauthorized)
 		return
 	}
-	resp, err := loadFacilityRow(r.Context(), h.Pool, pid)
-	if err != nil {
-		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
-		return
-	}
-
-	// Required-field gate. We're explicit about each one so the error message
-	// can name the missing field and the wizard's progress bar can highlight
-	// the right step.
-	missing := []string{}
-	if strings.TrimSpace(resp.Name) == "" {
-		missing = append(missing, "name")
-	}
-	if strings.TrimSpace(resp.LicenseNumber) == "" {
-		missing = append(missing, "licenseNumber")
-	}
-	if resp.LicenseExpiresOn == nil || *resp.LicenseExpiresOn == "" {
-		missing = append(missing, "licenseExpiresOn")
-	}
-	if strings.TrimSpace(resp.County) == "" {
-		missing = append(missing, "county")
-	}
-	if strings.TrimSpace(resp.Address1) == "" {
-		missing = append(missing, "address1")
-	}
-	if strings.TrimSpace(resp.City) == "" {
-		missing = append(missing, "city")
-	}
-	if strings.TrimSpace(resp.PostalCode) == "" {
-		missing = append(missing, "postalCode")
-	}
-	if strings.TrimSpace(resp.Phone) == "" {
-		missing = append(missing, "phone")
-	}
-	if resp.Capacity <= 0 {
-		missing = append(missing, "capacity")
-	}
-	if resp.IndoorSqft == nil || *resp.IndoorSqft <= 0 {
-		missing = append(missing, "indoorSqft")
-	}
-	if strings.TrimSpace(resp.OwnerFullName) == "" {
-		missing = append(missing, "ownerFullName")
-	}
-	if strings.TrimSpace(resp.DirectorFullName) == "" {
-		missing = append(missing, "directorFullName")
-	}
-	if strings.TrimSpace(resp.DirectorEmail) == "" {
-		missing = append(missing, "directorEmail")
-	}
-	if len(missing) > 0 {
-		httpx.RenderError(w, r, httpx.BadRequestf("required fields missing: %s", strings.Join(missing, ", ")))
-		return
-	}
-
+	// Onboarding is non-blocking: the operator lands on the dashboard right
+	// after signing legal, and fills out facility details whenever they want
+	// from /onboarding/facility or Settings. We stamp complete unconditionally
+	// here so the route guard lets them in; missing fields surface as a
+	// dashboard banner, not a 400.
 	if _, err := h.Pool.ExecContext(r.Context(), `
 		UPDATE providers
 		   SET onboarding_completed_at = CURRENT_TIMESTAMP,

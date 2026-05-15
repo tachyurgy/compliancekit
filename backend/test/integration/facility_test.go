@@ -6,27 +6,21 @@ import (
 	"testing"
 )
 
-// REQ-003 verification: complete-onboarding refuses when required fields
-// are missing, accepts once they're filled. Light end-to-end coverage of
-// the validation gate.
-func TestFacility_CompleteOnboarding_RejectsIncomplete(t *testing.T) {
+// complete-onboarding is non-blocking — facility details are filled out from
+// the dashboard banner whenever the operator gets to them. The endpoint just
+// stamps onboarding_complete=1 so the route guard lets them into /dashboard.
+func TestFacility_CompleteOnboarding_AcceptsEmpty(t *testing.T) {
 	h := NewHarness(t)
 	client, _, _ := h.AuthAs(t, "FL")
 
 	resp := postJSON(t, client, h.URL("/api/facility/complete-onboarding"), map[string]any{})
 	body := readAll(t, resp)
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400 with required-field list, got %d (body=%s)", resp.StatusCode, body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body=%s)", resp.StatusCode, body)
 	}
-	// The handler enumerates missing fields. Spot-check a handful so future
-	// reorders are tolerated but the list is recognisably present. (We do
-	// not assert "name" because the AuthAs fixture pre-fills providers.name
-	// at signup so it's never missing.)
-	for _, want := range []string{"licenseNumber", "indoorSqft", "directorEmail"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("expected missing-field list to include %q; body=%s", want, body)
-		}
+	if !strings.Contains(body, `"onboardingCompletedAt"`) {
+		t.Errorf("expected onboardingCompletedAt in response body; got %s", body)
 	}
 }
 

@@ -15,6 +15,7 @@ import Button from '@/components/common/Button';
 import EmptyState from '@/components/common/EmptyState';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import TrialBanner from '@/components/common/TrialBanner';
+import FacilityProfileBanner from '@/components/dashboard/FacilityProfileBanner';
 import ScoreHero, { ScoreHeroSkeleton } from '@/components/dashboard/ScoreHero';
 import AttendanceStrip from '@/components/dashboard/AttendanceStrip';
 import { useDashboard } from '@/hooks/useDashboard';
@@ -40,6 +41,7 @@ export default function Dashboard(): JSX.Element {
   return (
     <div>
       <TrialBanner />
+      <FacilityProfileBanner />
       <PageHeader
         eyebrow="Today at your center"
         title="Welcome back."

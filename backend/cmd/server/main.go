@@ -157,6 +157,7 @@ func run() error {
 		Log: log.With("component", "auth"),
 	}
 	legalH := &handlers.LegalHandler{Pool: pool, Log: log.With("component", "legal")}
+	demoH := &handlers.DemoHandler{Pool: pool, Log: log.With("component", "demo")}
 	stripeWH := &handlers.StripeWebhookHandler{Billing: bill, Log: log.With("component", "stripe_wh")}
 	// REQ-007: opt-out registry hooks. SES bounce JSON arrives via SNS;
 	// Twilio STOP-keyword inbound arrives as form-encoded. Both insert into
@@ -298,6 +299,7 @@ func run() error {
 		Facility:        facility,
 		UploadLink:      uploadLink,
 		Score:           scoreH,
+		Demo:            demoH,
 		Kiosk:           kioskH,
 		Attendance:      attendanceH,
 		TestHelpers:     testHelpers,

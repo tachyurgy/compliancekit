@@ -104,6 +104,7 @@ type Deps struct {
 	Facility        *handlers.FacilityHandler   // REQ-003: 4-step onboarding wizard
 	UploadLink      *handlers.UploadLinkHandler // REQ-004: shareable staff upload link
 	Score           *handlers.ScoreHandler      // REQ-013: synthesised dashboard score
+	Demo            *handlers.DemoHandler       // REQ-024: Shayna onboarding tour seed + purge
 	Kiosk           *handlers.KioskHandler      // REQ-016: facility-scoped attendance kiosk
 	Attendance      *handlers.AttendanceHandler // REQ-016: today + history + drill roster PDF
 	TestHelpers     *handlers.TestHelperHandler // only mounted when non-production
@@ -361,6 +362,15 @@ func NewRouter(d Deps) http.Handler {
 			// admin-only read of the audit trail
 			r.Group(adminOnly(func(r chi.Router) {
 				r.Get("/legal/signatures", d.Legal.ListSignatures)
+			}))
+		}
+
+		// REQ-024 Shayna onboarding tour — read state any time, only an
+		// admin should be allowed to wipe the seed.
+		if d.Demo != nil {
+			r.Get("/demo/status", d.Demo.Status)
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Post("/demo/purge", d.Demo.Purge)
 			}))
 		}
 

@@ -19,6 +19,7 @@ import (
 
 	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
+	"github.com/tachyurgy/compliancekit/backend/internal/demoseed"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
 )
@@ -150,6 +151,18 @@ func (h *LegalHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
+	}
+
+	// REQ-024 (Shayna tour): a brand-new tenant lands on /dashboard with
+	// no staff, no kids, no documents — the score widget renders 100/100
+	// against zero rules and there's nothing to wow them with. Pre-seed a
+	// realistic FL center marked is_demo=1 so the tour has something real
+	// to point at. Idempotent + best-effort; a seed failure must NOT block
+	// the operator from continuing to /dashboard. We log and move on.
+	if seeded, err := demoseed.Seed(r.Context(), h.Pool, pid); err != nil {
+		h.Log.Warn("demoseed failed", "err", err, "provider_id", pid)
+	} else if seeded {
+		h.Log.Info("demoseed succeeded", "provider_id", pid)
 	}
 
 	auditlog.Emit(r.Context(), h.Pool, auditlog.Entry{

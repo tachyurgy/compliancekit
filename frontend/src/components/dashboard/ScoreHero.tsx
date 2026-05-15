@@ -121,7 +121,10 @@ export default function ScoreHero({ data }: { data: ScoreData }): JSX.Element {
   const isPerfect = data.score === 100;
 
   return (
-    <div className={`rounded-lb-lg border ${tokens.surface} p-6 sm:p-8`}>
+    <div
+      data-tour-id="score-hero"
+      className={`rounded-lb-lg border ${tokens.surface} p-6 sm:p-8`}
+    >
       <div className="flex flex-col sm:flex-row sm:items-center gap-6">
         <ScoreNumeral score={data.score} band={data.band} />
         <div className="flex-1">
@@ -147,7 +150,9 @@ export default function ScoreHero({ data }: { data: ScoreData }): JSX.Element {
       {data.top_gaps.length > 0 ? (
         <div className="mt-7 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {data.top_gaps.slice(0, 4).map((gap, i) => (
-            <GapCard key={`${gap.kind}-${i}`} gap={gap} />
+            <div key={`${gap.kind}-${i}`} data-tour-id={i === 0 ? 'top-gap' : undefined}>
+              <GapCard gap={gap} />
+            </div>
           ))}
         </div>
       ) : (

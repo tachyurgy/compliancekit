@@ -18,8 +18,11 @@ import TrialBanner from '@/components/common/TrialBanner';
 import FacilityProfileBanner from '@/components/dashboard/FacilityProfileBanner';
 import ScoreHero, { ScoreHeroSkeleton } from '@/components/dashboard/ScoreHero';
 import AttendanceStrip from '@/components/dashboard/AttendanceStrip';
+import ShaynaTour from '@/components/tour/ShaynaTour';
 import { useDashboard } from '@/hooks/useDashboard';
 import { useScore } from '@/hooks/useScore';
+import { useQuery } from '@tanstack/react-query';
+import { demoApi } from '@/api/demo';
 import { formatDate, formatRelativeDays } from '@/lib/format';
 
 const SEVERITY_DOT: Record<'critical' | 'warning' | 'info', string> = {
@@ -37,9 +40,15 @@ const SEVERITY_ICON: Record<'critical' | 'warning' | 'info', string> = {
 export default function Dashboard(): JSX.Element {
   const { data, isLoading, isError, error, refetch } = useDashboard();
   const score = useScore();
+  const demoStatus = useQuery({
+    queryKey: ['demo-status'],
+    queryFn: () => demoApi.status(),
+    staleTime: 30_000,
+  });
 
   return (
     <div>
+      <ShaynaTour hasDemoData={demoStatus.data?.has_demo_data ?? false} />
       <TrialBanner />
       <FacilityProfileBanner />
       <PageHeader

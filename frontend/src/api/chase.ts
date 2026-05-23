@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { apiFetch } from './client';
 
-// REQ-038: Chase Mode dashboard. Three endpoints back this page:
+// REQ-042: Chase Mode dashboard. Three endpoints back this page:
 //
 //   GET  /api/chase/state    — outstanding chases + stuck items
 //   GET  /api/chase/activity — recent nag log

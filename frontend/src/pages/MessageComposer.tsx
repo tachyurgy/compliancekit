@@ -11,7 +11,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { toast } from '@/components/common/Toast';
 import { messagesApi, type RecipientOption, type SendResult } from '@/api/messages';
 
-// REQ-039: /messages/new composer. Recipients can be staff or parents,
+// REQ-043: /messages/new composer. Recipients can be staff or parents,
 // channel is email/sms/both, body is plaintext. Submit fires the
 // fan-out and renders a per-recipient/per-channel results panel.
 

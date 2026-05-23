@@ -269,7 +269,7 @@ export default function StaffDetailPage(): JSX.Element {
         </Card>
       </div>
 
-      {/* REQ-040: per-staff message log */}
+      {/* REQ-044: per-staff message log */}
       <div className="mt-6">
         <MessageHistory
           recipientKind="staff"
@@ -297,7 +297,7 @@ export default function StaffDetailPage(): JSX.Element {
   );
 }
 
-// REQ-040: Edit modal that wraps the existing staffApi.update mutation.
+// REQ-044: Edit modal that wraps the existing staffApi.update mutation.
 // Binds to name, role, email, phone, hire date, and preferred channel —
 // the fields a director would actually want to fix from this screen.
 function EditStaffModal({

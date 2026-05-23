@@ -11,7 +11,7 @@ import { toast } from '@/components/common/Toast';
 import { chaseApi, type ChaseRow, type ChaseActivityItem } from '@/api/chase';
 import { formatDate } from '@/lib/format';
 
-// REQ-038: Chase Mode dashboard. Three sections, single page.
+// REQ-042: Chase Mode dashboard. Three sections, single page.
 //
 // Calm voice: this page makes the chase engine visible without leaning on
 // red. Yellow + ink + brand-700; "needs a personal call" is the only band

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { apiFetch } from './client';
 
-// REQ-039: free-form message composer. Three endpoints:
+// REQ-043: free-form message composer. Three endpoints:
 //
 //   POST /api/messages/send            — fan out across recipients + channels
 //   GET  /api/messages                 — per-recipient thread

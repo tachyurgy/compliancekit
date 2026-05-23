@@ -18,7 +18,7 @@ import (
 )
 
 // ChaseHandler powers the operator-facing "Chase Mode" dashboard
-// (REQ-038). It reads from the existing chase-related tables and exposes
+// (REQ-042). It reads from the existing chase-related tables and exposes
 // three endpoints:
 //
 //   GET  /api/chase/state    — outstanding chases + stuck items

@@ -1,5 +1,5 @@
--- 000039_outgoing_messages.up.sql
--- REQ-039: per-tenant log of every free-form message the operator sends out
+-- 000043_outgoing_messages.up.sql
+-- REQ-043: per-tenant log of every free-form message the operator sends out
 -- through the in-app composer. Powers /api/messages/send and the StaffDetail
 -- / ChildDetail "Messages" tab.
 --

@@ -15,7 +15,7 @@ interface Props {
   composerHref: string;
 }
 
-// REQ-040: reusable message thread for StaffDetail + ChildDetail.
+// REQ-044: reusable message thread for StaffDetail + ChildDetail.
 // Calls GET /api/messages?recipientKind=&recipientId= and renders the
 // outgoing thread newest-first. "Send a message" jumps to the composer
 // pre-filled for this contact.

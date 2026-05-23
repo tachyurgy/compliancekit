@@ -14,11 +14,11 @@ import (
 	"github.com/tachyurgy/compliancekit/backend/internal/notify"
 )
 
-// MessagesHandler powers the in-app message composer (REQ-039). It
+// MessagesHandler powers the in-app message composer (REQ-043). It
 // fans out free-form messages across email + SMS using the existing
 // notify.Emailer / notify.SMSSender, and writes one row per (channel,
 // recipient) into outgoing_messages so the per-recipient history tab
-// (REQ-040) has something to read.
+// (REQ-044) has something to read.
 type MessagesHandler struct {
 	Pool    *sql.DB
 	Emailer *notify.Emailer

@@ -144,6 +144,11 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 		Log: log.With("component", "auth"),
 	}
 
+	// REQ-024 demo seed + REQ-038 workspace switcher.
+	legalH := &handlers.LegalHandler{Pool: pool, Log: log.With("component", "legal")}
+	demoH := &handlers.DemoHandler{Pool: pool, Log: log.With("component", "demo")}
+	workspaceH := &handlers.WorkspaceHandler{Pool: pool, Log: log.With("component", "workspace")}
+
 	router := api.NewRouter(api.Deps{
 		Logger:          log,
 		Providers:       providers,
@@ -166,6 +171,9 @@ func NewHarnessWithOpts(t *testing.T, opts HarnessOpts) *Harness {
 		Facility:        facility,
 		UploadLink:      uploadLink,
 		Auth:            authH,
+		Legal:           legalH,
+		Demo:            demoH,
+		Workspace:       workspaceH,
 		Magic:           magic,
 		Session:         providers,
 		RoleLookup:      mw.PoolRoleLookup{DB: pool},
@@ -270,6 +278,16 @@ func (h *Harness) AuthAs(t *testing.T, stateCode string) (*http.Client, string, 
 		VALUES (?, ?, ?, 'Test Admin', 'provider_admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
 		userID, providerID, email); err != nil {
 		t.Fatalf("AuthAs: insert user: %v", err)
+	}
+
+	// REQ-038: every user has a row in provider_memberships pointing at
+	// their real provider. The 000039 backfill only catches rows present
+	// at migration time, so we have to insert this for new tests.
+	if _, err := h.DB.Exec(`
+		INSERT OR IGNORE INTO provider_memberships (id, user_id, provider_id, role, created_at)
+		VALUES (?, ?, ?, 'provider_admin', CURRENT_TIMESTAMP)`,
+		base62.NewID()[:22], userID, providerID); err != nil {
+		t.Fatalf("AuthAs: insert membership: %v", err)
 	}
 
 	// Session row — expires_at is TEXT per 000009 schema, so we pass a

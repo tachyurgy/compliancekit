@@ -153,16 +153,15 @@ func (h *LegalHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// REQ-024 (Shayna tour): a brand-new tenant lands on /dashboard with
-	// no staff, no kids, no documents — the score widget renders 100/100
-	// against zero rules and there's nothing to wow them with. Pre-seed a
-	// realistic FL center marked is_demo=1 so the tour has something real
-	// to point at. Idempotent + best-effort; a seed failure must NOT block
-	// the operator from continuing to /dashboard. We log and move on.
-	if seeded, err := demoseed.Seed(r.Context(), h.Pool, pid); err != nil {
-		h.Log.Warn("demoseed failed", "err", err, "provider_id", pid)
-	} else if seeded {
-		h.Log.Info("demoseed succeeded", "provider_id", pid)
+	// REQ-038 (demo as second facility): seed a SEPARATE demo provider
+	// owned by the same user instead of stamping the real one. The real
+	// facility (pid above) stays clean; the user can hop between them via
+	// the workspace switcher. Idempotent + best-effort — a seed failure
+	// must NOT block the operator from continuing to /dashboard.
+	if demoID, err := demoseed.SeedDemoFacility(r.Context(), h.Pool, uid, pid); err != nil {
+		h.Log.Warn("demoseed failed", "err", err, "user_id", uid, "real_provider_id", pid)
+	} else {
+		h.Log.Info("demoseed succeeded", "user_id", uid, "demo_provider_id", demoID)
 	}
 
 	auditlog.Emit(r.Context(), h.Pool, auditlog.Entry{

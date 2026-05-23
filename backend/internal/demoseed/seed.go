@@ -28,6 +28,107 @@ import (
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 )
 
+// DemoFacilityName is the default legal_name + display name for a
+// freshly minted demo provider. Kept on-brand for the FL launch persona —
+// REQ-024 originally used "Sunshine Kids of Hialeah" inside Inspector
+// Mode preview copy, so we match it here for continuity.
+const DemoFacilityName = "Sunshine Kids of Hialeah (Demo)"
+
+// SeedDemoFacility creates a brand-new provider row marked is_demo=1,
+// attaches the user via provider_memberships, and runs Seed to populate
+// it with the canonical FL daycare. The new provider's id is returned.
+//
+// Idempotent: if the user already has a demo provider attached we return
+// that provider's id without touching anything. The legal-sign handler
+// calls this on every signup and we DO NOT want the second login to
+// re-seed and double-populate.
+//
+// REQ-038: replaces the old REQ-024 pattern of seeding the REAL provider
+// in place. The real provider stays clean; the demo facility is a
+// separate row.
+func SeedDemoFacility(ctx context.Context, db *sql.DB, userID, realProviderID string) (string, error) {
+	if userID == "" {
+		return "", fmt.Errorf("demoseed.SeedDemoFacility: empty userID")
+	}
+
+	// If a demo provider is already attached to this user, short-circuit.
+	// We look it up through provider_memberships rather than via users.provider_id
+	// because users.provider_id always points at the REAL provider.
+	var existing string
+	err := db.QueryRowContext(ctx, `
+		SELECT p.id
+		  FROM provider_memberships pm
+		  JOIN providers p ON p.id = pm.provider_id
+		 WHERE pm.user_id = ? AND p.is_demo = 1 AND p.deleted_at IS NULL
+		 LIMIT 1`, userID).Scan(&existing)
+	if err == nil && existing != "" {
+		return existing, nil
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return "", fmt.Errorf("demoseed.SeedDemoFacility: lookup existing: %w", err)
+	}
+
+	// Pull the user's email so the demo provider has a sensible
+	// owner_email field. Falls back to a placeholder when the user row
+	// is missing (shouldn't happen in production).
+	var ownerEmail string
+	_ = db.QueryRowContext(ctx, `SELECT COALESCE(email, '') FROM users WHERE id = ?`, userID).Scan(&ownerEmail)
+	if ownerEmail == "" {
+		ownerEmail = "demo@example.com"
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", fmt.Errorf("demoseed.SeedDemoFacility: begin: %w", err)
+	}
+	defer tx.Rollback()
+
+	demoProviderID := base62.NewID()[:22]
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO providers
+		    (id, legal_name, name, dba, state, state_code, state_abbr,
+		     owner_email, timezone, onboarding_complete, is_demo,
+		     created_at, updated_at)
+		VALUES (?, ?, ?, ?, 'FL', 'FL', 'FL', ?, 'America/New_York', 1, 1,
+		        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		demoProviderID, DemoFacilityName, DemoFacilityName, DemoFacilityName, ownerEmail); err != nil {
+		return "", fmt.Errorf("demoseed.SeedDemoFacility: insert provider: %w", err)
+	}
+
+	// Ensure the real provider has a membership row for this user. The
+	// 000039 migration backfills existing users but a brand-new signup
+	// may not have hit the backfill yet (the user row was created after
+	// the migration ran on the droplet — backfill only catches rows
+	// present at migration time).
+	if realProviderID != "" {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT OR IGNORE INTO provider_memberships (id, user_id, provider_id, role)
+			VALUES (?, ?, ?, 'provider_admin')`,
+			base62.NewID()[:22], userID, realProviderID); err != nil {
+			return "", fmt.Errorf("demoseed.SeedDemoFacility: insert real membership: %w", err)
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO provider_memberships (id, user_id, provider_id, role)
+		VALUES (?, ?, ?, 'provider_admin')`,
+		base62.NewID()[:22], userID, demoProviderID); err != nil {
+		return "", fmt.Errorf("demoseed.SeedDemoFacility: insert demo membership: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("demoseed.SeedDemoFacility: commit: %w", err)
+	}
+
+	// Now run the existing per-provider seeder against the new provider.
+	// We do this OUTSIDE the membership transaction because Seed opens
+	// its own; both paths are independently committed.
+	if _, err := Seed(ctx, db, demoProviderID); err != nil {
+		return "", fmt.Errorf("demoseed.SeedDemoFacility: populate: %w", err)
+	}
+	return demoProviderID, nil
+}
+
 // Seed checks whether the provider already has any non-demo rows. If
 // the facility is empty (a freshly-signed-up tenant) it populates the
 // demo state. Idempotent — calling Seed twice does nothing the second

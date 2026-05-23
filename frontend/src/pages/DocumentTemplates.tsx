@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { FieldDesigner } from "../components/PdfSigner/FieldDesigner";
 import { listTemplates, type TemplateSummary } from "../components/PdfSigner/api";
 
-const API_BASE =
-  (import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE ?? "";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export default function DocumentTemplates() {
   const [templates, setTemplates] = useState<TemplateSummary[] | null>(null);

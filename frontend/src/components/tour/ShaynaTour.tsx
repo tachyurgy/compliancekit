@@ -147,11 +147,13 @@ export default function ShaynaTour({ hasDemoData = true }: Props): JSX.Element |
               Step 2 of 4 · Inspector Mode
             </div>
             <p className="mt-1 text-sm text-ink-800 leading-relaxed">
-              When your counselor walks in, tap <strong>Inspector Mode</strong>{' '}
-              and hand them the iPad. This is the exact view they see — the
-              same CF-FSP 5316 they fill out by hand. No screenshots, no
-              binder, no "let me find that file." Every file you'll need on
-              one screen, evidence one tap away.
+              When it's time for your inspection, just tap{' '}
+              <strong>Inspector Mode</strong> here and hand your counselor the
+              iPad. That's it. This is the exact view they see — the same
+              CF-FSP 5316 they'd otherwise fill in by hand — with every file
+              already filed, sorted, and one tap away. No screenshots, no
+              binder, no "let me find that file." Every competitor makes you
+              build this by hand. We do it for you.
             </p>
           </div>
         </div>
@@ -170,10 +172,12 @@ export default function ShaynaTour({ hasDemoData = true }: Props): JSX.Element |
       <FloatingPanel onSkip={tour.skip}>
         <FloatingHeader step="Step 3 of 4" title="Chase Mode does this for you." />
         <p className="text-sm text-ink-700 leading-relaxed">
-          Liam Davis is missing his DH-680. <strong>Chase Mode</strong> already
-          texted his mom Karina a private link. She'll snap a photo at the
-          pediatrician's office, we OCR it, and it lands in Liam's file —
-          while you keep teaching. Tap below to see the link we sent.
+          You don't chase parents anymore — <strong>Chase Mode does it
+          automatically.</strong> Liam Davis is missing his DH-680. While you
+          were teaching, Chase Mode already texted his mom Karina a private
+          link. When she snaps a photo at the pediatrician's office, we OCR
+          it, file it under Liam, and update his record — hands-free. Tap
+          below to see the message we already sent on your behalf.
         </p>
         <div className="mt-3 rounded-lb-sm border border-ink-200 bg-white p-3 text-sm">
           <div className="text-xs uppercase tracking-wide text-ink-500 font-semibold">

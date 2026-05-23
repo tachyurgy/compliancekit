@@ -1,7 +1,6 @@
 import type { AuditRecord, PreparedSession, SignatureRecord } from "./types";
 
-const API_BASE = (import.meta as unknown as { env?: { VITE_API_BASE?: string } })
-  .env?.VITE_API_BASE ?? "";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 async function handle<T>(resp: Response): Promise<T> {
   if (!resp.ok) {

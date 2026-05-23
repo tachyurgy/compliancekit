@@ -354,7 +354,7 @@ function DrillModal({
       open={open}
       onClose={onClose}
       title="Log a drill"
-      description="Record what was practiced, when, and how long it took. Staff signatures can be attached later."
+      description="Record what was practiced, when, and how long it took. Attach photos as evidence below."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>

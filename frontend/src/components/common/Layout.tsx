@@ -22,6 +22,7 @@ import {
   ScrollText,
   Scale,
   Zap,
+  MessageSquare,
 } from 'lucide-react';
 
 import { useSession } from '@/hooks/useSession';
@@ -44,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/staff', label: 'Staff', icon: Users },
   { to: '/operations', label: 'Operations', icon: ClipboardCheck },
   { to: '/inspections', label: 'Inspections', icon: FlaskConical },
+  { to: '/messages/new', label: 'Send a message', icon: MessageSquare },
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/templates', label: 'Templates', icon: FileSignature },
   { to: '/settings', label: 'Settings', icon: Settings },

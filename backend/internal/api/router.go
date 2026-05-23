@@ -101,6 +101,7 @@ type Deps struct {
 	DataExport      *handlers.DataExportHandler
 	Contact         *handlers.ContactHandler
 	Nag             *handlers.NagHandler
+	Chase           *handlers.ChaseHandler // REQ-038: Chase Mode dashboard
 	Facility        *handlers.FacilityHandler   // REQ-003: 4-step onboarding wizard
 	UploadLink      *handlers.UploadLinkHandler // REQ-004: shareable staff upload link
 	Score           *handlers.ScoreHandler      // REQ-013: synthesised dashboard score
@@ -376,6 +377,16 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/demo/status", d.Demo.Status)
 			r.Group(adminOnly(func(r chi.Router) {
 				r.Post("/demo/purge", d.Demo.Purge)
+			}))
+		}
+
+		// REQ-038: Chase Mode dashboard. Read endpoints open to both roles;
+		// the trigger reuses the admin-gated NagHandler under the hood.
+		if d.Chase != nil {
+			r.Get("/chase/state", d.Chase.State)
+			r.Get("/chase/activity", d.Chase.Activity)
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Post("/chase/trigger", d.Chase.Trigger)
 			}))
 		}
 

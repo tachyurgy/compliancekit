@@ -3,9 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <title>Levelbrook</title>
-    <meta http-equiv="refresh" content="0; url=/" />
+    <script>
+      // SPA path-preservation trick for static hosts that don't honor a
+      // generic SPA rewrite (Cloudflare Pages, GitHub Pages, etc.). We rewrite
+      // /foo/bar?baz=1 to /?p=/foo/bar&q=baz=1, then index.html's restore
+      // script reads ?p= and replaces history with the original URL so the
+      // React router picks up the right route.
+      (function () {
+        var l = window.location;
+        l.replace(
+          l.protocol +
+            '//' +
+            l.hostname +
+            (l.port ? ':' + l.port : '') +
+            '/?p=/' +
+            l.pathname.slice(1).replace(/&/g, '~and~') +
+            (l.search ? '&q=' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+            l.hash,
+        );
+      })();
+    </script>
   </head>
   <body>
-    <p>Page not found. <a href="/">Return to Levelbrook</a>.</p>
+    Redirecting…
   </body>
 </html>

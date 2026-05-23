@@ -19,6 +19,28 @@
     />
     <meta property="og:type" content="website" />
     <title>Levelbrook — Inspection-Ready Every Day</title>
+    <script>
+      // Restore path encoded by 404.html's SPA-preservation trick. CF Pages
+      // doesn't honor _redirects rewrites on this project, so anyone who
+      // lands directly on /staff/abc or /templates hits 404.html, which
+      // bounces them to /?p=/staff/abc. We decode the ?p= back into a real
+      // history entry before React boots so react-router picks up the
+      // intended route.
+      (function () {
+        var l = window.location;
+        if (l.search && l.search.indexOf('?p=/') === 0) {
+          var raw = l.search.slice(3); // strip '?p='
+          var search = '';
+          var qIdx = raw.indexOf('&q=');
+          if (qIdx !== -1) {
+            search = '?' + raw.slice(qIdx + 3).replace(/~and~/g, '&');
+            raw = raw.slice(0, qIdx);
+          }
+          var path = decodeURIComponent(raw).replace(/~and~/g, '&');
+          window.history.replaceState(null, '', path + search + l.hash);
+        }
+      })();
+    </script>
   </head>
   <body class="bg-surface-muted text-gray-900 antialiased">
     <div id="root"></div>

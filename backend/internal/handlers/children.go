@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log/slog"
@@ -16,6 +17,199 @@ import (
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
 	"github.com/tachyurgy/compliancekit/backend/internal/models"
 )
+
+// childResponse is the camelCase JSON shape the React app expects.
+// Keep this in sync with frontend/src/api/children.ts ChildSchema.
+//
+// Aggregate fields (requiredDocsCount/completedDocsCount/immunizationStatus/
+// complianceStatus) are computed per-child from child_documents_required.
+// Until we wire a real immunization tracker, immunizationStatus stays
+// 'unknown' — that's a valid enum value, the UI handles it.
+type childResponse struct {
+	ID                 string `json:"id"`
+	ProviderID         string `json:"providerId"`
+	FirstName          string `json:"firstName"`
+	LastName           string `json:"lastName"`
+	DateOfBirth        string `json:"dateOfBirth"`
+	EnrollmentDate     string `json:"enrollmentDate"`
+	ParentName         string `json:"parentName"`
+	ParentEmail        string `json:"parentEmail"`
+	ParentPhone        string `json:"parentPhone"`
+	ImmunizationStatus string `json:"immunizationStatus"`
+	RequiredDocsCount  int    `json:"requiredDocsCount"`
+	CompletedDocsCount int    `json:"completedDocsCount"`
+	ComplianceStatus   string `json:"complianceStatus"`
+	UpdatedAt          string `json:"updatedAt"`
+}
+
+// childDetailResponse extends childResponse with the per-child arrays
+// ChildDetail.tsx renders (requiredDocs, immunizations, notes).
+type childDetailResponse struct {
+	childResponse
+	Notes         *string                 `json:"notes"`
+	RequiredDocs  []childRequiredDocItem  `json:"requiredDocs"`
+	Immunizations []childImmunizationItem `json:"immunizations"`
+}
+
+type childRequiredDocItem struct {
+	ID           string  `json:"id"`
+	DocumentType string  `json:"documentType"`
+	Label        string  `json:"label"`
+	Status       string  `json:"status"` // missing | pending | complete | expired
+	DueDate      *string `json:"dueDate"`
+	DocumentID   *string `json:"documentId"`
+}
+
+type childImmunizationItem struct {
+	Vaccine  string  `json:"vaccine"`
+	Status   string  `json:"status"` // up_to_date | due_soon | overdue | exempt
+	DueDate  *string `json:"dueDate"`
+	LastDose *string `json:"lastDose"`
+}
+
+// childRequiredStatusToUI maps the db enum onto the four-value UI enum
+// ChildDetail expects: 'missing'|'pending'|'complete'|'expired'.
+func childRequiredStatusToUI(s string) string {
+	switch s {
+	case "uploaded", "compliant":
+		return "complete"
+	case "expiring_soon":
+		return "pending"
+	case "expired":
+		return "expired"
+	default:
+		return "missing"
+	}
+}
+
+// humanizeDocType turns 'dh_680_immunization' into 'Dh 680 Immunization' as a
+// fallback when there's no curated label. Real label catalog should live in
+// requirements/<state>/ — wire later.
+func humanizeDocType(t string) string {
+	if t == "" {
+		return "Document"
+	}
+	out := make([]rune, 0, len(t))
+	upNext := true
+	for _, r := range t {
+		switch r {
+		case '_', '-':
+			out = append(out, ' ')
+			upNext = true
+		default:
+			if upNext {
+				if r >= 'a' && r <= 'z' {
+					r = r - 32
+				}
+				upNext = false
+			}
+			out = append(out, r)
+		}
+	}
+	return string(out)
+}
+
+// loadChildRequiredDocs returns the requiredDocs array for one child.
+func loadChildRequiredDocs(ctx context.Context, db *sql.DB, childID string) ([]childRequiredDocItem, error) {
+	out := make([]childRequiredDocItem, 0)
+	rows, err := db.QueryContext(ctx, `
+		SELECT id, doc_type, COALESCE(required_by,''), status
+		  FROM child_documents_required
+		 WHERE child_id = ?
+		 ORDER BY status, doc_type`, childID)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, docType, requiredBy, status string
+		if err := rows.Scan(&id, &docType, &requiredBy, &status); err != nil {
+			return out, err
+		}
+		item := childRequiredDocItem{
+			ID:           id,
+			DocumentType: docType,
+			Label:        humanizeDocType(docType),
+			Status:       childRequiredStatusToUI(status),
+		}
+		if requiredBy != "" {
+			item.DueDate = &requiredBy
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+// childAggregates pulls per-child required/completed doc counts in one
+// query so List doesn't N+1. Returns a map keyed by child id.
+//
+// 'completed' means the checklist row reached either 'uploaded' or
+// 'compliant'; 'missing'/'expired'/'expiring_soon' all count as required-
+// but-not-done.
+func loadChildAggregates(ctx context.Context, db *sql.DB, pid string) (map[string]struct{ required, completed int }, error) {
+	out := map[string]struct{ required, completed int }{}
+	rows, err := db.QueryContext(ctx, `
+		SELECT cdr.child_id,
+		       COUNT(*) AS required,
+		       SUM(CASE WHEN cdr.status IN ('uploaded','compliant') THEN 1 ELSE 0 END) AS completed
+		  FROM child_documents_required cdr
+		  JOIN children c ON c.id = cdr.child_id
+		 WHERE c.provider_id = ?
+		 GROUP BY cdr.child_id`, pid)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var req, done int
+		if err := rows.Scan(&id, &req, &done); err != nil {
+			return out, err
+		}
+		out[id] = struct{ required, completed int }{req, done}
+	}
+	return out, nil
+}
+
+// toChildResponse copies a models.Child into the camelCase response shape
+// and folds in pre-computed aggregates.
+func toChildResponse(c models.Child, req, done int) childResponse {
+	r := childResponse{
+		ID:                 c.ID,
+		ProviderID:         c.ProviderID,
+		FirstName:          c.FirstName,
+		LastName:           c.LastName,
+		ParentName:         c.ParentName,
+		ParentEmail:        c.ParentEmail,
+		ParentPhone:        c.ParentPhone,
+		ImmunizationStatus: "unknown",
+		RequiredDocsCount:  req,
+		CompletedDocsCount: done,
+	}
+	if !c.DOB.IsZero() {
+		r.DateOfBirth = c.DOB.Format("2006-01-02")
+	}
+	if !c.EnrollDate.IsZero() {
+		r.EnrollmentDate = c.EnrollDate.Format("2006-01-02")
+	}
+	if !c.UpdatedAt.IsZero() {
+		r.UpdatedAt = c.UpdatedAt.UTC().Format(time.RFC3339)
+	}
+	// Compliance bucket — keeps the score-style traffic light coherent with
+	// the dashboard. Missing docs always wins.
+	missing := req - done
+	switch {
+	case req == 0:
+		r.ComplianceStatus = "compliant"
+	case missing <= 0:
+		r.ComplianceStatus = "compliant"
+	case missing >= 3:
+		r.ComplianceStatus = "critical"
+	default:
+		r.ComplianceStatus = "warning"
+	}
+	return r
+}
 
 type ChildHandler struct {
 	Pool         *sql.DB
@@ -74,20 +268,29 @@ func (h *ChildHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rows.Close()
-	out := make([]models.Child, 0)
+	scanned := make([]models.Child, 0)
 	for rows.Next() {
 		var c models.Child
 		if err := scanChild(rows, &c); err != nil {
 			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 			return
 		}
-		out = append(out, c)
+		scanned = append(scanned, c)
+	}
+	// Single grouped query for all per-child aggregates.
+	agg, _ := loadChildAggregates(r.Context(), h.Pool, pid)
+	out := make([]childResponse, 0, len(scanned))
+	for _, c := range scanned {
+		a := agg[c.ID]
+		out = append(out, toChildResponse(c, a.required, a.completed))
 	}
 	httpx.RenderJSON(w, http.StatusOK, out)
 }
 
-// childCreateInput is the inbound JSON shape for POST /api/children. We accept
-// both snake_case and the omitempty fields directly off models.Child.
+// childCreateInput is the inbound JSON shape for POST /api/children. Accepts
+// both snake_case (legacy/internal callers) and camelCase (the React app). We
+// merge them in the handler — camelCase wins when both are set on the same
+// field, but in practice clients only send one.
 type childCreateInput struct {
 	FirstName               string    `json:"first_name"`
 	LastName                string    `json:"last_name"`
@@ -101,6 +304,17 @@ type childCreateInput struct {
 	Allergies               string    `json:"allergies"`
 	MedicalConditions       string    `json:"medical_conditions"`
 	Status                  string    `json:"status"`
+
+	// camelCase aliases — accepted in addition to the snake_case fields
+	// above so the frontend can stop translating shapes at the boundary.
+	FirstNameCamel               string    `json:"firstName,omitempty"`
+	LastNameCamel                string    `json:"lastName,omitempty"`
+	DOBCamel                     time.Time `json:"dateOfBirth,omitempty"`
+	EnrollCamel                  time.Time `json:"enrollmentDate,omitempty"`
+	ParentNameCamel              string    `json:"parentName,omitempty"`
+	ParentEmailCamel             string    `json:"parentEmail,omitempty"`
+	ParentPhoneCamel             string    `json:"parentPhone,omitempty"`
+	PreferredContactChannelCamel string    `json:"preferredContactChannel,omitempty"`
 }
 
 // POST /api/children
@@ -111,8 +325,33 @@ func (h *ChildHandler) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, err)
 		return
 	}
+	// Merge camelCase aliases into the canonical fields if present.
+	if in.FirstName == "" {
+		in.FirstName = in.FirstNameCamel
+	}
+	if in.LastName == "" {
+		in.LastName = in.LastNameCamel
+	}
+	if in.DOB.IsZero() && !in.DOBCamel.IsZero() {
+		in.DOB = in.DOBCamel
+	}
+	if in.EnrollDate.IsZero() && !in.EnrollCamel.IsZero() {
+		in.EnrollDate = in.EnrollCamel
+	}
+	if in.ParentName == "" {
+		in.ParentName = in.ParentNameCamel
+	}
+	if in.ParentEmail == "" {
+		in.ParentEmail = in.ParentEmailCamel
+	}
+	if in.ParentPhone == "" {
+		in.ParentPhone = in.ParentPhoneCamel
+	}
+	if in.PreferredContactChannel == "" {
+		in.PreferredContactChannel = in.PreferredContactChannelCamel
+	}
 	if in.FirstName == "" || in.LastName == "" || in.DOB.IsZero() {
-		httpx.RenderError(w, r, httpx.BadRequestf("first_name, last_name, and date_of_birth are required"))
+		httpx.RenderError(w, r, httpx.BadRequestf("firstName, lastName, and dateOfBirth are required"))
 		return
 	}
 	if in.EnrollDate.IsZero() {
@@ -156,10 +395,10 @@ func (h *ChildHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	auditlog.EmitChildCreate(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), id, r)
 
-	// Echo the stored row back. We rebuild from the input rather than re-read
-	// because we want to return 201 Created with the canonical body shape;
-	// h.Get would render 200.
-	out := models.Child{
+	// Echo the stored row back in the camelCase shape the React app expects.
+	// We rebuild from the input rather than re-read so we can return 201
+	// Created with the canonical body shape; h.Get would render 200.
+	out := toChildResponse(models.Child{
 		ID:                      id,
 		ProviderID:              pid,
 		FirstName:               in.FirstName,
@@ -176,7 +415,7 @@ func (h *ChildHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Status:                  in.Status,
 		CreatedAt:               time.Now(),
 		UpdatedAt:               time.Now(),
-	}
+	}, 0, 0)
 	httpx.RenderJSON(w, http.StatusCreated, out)
 }
 
@@ -196,7 +435,22 @@ func (h *ChildHandler) Get(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrNotFound, err))
 		return
 	}
-	httpx.RenderJSON(w, http.StatusOK, c)
+	// Aggregate per-child counts for this one id. We pull both the totals
+	// and the per-doc rows in two queries (SQLite, single-process server —
+	// the overhead is negligible).
+	var req, done int
+	_ = h.Pool.QueryRowContext(r.Context(), `
+		SELECT COUNT(*),
+		       COALESCE(SUM(CASE WHEN status IN ('uploaded','compliant') THEN 1 ELSE 0 END), 0)
+		  FROM child_documents_required WHERE child_id = ?`, id).Scan(&req, &done)
+	required, _ := loadChildRequiredDocs(r.Context(), h.Pool, id)
+	base := toChildResponse(c, req, done)
+	out := childDetailResponse{
+		childResponse: base,
+		RequiredDocs:  required,
+		Immunizations: make([]childImmunizationItem, 0),
+	}
+	httpx.RenderJSON(w, http.StatusOK, out)
 }
 
 // PATCH /api/children/{id}

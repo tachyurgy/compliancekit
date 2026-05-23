@@ -246,6 +246,11 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/drill-roster.pdf", d.Attendance.DrillRosterPDF)
 		}
 
+		// Settings → "Facility" card reads from here. Same camelCase shape
+		// CompleteOnboarding renders; the React provider Zod schema parses
+		// both responses uniformly.
+		r.Get("/provider", d.Providers.Get)
+
 		// Onboarding wizard finalize — admin-only. Flipping onboarding_complete
 		// and seeding staff/children is a tenant-wide write; gate it the same
 		// way as other provider-level mutations.

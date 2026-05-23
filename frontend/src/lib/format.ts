@@ -15,17 +15,26 @@ const DATE_SHORT = new Intl.DateTimeFormat('en-US', {
   year: '2-digit',
 });
 
+/**
+ * isMeaningfulDate — guards against Go's zero time.Time sentinel ("0001-01-01")
+ * leaking through JSON. Anything before 1900 is treated as "no date set"
+ * because nothing in this app legitimately predates 1900.
+ */
+export function isMeaningfulDate(d: Date): boolean {
+  return !Number.isNaN(d.getTime()) && d.getUTCFullYear() >= 1900;
+}
+
 export function formatDate(input: string | Date | null | undefined): string {
   if (!input) return '';
   const d = typeof input === 'string' ? new Date(input) : input;
-  if (Number.isNaN(d.getTime())) return '';
+  if (!isMeaningfulDate(d)) return '';
   return DATE_LONG.format(d);
 }
 
 export function formatDateShort(input: string | Date | null | undefined): string {
   if (!input) return '';
   const d = typeof input === 'string' ? new Date(input) : input;
-  if (Number.isNaN(d.getTime())) return '';
+  if (!isMeaningfulDate(d)) return '';
   return DATE_SHORT.format(d);
 }
 
@@ -33,7 +42,7 @@ export function formatDateShort(input: string | Date | null | undefined): string
 export function formatRelativeDays(input: string | Date | null | undefined): string {
   if (!input) return '';
   const d = typeof input === 'string' ? new Date(input) : input;
-  if (Number.isNaN(d.getTime())) return '';
+  if (!isMeaningfulDate(d)) return '';
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   d.setHours(0, 0, 0, 0);
@@ -50,7 +59,7 @@ export function formatRelativeDays(input: string | Date | null | undefined): str
 export function formatTimestamp(input: string | Date | null | undefined): string {
   if (!input) return '';
   const d = typeof input === 'string' ? new Date(input) : input;
-  if (Number.isNaN(d.getTime())) return '';
+  if (!isMeaningfulDate(d)) return '';
   const datePart = new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',

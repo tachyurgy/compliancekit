@@ -724,6 +724,91 @@ func (h *ProviderHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+// GET /api/provider — Settings page payload. Mirrors the response shape
+// of CompleteOnboarding's terminal render so the frontend ProviderSchema
+// parses the same fields whether the provider just completed onboarding
+// or is re-loading Settings. Defensive against NULL columns.
+func (h *ProviderHandler) Get(w http.ResponseWriter, r *http.Request) {
+	pid := mw.ProviderIDFrom(r.Context())
+	if pid == "" {
+		httpx.RenderError(w, r, httpx.ErrUnauthorized)
+		return
+	}
+	var (
+		outID, outName, outStateCode, outLicenseType, outAddr1, outCity, outStateRegion, outPostal string
+		outLicenseNumber, outAddr2                                                                 sql.NullString
+		outCapacity, outMinMonths, outMaxMonths                                                    int
+		outOnboarded                                                                               bool
+		outCreatedStr                                                                              string
+	)
+	err := h.Pool.QueryRowContext(r.Context(), `
+		SELECT id,
+		       COALESCE(name, legal_name, '') AS name,
+		       COALESCE(state_code, state, '') AS state_code,
+		       COALESCE(license_type, '') AS license_type,
+		       license_number,
+		       COALESCE(address_line1, '') AS address1,
+		       address_line2,
+		       COALESCE(city, '') AS city,
+		       COALESCE(state_abbr, '') AS state_region,
+		       COALESCE(postal_code, '') AS postal_code,
+		       COALESCE(capacity, 0),
+		       COALESCE(min_age_months, 0),
+		       COALESCE(max_age_months, 0),
+		       COALESCE(onboarding_complete, 0),
+		       created_at
+		  FROM providers WHERE id = ? AND deleted_at IS NULL`, pid).
+		Scan(&outID, &outName, &outStateCode, &outLicenseType, &outLicenseNumber,
+			&outAddr1, &outAddr2, &outCity, &outStateRegion, &outPostal,
+			&outCapacity, &outMinMonths, &outMaxMonths, &outOnboarded, &outCreatedStr)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			httpx.RenderError(w, r, httpx.ErrNotFound)
+			return
+		}
+		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
+		return
+	}
+
+	var licenseNumOut, addr2Out any
+	if outLicenseNumber.Valid {
+		licenseNumOut = outLicenseNumber.String
+	} else {
+		licenseNumOut = nil
+	}
+	if outAddr2.Valid {
+		addr2Out = outAddr2.String
+	} else {
+		addr2Out = nil
+	}
+	// licenseType may be empty for accounts that signed up before REQ-003
+	// added the column; default to "center" rather than send "" which fails
+	// the frontend Zod enum check.
+	if outLicenseType == "" {
+		outLicenseType = "center"
+	}
+
+	httpx.RenderJSON(w, http.StatusOK, map[string]any{
+		"id":            outID,
+		"name":          outName,
+		"stateCode":     outStateCode,
+		"licenseType":   outLicenseType,
+		"licenseNumber": licenseNumOut,
+		"address1":      outAddr1,
+		"address2":      addr2Out,
+		"city":          outCity,
+		"stateRegion":   outStateRegion,
+		"postalCode":    outPostal,
+		"capacity":      outCapacity,
+		"agesServedMonths": map[string]int{
+			"minMonths": outMinMonths,
+			"maxMonths": outMaxMonths,
+		},
+		"onboardingComplete": outOnboarded,
+		"createdAt":          parseSQLiteTime(outCreatedStr).Format(time.RFC3339),
+	})
+}
+
 // POST /api/children/{id}/portal-link — mint a parent-upload magic link
 // for a child. Admin-only. Returns { url, expires_at } so the admin can copy
 // and send the link out-of-band (SMS, email from their own account, etc.).

@@ -30,7 +30,7 @@ import {
   DRILL_CADENCE_DAYS,
   drillLabel,
 } from '@/api/operations';
-import { formatDate, formatRelativeDays } from '@/lib/format';
+import { formatDate, formatRelativeDays, isMeaningfulDate } from '@/lib/format';
 
 // ---------------------------------------------------------------------------
 // Page shell — tabs + routing-free sub-view switch.
@@ -117,11 +117,16 @@ function DrillsTab(): JSX.Element {
   });
 
   // Compute "last X drill was N days ago; overdue?" per kind.
+  // Ignore rows whose drill_date is the zero/sentinel value — those slipped
+  // in through a backend bug; treating them as legitimate produces the
+  // "739759 days ago" rendering.
   const lastByKind = useMemo(() => {
     const m = new Map<DrillKind, DrillLog>();
     for (const d of drills) {
+      const dDate = new Date(d.drill_date);
+      if (!isMeaningfulDate(dDate)) continue;
       const prev = m.get(d.drill_kind);
-      if (!prev || new Date(d.drill_date) > new Date(prev.drill_date)) {
+      if (!prev || dDate > new Date(prev.drill_date)) {
         m.set(d.drill_kind, d);
       }
     }

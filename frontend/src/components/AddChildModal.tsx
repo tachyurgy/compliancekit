@@ -28,17 +28,17 @@ export default function AddChildModal({
   onCreated,
 }: AddChildModalProps): JSX.Element {
   const [form, setForm] = useState({
-    first_name: '',
-    last_name: '',
-    date_of_birth: '',
-    enroll_date: '',
+    firstName: '',
+    lastName: '',
+    dateOfBirth: '',
+    enrollmentDate: '',
     classroom: '',
     allergies: '',
     medical_conditions: '',
-    parent_name: '',
-    parent_email: '',
-    parent_phone: '',
-    preferred_contact_channel: 'email' as 'email' | 'sms' | 'both',
+    parentName: '',
+    parentEmail: '',
+    parentPhone: '',
+    preferredContactChannel: 'email' as 'email' | 'sms' | 'both',
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -49,14 +49,14 @@ export default function AddChildModal({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
-    if (!form.first_name || !form.last_name || !form.date_of_birth) {
+    if (!form.firstName || !form.lastName || !form.dateOfBirth) {
       setErr("Name and date of birth are required to start a child's file.");
       return;
     }
     if (
-      (form.preferred_contact_channel === 'sms' ||
-        form.preferred_contact_channel === 'both') &&
-      !form.parent_phone
+      (form.preferredContactChannel === 'sms' ||
+        form.preferredContactChannel === 'both') &&
+      !form.parentPhone
     ) {
       setErr('Phone is required when text is the preferred channel.');
       return;
@@ -65,8 +65,8 @@ export default function AddChildModal({
     try {
       const body = {
         ...form,
-        date_of_birth: new Date(form.date_of_birth).toISOString(),
-        enroll_date: form.enroll_date ? new Date(form.enroll_date).toISOString() : undefined,
+        dateOfBirth: new Date(form.dateOfBirth).toISOString(),
+        enrollmentDate: form.enrollmentDate ? new Date(form.enrollmentDate).toISOString() : undefined,
       };
       const r = await fetch(`${API_BASE}/api/children`, {
         method: 'POST',
@@ -97,6 +97,7 @@ export default function AddChildModal({
     <Modal
       open={open}
       onClose={onClose}
+      size="lg"
       title="Add a child"
       description="We'll start tracking their file and chase the parents for any missing forms."
       footer={
@@ -119,27 +120,27 @@ export default function AddChildModal({
         <Input
           label="First name"
           required
-          value={form.first_name}
-          onChange={(e) => setField('first_name', e.target.value)}
+          value={form.firstName}
+          onChange={(e) => setField('firstName', e.target.value)}
         />
         <Input
           label="Last name"
           required
-          value={form.last_name}
-          onChange={(e) => setField('last_name', e.target.value)}
+          value={form.lastName}
+          onChange={(e) => setField('lastName', e.target.value)}
         />
         <Input
           label="Date of birth"
           type="date"
           required
-          value={form.date_of_birth}
-          onChange={(e) => setField('date_of_birth', e.target.value)}
+          value={form.dateOfBirth}
+          onChange={(e) => setField('dateOfBirth', e.target.value)}
         />
         <Input
           label="Enrollment date"
           type="date"
-          value={form.enroll_date}
-          onChange={(e) => setField('enroll_date', e.target.value)}
+          value={form.enrollmentDate}
+          onChange={(e) => setField('enrollmentDate', e.target.value)}
         />
         <Input
           label="Room"
@@ -169,28 +170,28 @@ export default function AddChildModal({
         </div>
         <Input
           label="Parent name"
-          value={form.parent_name}
-          onChange={(e) => setField('parent_name', e.target.value)}
+          value={form.parentName}
+          onChange={(e) => setField('parentName', e.target.value)}
         />
         <Input
           label="Parent email"
           type="email"
-          value={form.parent_email}
-          onChange={(e) => setField('parent_email', e.target.value)}
+          value={form.parentEmail}
+          onChange={(e) => setField('parentEmail', e.target.value)}
         />
         <Input
           label="Parent phone"
           type="tel"
-          value={form.parent_phone}
-          onChange={(e) => setField('parent_phone', e.target.value)}
+          value={form.parentPhone}
+          onChange={(e) => setField('parentPhone', e.target.value)}
           placeholder="(305) 555-0100"
         />
         <Select
           label="Preferred channel"
-          value={form.preferred_contact_channel}
+          value={form.preferredContactChannel}
           onChange={(e) =>
             setField(
-              'preferred_contact_channel',
+              'preferredContactChannel',
               e.target.value as 'email' | 'sms' | 'both',
             )
           }

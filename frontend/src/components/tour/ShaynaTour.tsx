@@ -137,9 +137,11 @@ export default function ShaynaTour({ hasDemoData }: Props): JSX.Element | null {
               Step 2 of 4 · Inspector Mode
             </div>
             <p className="mt-1 text-sm text-ink-800 leading-relaxed">
-              Hand the iPad to your counselor. That's it. No screenshots, no
-              binder, no "let me find that file." This is what every
-              competitor makes you build by hand.
+              When your counselor walks in, tap <strong>Inspector Mode</strong>{' '}
+              and hand them the iPad. This is the exact view they see — the
+              same CF-FSP 5316 they fill out by hand. No screenshots, no
+              binder, no "let me find that file." Every file you'll need on
+              one screen, evidence one tap away.
             </p>
           </div>
         </div>
@@ -156,11 +158,12 @@ export default function ShaynaTour({ hasDemoData }: Props): JSX.Element | null {
   if (tour.step === 'magic_link') {
     return (
       <FloatingPanel onSkip={tour.skip}>
-        <FloatingHeader step="Step 3 of 4" title="Close a gap in one tap." />
+        <FloatingHeader step="Step 3 of 4" title="Chase Mode does this for you." />
         <p className="text-sm text-ink-700 leading-relaxed">
-          Liam Davis is missing his DH-680. Send his mom Karina a link — she
-          opens it on her phone, snaps a photo at the pediatrician's office,
-          and we file it for you.
+          Liam Davis is missing his DH-680. <strong>Chase Mode</strong> already
+          texted his mom Karina a private link. She'll snap a photo at the
+          pediatrician's office, we OCR it, and it lands in Liam's file —
+          while you keep teaching. Tap below to see the link we sent.
         </p>
         <div className="mt-3 rounded-lb-sm border border-ink-200 bg-white p-3 text-sm">
           <div className="text-xs uppercase tracking-wide text-ink-500 font-semibold">

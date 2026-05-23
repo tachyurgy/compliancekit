@@ -53,7 +53,7 @@ export default function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative w-full ${sizes[size]} bg-white rounded-lb shadow-elevated border border-line`}
+        className={`relative w-full ${sizes[size]} bg-white rounded-lb shadow-elevated border border-line max-h-[calc(100vh-2rem)] flex flex-col`}
       >
         <button
           type="button"
@@ -64,16 +64,16 @@ export default function Modal({
           <X className="h-4 w-4" />
         </button>
         {(title || description) && (
-          <div className="px-5 pt-5 pb-3 border-b border-line-soft">
+          <div className="px-5 pt-5 pb-3 border-b border-line-soft shrink-0">
             {title && <h2 className="text-lg font-semibold text-ink-900">{title}</h2>}
             {description && (
               <p className="mt-1 text-sm text-ink-700">{description}</p>
             )}
           </div>
         )}
-        <div className="px-5 py-4">{children}</div>
+        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">{children}</div>
         {footer && (
-          <div className="px-5 py-3 border-t border-line-soft bg-surface-muted flex justify-end gap-2 rounded-b-lg">
+          <div className="px-5 py-3 border-t border-line-soft bg-surface-muted flex justify-end gap-2 rounded-b-lg shrink-0">
             {footer}
           </div>
         )}

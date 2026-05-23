@@ -95,7 +95,8 @@ type Deps struct {
 	Drills          *handlers.DrillHandler
 	Postings        *handlers.PostingHandler
 	Ratio           *handlers.RatioHandler
-	EvidencePhotos  *handlers.EvidencePhotoHandler // REQ-038
+	EvidencePhotos  *handlers.EvidencePhotoHandler  // REQ-038
+	RatioCurrent    *handlers.RatioCurrentHandler   // REQ-039: per-room computed ratio
 	Inspections     *handlers.InspectionHandler
 	InspectionMode  *handlers.InspectionModeHandler
 	AuditLog        *handlers.AuditLogHandler
@@ -245,6 +246,12 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/attendance/today", d.Attendance.Today)
 			r.Get("/attendance/history", d.Attendance.History)
 			r.Get("/drill-roster.pdf", d.Attendance.DrillRosterPDF)
+		}
+
+		// REQ-039: per-room computed ratio snapshot. Read-only — the old
+		// /api/facility/ratio-check remains for back-compat.
+		if d.RatioCurrent != nil {
+			r.Get("/ratio/current", d.RatioCurrent.Get)
 		}
 
 		// Settings → "Facility" card reads from here. Same camelCase shape

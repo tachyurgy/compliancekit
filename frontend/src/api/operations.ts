@@ -148,7 +148,39 @@ export const operationsApi = {
     });
     return RatioCheckResponseSchema.parse(data);
   },
+
+  // REQ-039 — per-room computed ratio snapshot. Read-only. The handler
+  // joins rooms × today's attendance × FL ratio table and labels each
+  // room compliant / tight / out_of_ratio.
+  async getCurrentRatio(): Promise<RatioCurrentResponse> {
+    const data = await apiFetch<unknown>('/api/ratio/current');
+    return RatioCurrentResponseSchema.parse(data);
+  },
 };
+
+// REQ-039: shape of /api/ratio/current.
+export const RoomRatioStatusSchema = z.object({
+  room_id: z.string(),
+  room_name: z.string(),
+  age_band: z.string(),
+  age_band_label: z.string(),
+  mandated_ratio: z.number().int().default(0),
+  children_present: z.number().int().default(0),
+  staff_present: z.number().int().default(0),
+  status: z.enum(['compliant', 'tight', 'out_of_ratio', 'unknown']),
+  explainer: z.string().default(''),
+});
+export type RoomRatioStatus = z.infer<typeof RoomRatioStatusSchema>;
+
+export const RatioCurrentResponseSchema = z.object({
+  state: z.string(),
+  as_of: z.string(),
+  staff_present_total: z.number().int(),
+  children_present_total: z.number().int(),
+  rooms: z.array(RoomRatioStatusSchema),
+  any_out_of_ratio: z.boolean(),
+});
+export type RatioCurrentResponse = z.infer<typeof RatioCurrentResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Helpers

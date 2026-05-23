@@ -1,7 +1,6 @@
-import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MessageSquare, Send, AlertCircle, Clock, Zap } from 'lucide-react';
+import { Mail, Phone, MessageSquare, Send, AlertCircle, Clock, Zap, MessageCircle } from 'lucide-react';
 
 import PageHeader from '@/components/common/PageHeader';
 import Card from '@/components/common/Card';
@@ -79,6 +78,11 @@ export default function ChasePage(): JSX.Element {
           </span>
         }
         description="Levelbrook does the chasing. Here's what's open right now, what already went out, and who needs a personal call."
+        actions={
+          <Link to="/messages/new">
+            <Button leftIcon={<MessageCircle className="h-4 w-4" />}>Send a message</Button>
+          </Link>
+        }
       />
 
       {stuck.length > 0 && (

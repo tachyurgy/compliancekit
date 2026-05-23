@@ -1,6 +1,6 @@
 package handlers
 
-// REQ-039: replace the free-text ratio input with a per-room computed
+// REQ-040: replace the free-text ratio input with a per-room computed
 // display.  Florida law sets staff:child ratios by age band (Handbook
 // §3.4), not by operator preference. The Operations → Ratio tab used to
 // ask "how many staff per child do you want?" — wrong, and not what

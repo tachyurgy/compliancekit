@@ -1,6 +1,6 @@
 package handlers
 
-// REQ-038: arbitrary photo evidence on drills + postings (and any other
+// REQ-039: arbitrary photo evidence on drills + postings (and any other
 // subject — schema's generic). We store the bytes in S3 the same way
 // document uploads do, but skip OCR/extraction. The point is just "snap
 // a photo, attach it to this drill/posting so the inspector can see

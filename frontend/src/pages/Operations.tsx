@@ -20,6 +20,7 @@ import Select from '@/components/common/Select';
 import Modal from '@/components/common/Modal';
 import EmptyState from '@/components/common/EmptyState';
 import { toast } from '@/components/common/Toast';
+import EvidencePhotos from '@/components/EvidencePhotos';
 import {
   operationsApi,
   type DrillKind,
@@ -98,6 +99,7 @@ const DRILL_KINDS: DrillKind[] = [
 function DrillsTab(): JSX.Element {
   const qc = useQueryClient();
   const [showModal, setShowModal] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: drills = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['drills'],
@@ -237,38 +239,62 @@ function DrillsTab(): JSX.Element {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-soft">
-                {drills.map((d) => (
-                  <tr key={d.id} className="hover:bg-surface-muted">
-                    <td className="px-5 py-3 font-medium text-ink-900 capitalize">
-                      {drillLabel(d.drill_kind)}
-                    </td>
-                    <td className="px-5 py-3 text-ink-700">
-                      {formatDate(d.drill_date)}
-                    </td>
-                    <td className="px-5 py-3 text-ink-700">
-                      {d.duration_seconds
-                        ? formatDuration(d.duration_seconds)
-                        : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-ink-700 max-w-md truncate">
-                      {d.notes || '—'}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <button
-                        type="button"
-                        aria-label="Delete drill"
-                        onClick={() => {
-                          if (confirm('Delete this drill log?')) {
-                            deleteMutation.mutate(d.id);
-                          }
-                        }}
-                        className="p-1 rounded text-ink-400 hover:text-critical-600 hover:bg-critical-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {drills.map((d) => {
+                  const isOpen = expandedId === d.id;
+                  return (
+                    <>
+                      <tr key={d.id} className="hover:bg-surface-muted">
+                        <td className="px-5 py-3 font-medium text-ink-900 capitalize">
+                          {drillLabel(d.drill_kind)}
+                        </td>
+                        <td className="px-5 py-3 text-ink-700">
+                          {formatDate(d.drill_date)}
+                        </td>
+                        <td className="px-5 py-3 text-ink-700">
+                          {d.duration_seconds
+                            ? formatDuration(d.duration_seconds)
+                            : '—'}
+                        </td>
+                        <td className="px-5 py-3 text-ink-700 max-w-md truncate">
+                          {d.notes || '—'}
+                        </td>
+                        <td className="px-5 py-3 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedId(isOpen ? null : d.id)}
+                            className="text-xs text-ink-600 hover:text-brand-700 mr-3"
+                          >
+                            {isOpen ? 'Hide photos' : 'Photos'}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Delete drill"
+                            onClick={() => {
+                              if (confirm('Delete this drill log?')) {
+                                deleteMutation.mutate(d.id);
+                              }
+                            }}
+                            className="p-1 rounded text-ink-400 hover:text-critical-600 hover:bg-critical-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr key={`${d.id}-photos`} className="bg-surface-muted">
+                          <td colSpan={5} className="px-5 py-4">
+                            <EvidencePhotos
+                              subjectKind="drill"
+                              subjectId={d.id}
+                              title="Drill photos"
+                              compact
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -514,39 +540,55 @@ function PostingRow({
   pending: boolean;
 }): JSX.Element {
   const posted = !!item.posted_at;
+  const [showPhotos, setShowPhotos] = useState(false);
   return (
-    <li className="flex items-start gap-3 px-5 py-4">
-      <button
-        type="button"
-        onClick={() => onToggle(!posted)}
-        disabled={pending}
-        aria-pressed={posted}
-        aria-label={posted ? 'Mark as not posted' : 'Mark as posted'}
-        className={`mt-0.5 h-6 w-6 flex-shrink-0 rounded-full border-2 grid place-items-center transition-colors ${
-          posted
-            ? 'bg-brand-600 border-brand-600 text-white'
-            : 'border-line hover:border-brand-400'
-        }`}
-      >
-        {posted ? (
-          <CheckCircle2 className="h-4 w-4" />
-        ) : (
-          <Circle className="h-4 w-4 text-transparent" />
-        )}
-      </button>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-ink-900">{item.label}</span>
-          {!item.required && <Badge variant="neutral">Optional</Badge>}
+    <li className="px-5 py-4">
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={() => onToggle(!posted)}
+          disabled={pending}
+          aria-pressed={posted}
+          aria-label={posted ? 'Mark as not posted' : 'Mark as posted'}
+          className={`mt-0.5 h-6 w-6 flex-shrink-0 rounded-full border-2 grid place-items-center transition-colors ${
+            posted
+              ? 'bg-brand-600 border-brand-600 text-white'
+              : 'border-line hover:border-brand-400'
+          }`}
+        >
+          {posted ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : (
+            <Circle className="h-4 w-4 text-transparent" />
+          )}
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-ink-900">{item.label}</span>
+            {!item.required && <Badge variant="neutral">Optional</Badge>}
+          </div>
+          <div className="text-xs text-ink-500 mt-0.5">
+            {posted ? `Posted ${formatDate(item.posted_at!)}` : 'Not yet posted'}
+          </div>
         </div>
-        <div className="text-xs text-ink-500 mt-0.5">
-          {posted
-            ? `Posted ${formatDate(item.posted_at!)}`
-            : 'Not yet posted'}
-          {item.photo_document_id && ' • photo on file'}
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowPhotos((v) => !v)}
+          className="text-xs text-ink-600 hover:text-brand-700 self-center"
+        >
+          {showPhotos ? 'Hide photos' : 'Photos'}
+        </button>
       </div>
-      {/* Photo upload is stubbed — the Documents upload flow already exists; hook it up later. */}
+      {showPhotos && (
+        <div className="mt-3 ml-9 pt-3 border-t border-line-soft">
+          <EvidencePhotos
+            subjectKind="posting"
+            subjectId={item.key}
+            title={`Photos for "${item.label}"`}
+            compact
+          />
+        </div>
+      )}
     </li>
   );
 }

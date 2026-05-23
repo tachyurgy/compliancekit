@@ -95,6 +95,7 @@ type Deps struct {
 	Drills          *handlers.DrillHandler
 	Postings        *handlers.PostingHandler
 	Ratio           *handlers.RatioHandler
+	EvidencePhotos  *handlers.EvidencePhotoHandler // REQ-038
 	Inspections     *handlers.InspectionHandler
 	InspectionMode  *handlers.InspectionModeHandler
 	AuditLog        *handlers.AuditLogHandler
@@ -377,6 +378,20 @@ func NewRouter(d Deps) http.Handler {
 			r.Group(adminOnly(func(r chi.Router) {
 				r.Post("/demo/purge", d.Demo.Purge)
 			}))
+		}
+
+		// REQ-038: evidence photos. List is open to provider users; the
+		// upload + edit + delete paths are admin-only because they touch
+		// S3 and the audit log.
+		if d.EvidencePhotos != nil {
+			r.Route("/evidence-photos", func(r chi.Router) {
+				r.Get("/", d.EvidencePhotos.List)
+				r.Group(adminOnly(func(r chi.Router) {
+					r.Post("/", d.EvidencePhotos.Create)
+					r.Patch("/{id}", d.EvidencePhotos.Update)
+					r.Delete("/{id}", d.EvidencePhotos.Delete)
+				}))
+			})
 		}
 
 		// Facility & Operations: drills, wall postings, ratio checks.

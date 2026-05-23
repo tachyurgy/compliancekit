@@ -120,6 +120,7 @@ func (h *TestHelperHandler) Reset(w http.ResponseWriter, r *http.Request) {
 		"data_exports",
 		"compliance_snapshots",
 		"chase_events",
+		"outgoing_messages",
 		"document_chase_sends",
 		"document_ocr_results",
 		"document_unassigned_photos",

@@ -223,6 +223,7 @@ var tablesWithProviderFK = []struct {
 	{"staff", `DELETE FROM staff WHERE provider_id = ?`},
 	{"compliance_snapshots", `DELETE FROM compliance_snapshots WHERE provider_id = ?`},
 	{"chase_events", `DELETE FROM chase_events WHERE provider_id = ?`},
+	{"outgoing_messages", `DELETE FROM outgoing_messages WHERE provider_id = ?`},
 	{"data_exports", `DELETE FROM data_exports WHERE provider_id = ?`},
 	{"sessions", `DELETE FROM sessions WHERE provider_id = ?`},
 	{"subscriptions", `DELETE FROM subscriptions WHERE provider_id = ?`},

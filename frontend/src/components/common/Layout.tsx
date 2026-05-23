@@ -14,6 +14,7 @@ import {
   FlaskConical,
   ScrollText,
   Scale,
+  Zap,
 } from 'lucide-react';
 
 import { useSession } from '@/hooks/useSession';
@@ -28,6 +29,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/chase', label: 'Chase Mode', icon: Zap },
   { to: '/children', label: 'Children', icon: Baby },
   { to: '/staff', label: 'Staff', icon: Users },
   { to: '/operations', label: 'Operations', icon: ClipboardCheck },

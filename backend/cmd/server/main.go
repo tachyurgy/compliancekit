@@ -206,6 +206,11 @@ func run() error {
 		Pool: pool, Nag: nag,
 		Log: log.With("component", "chase_dashboard"),
 	}
+	// REQ-039: free-form message composer.
+	messagesH := &handlers.MessagesHandler{
+		Pool: pool, Emailer: emailer, SMS: sms,
+		Log: log.With("component", "messages"),
+	}
 	facility := &handlers.FacilityHandler{Pool: pool, Log: log.With("component", "facility")}
 	uploadLink := &handlers.UploadLinkHandler{
 		Pool: pool, Magic: magic, FrontendBase: cfg.FrontendBaseURL,
@@ -303,6 +308,7 @@ func run() error {
 		Contact:         contact,
 		Nag:             nag,
 		Chase:           chaseH,
+		Messages:        messagesH,
 		Facility:        facility,
 		UploadLink:      uploadLink,
 		Score:           scoreH,

@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  BookOpen,
   CheckCircle2,
   ChevronLeft,
   Download,
@@ -20,6 +21,10 @@ import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { inspectionsApi } from '@/api/inspections';
+import {
+  getExplainer,
+  hasExplainer,
+} from '@/lib/inspectionExplainers';
 import type {
   Answer,
   DomainBreakdown,
@@ -62,6 +67,82 @@ function domainOfItemIndex(detail: RunDetail, index: number): { name: string; po
     }
   }
   return { name: '', position: 0, total: domains.length };
+}
+
+// --- REQ-040 explainer block ---
+//
+// Renders a calm "Learn more" affordance under each inspection question.
+// Native <details>/<summary> so it works without a JS dependency and is
+// keyboard-accessible by default. Curated items pull from
+// inspectionExplainers; everything else falls back to a short note.
+
+function ExplainerBlock({
+  itemId,
+  reference,
+}: {
+  itemId: string;
+  reference: string;
+}): JSX.Element {
+  const exp = getExplainer(itemId);
+  const curated = hasExplainer(itemId);
+  // Curated items get the item's own reference if we didn't hard-code one.
+  const source = exp.source || reference;
+  return (
+    <details className="mt-4 rounded-lg border border-line-soft bg-surface-muted text-sm group">
+      <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-ink-700 hover:text-ink-900 select-none">
+        <BookOpen className="h-4 w-4 text-ink-500" />
+        <span className="font-medium">
+          {curated ? 'Learn more' : "We're still writing this up"}
+        </span>
+        <span className="ml-auto text-xs text-ink-500 group-open:hidden">
+          Open
+        </span>
+        <span className="ml-auto text-xs text-ink-500 hidden group-open:inline">
+          Close
+        </span>
+      </summary>
+      <div className="px-3 pb-3 pt-1 space-y-3">
+        <div>
+          <div className="text-xs uppercase tracking-wide text-ink-500 font-medium">
+            What this means
+          </div>
+          <p className="text-sm text-ink-800 mt-1 leading-snug">{exp.meaning}</p>
+        </div>
+        {exp.steps.length > 0 && (
+          <div>
+            <div className="text-xs uppercase tracking-wide text-ink-500 font-medium">
+              How to satisfy this
+            </div>
+            <ol className="mt-1 list-decimal list-inside space-y-1 text-sm text-ink-800">
+              {exp.steps.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ol>
+          </div>
+        )}
+        {source && (
+          <div>
+            <div className="text-xs uppercase tracking-wide text-ink-500 font-medium">
+              Where the rule comes from
+            </div>
+            <p className="text-xs text-ink-700 mt-1">{source}</p>
+          </div>
+        )}
+        {!curated && (
+          <p className="text-xs text-ink-500 italic">
+            Need a steer? Email{' '}
+            <a
+              href="mailto:levelbrookteam@gmail.com"
+              className="underline hover:text-ink-700"
+            >
+              levelbrookteam@gmail.com
+            </a>{' '}
+            and we'll walk you through it.
+          </p>
+        )}
+      </div>
+    </details>
+  );
 }
 
 // --- summary sub-view (post-finalize) ---
@@ -198,6 +279,10 @@ function SummaryView({ detail }: { detail: RunDetail }): JSX.Element {
                   {c.note ? (
                     <div className="text-xs text-ink-700 mt-1 italic">Note: {c.note}</div>
                   ) : null}
+                  {/* REQ-040: same explainer here so the post-mortem
+                      doesn't force the operator to redo the whole
+                      inspection to learn what to fix. */}
+                  <ExplainerBlock itemId={c.item_id} reference={c.reference} />
                 </div>
               </li>
             ))}
@@ -336,6 +421,10 @@ function Wizard({ detail }: { detail: RunDetail }): JSX.Element {
         <p className="text-lg sm:text-xl text-ink-900 leading-snug font-medium">
           {current.question}
         </p>
+
+        {/* REQ-040: plain-English explainer for the question. Curated for
+            the highest-stakes items; a calm fallback otherwise. */}
+        <ExplainerBlock itemId={current.id} reference={current.reference} />
 
         {/* Big answer buttons — tablet-first */}
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -20,13 +20,13 @@ import Select from '@/components/common/Select';
 import Modal from '@/components/common/Modal';
 import EmptyState from '@/components/common/EmptyState';
 import { toast } from '@/components/common/Toast';
+import EvidencePhotos from '@/components/EvidencePhotos';
 import {
   operationsApi,
   type DrillKind,
   type DrillLog,
   type PostingItem,
-  type RoomInput,
-  type RatioCheckResponse,
+  type RoomRatioStatus,
   DRILL_CADENCE_DAYS,
   drillLabel,
 } from '@/api/operations';
@@ -98,6 +98,7 @@ const DRILL_KINDS: DrillKind[] = [
 function DrillsTab(): JSX.Element {
   const qc = useQueryClient();
   const [showModal, setShowModal] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: drills = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['drills'],
@@ -237,38 +238,62 @@ function DrillsTab(): JSX.Element {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-soft">
-                {drills.map((d) => (
-                  <tr key={d.id} className="hover:bg-surface-muted">
-                    <td className="px-5 py-3 font-medium text-ink-900 capitalize">
-                      {drillLabel(d.drill_kind)}
-                    </td>
-                    <td className="px-5 py-3 text-ink-700">
-                      {formatDate(d.drill_date)}
-                    </td>
-                    <td className="px-5 py-3 text-ink-700">
-                      {d.duration_seconds
-                        ? formatDuration(d.duration_seconds)
-                        : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-ink-700 max-w-md truncate">
-                      {d.notes || '—'}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <button
-                        type="button"
-                        aria-label="Delete drill"
-                        onClick={() => {
-                          if (confirm('Delete this drill log?')) {
-                            deleteMutation.mutate(d.id);
-                          }
-                        }}
-                        className="p-1 rounded text-ink-400 hover:text-critical-600 hover:bg-critical-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {drills.map((d) => {
+                  const isOpen = expandedId === d.id;
+                  return (
+                    <>
+                      <tr key={d.id} className="hover:bg-surface-muted">
+                        <td className="px-5 py-3 font-medium text-ink-900 capitalize">
+                          {drillLabel(d.drill_kind)}
+                        </td>
+                        <td className="px-5 py-3 text-ink-700">
+                          {formatDate(d.drill_date)}
+                        </td>
+                        <td className="px-5 py-3 text-ink-700">
+                          {d.duration_seconds
+                            ? formatDuration(d.duration_seconds)
+                            : '—'}
+                        </td>
+                        <td className="px-5 py-3 text-ink-700 max-w-md truncate">
+                          {d.notes || '—'}
+                        </td>
+                        <td className="px-5 py-3 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedId(isOpen ? null : d.id)}
+                            className="text-xs text-ink-600 hover:text-brand-700 mr-3"
+                          >
+                            {isOpen ? 'Hide photos' : 'Photos'}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Delete drill"
+                            onClick={() => {
+                              if (confirm('Delete this drill log?')) {
+                                deleteMutation.mutate(d.id);
+                              }
+                            }}
+                            className="p-1 rounded text-ink-400 hover:text-critical-600 hover:bg-critical-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr key={`${d.id}-photos`} className="bg-surface-muted">
+                          <td colSpan={5} className="px-5 py-4">
+                            <EvidencePhotos
+                              subjectKind="drill"
+                              subjectId={d.id}
+                              title="Drill photos"
+                              compact
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -514,271 +539,205 @@ function PostingRow({
   pending: boolean;
 }): JSX.Element {
   const posted = !!item.posted_at;
+  const [showPhotos, setShowPhotos] = useState(false);
   return (
-    <li className="flex items-start gap-3 px-5 py-4">
-      <button
-        type="button"
-        onClick={() => onToggle(!posted)}
-        disabled={pending}
-        aria-pressed={posted}
-        aria-label={posted ? 'Mark as not posted' : 'Mark as posted'}
-        className={`mt-0.5 h-6 w-6 flex-shrink-0 rounded-full border-2 grid place-items-center transition-colors ${
-          posted
-            ? 'bg-brand-600 border-brand-600 text-white'
-            : 'border-line hover:border-brand-400'
-        }`}
-      >
-        {posted ? (
-          <CheckCircle2 className="h-4 w-4" />
-        ) : (
-          <Circle className="h-4 w-4 text-transparent" />
-        )}
-      </button>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-ink-900">{item.label}</span>
-          {!item.required && <Badge variant="neutral">Optional</Badge>}
+    <li className="px-5 py-4">
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={() => onToggle(!posted)}
+          disabled={pending}
+          aria-pressed={posted}
+          aria-label={posted ? 'Mark as not posted' : 'Mark as posted'}
+          className={`mt-0.5 h-6 w-6 flex-shrink-0 rounded-full border-2 grid place-items-center transition-colors ${
+            posted
+              ? 'bg-brand-600 border-brand-600 text-white'
+              : 'border-line hover:border-brand-400'
+          }`}
+        >
+          {posted ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : (
+            <Circle className="h-4 w-4 text-transparent" />
+          )}
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-ink-900">{item.label}</span>
+            {!item.required && <Badge variant="neutral">Optional</Badge>}
+          </div>
+          <div className="text-xs text-ink-500 mt-0.5">
+            {posted ? `Posted ${formatDate(item.posted_at!)}` : 'Not yet posted'}
+          </div>
         </div>
-        <div className="text-xs text-ink-500 mt-0.5">
-          {posted
-            ? `Posted ${formatDate(item.posted_at!)}`
-            : 'Not yet posted'}
-          {item.photo_document_id && ' • photo on file'}
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowPhotos((v) => !v)}
+          className="text-xs text-ink-600 hover:text-brand-700 self-center"
+        >
+          {showPhotos ? 'Hide photos' : 'Photos'}
+        </button>
       </div>
-      {/* Photo upload is stubbed — the Documents upload flow already exists; hook it up later. */}
+      {showPhotos && (
+        <div className="mt-3 ml-9 pt-3 border-t border-line-soft">
+          <EvidencePhotos
+            subjectKind="posting"
+            subjectId={item.key}
+            title={`Photos for "${item.label}"`}
+            compact
+          />
+        </div>
+      )}
     </li>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Ratio tab
+// Ratio tab — REQ-039
+// Ratios are prescribed by Florida (Handbook §3.4), not by an operator
+// pref. Show today's room-by-room snapshot, computed from rooms +
+// attendance, with calm color bands. No text input — there's nothing for
+// the operator to type.
 // ---------------------------------------------------------------------------
 
-interface RoomRow extends RoomInput {
-  _id: string;
-}
-
-function newRoom(): RoomRow {
-  return {
-    _id: Math.random().toString(36).slice(2),
-    label: '',
-    age_months_low: 24,
-    age_months_high: 36,
-    children_present: 0,
-    staff_present: 1,
-  };
-}
-
 function RatioTab(): JSX.Element {
-  const qc = useQueryClient();
-  const [rooms, setRooms] = useState<RoomRow[]>(() => [
-    { ...newRoom(), label: 'Room 1' },
-  ]);
-  const [result, setResult] = useState<RatioCheckResponse | null>(null);
-
-  const check = useMutation({
-    mutationFn: () =>
-      operationsApi.checkRatio(
-        rooms.map(({ _id, ...r }) => ({ ...r, label: r.label || 'Room' })),
-      ),
-    onSuccess: (res) => {
-      setResult(res);
-      void qc.invalidateQueries({ queryKey: ['dashboard'] });
-      toast[res.ok ? 'success' : 'warning'](
-        res.ok
-          ? 'All rooms are within ratio.'
-          : `Over ratio in: ${res.violated_rooms.join(', ')}`,
-      );
-    },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : 'Ratio check failed');
-    },
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['ratio-current'],
+    queryFn: () => operationsApi.getCurrentRatio(),
+    refetchInterval: 60_000, // recompute every minute so the room cards stay live
   });
 
-  function update(id: string, patch: Partial<RoomInput>) {
-    setRooms((prev) =>
-      prev.map((r) => (r._id === id ? { ...r, ...patch } : r)),
+  if (isLoading) {
+    return (
+      <Card padded>
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="skeleton h-16 w-full" />
+          ))}
+        </div>
+      </Card>
     );
   }
 
-  function removeRoom(id: string) {
-    setRooms((prev) => prev.filter((r) => r._id !== id));
+  if (isError || !data) {
+    return (
+      <Card padded>
+        <div className="flex items-start gap-3 text-critical-700">
+          <AlertTriangle className="h-5 w-5 mt-0.5" />
+          <div>
+            <div className="font-medium">Couldn't load today's ratio</div>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="mt-3"
+              onClick={() => refetch()}
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
   }
-
-  const resultByLabel = useMemo(() => {
-    const m = new Map<string, RatioCheckResponse['rooms'][number]>();
-    if (result) {
-      for (const r of result.rooms) {
-        m.set(r.label, r);
-      }
-    }
-    return m;
-  }, [result]);
 
   return (
     <>
-      <Card title="Rooms" padded className="mb-6">
-        <div className="space-y-4">
-          {rooms.map((r) => {
-            const rr = resultByLabel.get(r.label || 'Room');
-            return (
-              <div
-                key={r._id}
-                className={`rounded-lg border p-4 ${
-                  rr
-                    ? rr.in_ratio
-                      ? 'border-brand-200 bg-brand-50'
-                      : 'border-critical-200 bg-critical-50'
-                    : 'border-line-soft bg-white'
-                }`}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                  <Input
-                    label="Room label"
-                    value={r.label}
-                    onChange={(e) => update(r._id, { label: e.target.value })}
-                    placeholder="e.g. Infants"
-                  />
-                  <Input
-                    label="Min age (mo)"
-                    type="number"
-                    min={0}
-                    value={r.age_months_low}
-                    onChange={(e) =>
-                      update(r._id, {
-                        age_months_low: parseInt(e.target.value || '0', 10),
-                      })
-                    }
-                  />
-                  <Input
-                    label="Max age (mo)"
-                    type="number"
-                    min={0}
-                    value={r.age_months_high}
-                    onChange={(e) =>
-                      update(r._id, {
-                        age_months_high: parseInt(e.target.value || '0', 10),
-                      })
-                    }
-                  />
-                  <Input
-                    label="Children present"
-                    type="number"
-                    min={0}
-                    value={r.children_present}
-                    onChange={(e) =>
-                      update(r._id, {
-                        children_present: parseInt(e.target.value || '0', 10),
-                      })
-                    }
-                  />
-                  <Input
-                    label="Staff present"
-                    type="number"
-                    min={0}
-                    value={r.staff_present}
-                    onChange={(e) =>
-                      update(r._id, {
-                        staff_present: parseInt(e.target.value || '0', 10),
-                      })
-                    }
-                  />
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <div className="text-xs text-ink-700">
-                    {rr ? (
-                      rr.in_ratio ? (
-                        <Badge variant="compliant">
-                          In ratio — cap 1:{rr.ratio_cap}
-                        </Badge>
-                      ) : (
-                        <Badge variant="critical">
-                          OVER ratio — cap 1:{rr.ratio_cap}, actual 1:
-                          {rr.actual_ratio.toFixed(1)}
-                        </Badge>
-                      )
-                    ) : (
-                      <span>Enter values and run the check.</span>
-                    )}
-                  </div>
-                  {rooms.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeRoom(r._id)}
-                      className="text-sm text-ink-500 hover:text-critical-600 inline-flex items-center gap-1"
-                    >
-                      <Trash2 className="h-4 w-4" /> Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 flex flex-wrap justify-between gap-3">
-          <Button
-            variant="secondary"
-            leftIcon={<Plus className="h-4 w-4" />}
-            onClick={() =>
-              setRooms((prev) => [
-                ...prev,
-                { ...newRoom(), label: `Room ${prev.length + 1}` },
-              ])
-            }
-          >
-            Add room
-          </Button>
-          <Button
-            loading={check.isPending}
-            onClick={() => check.mutate()}
-            disabled={rooms.length === 0}
-          >
-            Check ratio
-          </Button>
+      <Card padded className="mb-6">
+        <h3 className="text-base font-semibold text-ink-900">
+          Today's ratio, room by room
+        </h3>
+        <p className="text-sm text-ink-700 mt-1">
+          We compare today's attendance to Florida's required ratios. Tap a
+          room to see how many more staff you need — or stop adding kids.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink-700">
+          <Badge variant="neutral">
+            {data.staff_present_total} staff clocked in
+          </Badge>
+          <Badge variant="neutral">
+            {data.children_present_total} children signed in
+          </Badge>
+          {data.any_out_of_ratio ? (
+            <Badge variant="critical">One or more rooms over ratio</Badge>
+          ) : (
+            <Badge variant="compliant">All rooms within ratio</Badge>
+          )}
         </div>
       </Card>
 
-      {result && (
-        <Card
-          title={result.ok ? 'All rooms in ratio' : 'Over ratio'}
-          description={
-            result.ok
-              ? 'Staffing meets or beats the state cap for every room.'
-              : `Rooms over the cap: ${result.violated_rooms.join(', ')}`
-          }
-          padded
-        >
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-ink-500">
-                <th className="py-2 font-medium">Room</th>
-                <th className="py-2 font-medium">Cap</th>
-                <th className="py-2 font-medium">Actual</th>
-                <th className="py-2 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line-soft">
-              {result.rooms.map((r, i) => (
-                <tr key={`${r.label}-${i}`}>
-                  <td className="py-2">{r.label}</td>
-                  <td className="py-2">1:{r.ratio_cap || '—'}</td>
-                  <td className="py-2">
-                    {r.actual_ratio > 0 ? `1:${r.actual_ratio.toFixed(1)}` : '—'}
-                  </td>
-                  <td className="py-2">
-                    <Badge variant={r.in_ratio ? 'compliant' : 'critical'}>
-                      {r.in_ratio ? 'In ratio' : 'Over'}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+      {data.rooms.length === 0 ? (
+        <EmptyState
+          icon={<Users className="h-5 w-5 text-ink-500" />}
+          title="No classrooms yet"
+          description="Add a classroom on Settings → Facility so we can show you today's required ratios."
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {data.rooms.map((room) => (
+            <RatioRoomCard key={room.room_id} room={room} />
+          ))}
+        </div>
       )}
     </>
+  );
+}
+
+function RatioRoomCard({ room }: { room: RoomRatioStatus }): JSX.Element {
+  const palette =
+    room.status === 'out_of_ratio'
+      ? 'border-critical-200 bg-critical-50'
+      : room.status === 'tight'
+        ? 'border-caution-200 bg-caution-50'
+        : room.status === 'unknown'
+          ? 'border-line-soft bg-white'
+          : 'border-brand-200 bg-brand-50';
+
+  const badge =
+    room.status === 'out_of_ratio'
+      ? { variant: 'critical' as const, text: 'Over ratio' }
+      : room.status === 'tight'
+        ? { variant: 'warning' as const, text: 'Tight' }
+        : room.status === 'unknown'
+          ? { variant: 'neutral' as const, text: 'Set age band' }
+          : { variant: 'compliant' as const, text: 'Compliant' };
+
+  return (
+    <div className={`rounded-lg border p-4 ${palette}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="font-semibold text-ink-900">{room.room_name}</h4>
+          <p className="text-xs text-ink-700 mt-0.5">{room.age_band_label}</p>
+        </div>
+        <Badge variant={badge.variant}>{badge.text}</Badge>
+      </div>
+      <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-ink-500">
+            Required ratio
+          </dt>
+          <dd className="font-medium text-ink-900">
+            {room.mandated_ratio > 0 ? `1:${room.mandated_ratio}` : '—'}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-ink-500">
+            Children here
+          </dt>
+          <dd className="font-medium text-ink-900">{room.children_present}</dd>
+        </div>
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-ink-500">
+            Staff present
+          </dt>
+          <dd className="font-medium text-ink-900">{room.staff_present}</dd>
+        </div>
+      </dl>
+      {room.explainer && (
+        <p className="mt-3 text-sm text-ink-700 leading-snug">
+          {room.explainer}
+        </p>
+      )}
+    </div>
   );
 }
 

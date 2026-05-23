@@ -187,6 +187,10 @@ func run() error {
 	drills := &handlers.DrillHandler{Pool: pool, Log: log.With("component", "drills")}
 	postings := &handlers.PostingHandler{Pool: pool, Log: log.With("component", "postings")}
 	ratio := &handlers.RatioHandler{Pool: pool, Log: log.With("component", "ratio")}
+	// REQ-038: arbitrary photo evidence for drills + postings.
+	evidencePhotos := &handlers.EvidencePhotoHandler{Pool: pool, Storage: s3Client, Log: log.With("component", "evidence_photos")}
+	// REQ-039: read-only per-room computed ratio snapshot.
+	ratioCurrent := &handlers.RatioCurrentHandler{Pool: pool, Log: log.With("component", "ratio_current")}
 	inspections := &handlers.InspectionHandler{Pool: pool, Log: log.With("component", "inspections")}
 	inspectionMode := &handlers.InspectionModeHandler{Pool: pool, Log: log.With("component", "inspector_mode")}
 	auditLog := &handlers.AuditLogHandler{Pool: pool, Log: log.With("component", "audit_log")}
@@ -291,6 +295,8 @@ func run() error {
 		Drills:          drills,
 		Postings:        postings,
 		Ratio:           ratio,
+		EvidencePhotos:  evidencePhotos,
+		RatioCurrent:    ratioCurrent,
 		Inspections:     inspections,
 		InspectionMode:  inspectionMode,
 		AuditLog:        auditLog,

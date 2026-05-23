@@ -95,6 +95,8 @@ type Deps struct {
 	Drills          *handlers.DrillHandler
 	Postings        *handlers.PostingHandler
 	Ratio           *handlers.RatioHandler
+	EvidencePhotos  *handlers.EvidencePhotoHandler  // REQ-038
+	RatioCurrent    *handlers.RatioCurrentHandler   // REQ-039: per-room computed ratio
 	Inspections     *handlers.InspectionHandler
 	InspectionMode  *handlers.InspectionModeHandler
 	AuditLog        *handlers.AuditLogHandler
@@ -247,6 +249,12 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/drill-roster.pdf", d.Attendance.DrillRosterPDF)
 		}
 
+		// REQ-039: per-room computed ratio snapshot. Read-only — the old
+		// /api/facility/ratio-check remains for back-compat.
+		if d.RatioCurrent != nil {
+			r.Get("/ratio/current", d.RatioCurrent.Get)
+		}
+
 		// Settings → "Facility" card reads from here. Same camelCase shape
 		// CompleteOnboarding renders; the React provider Zod schema parses
 		// both responses uniformly.
@@ -385,6 +393,20 @@ func NewRouter(d Deps) http.Handler {
 		if d.Workspace != nil {
 			r.Get("/me/workspaces", d.Workspace.List)
 			r.Post("/me/active-workspace", d.Workspace.SetActive)
+		}
+
+		// REQ-039: evidence photos. List is open to provider users; the
+		// upload + edit + delete paths are admin-only because they touch
+		// S3 and the audit log.
+		if d.EvidencePhotos != nil {
+			r.Route("/evidence-photos", func(r chi.Router) {
+				r.Get("/", d.EvidencePhotos.List)
+				r.Group(adminOnly(func(r chi.Router) {
+					r.Post("/", d.EvidencePhotos.Create)
+					r.Patch("/{id}", d.EvidencePhotos.Update)
+					r.Delete("/{id}", d.EvidencePhotos.Delete)
+				}))
+			})
 		}
 
 		// Facility & Operations: drills, wall postings, ratio checks.

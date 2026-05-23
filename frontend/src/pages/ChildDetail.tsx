@@ -16,6 +16,7 @@ import Card from '@/components/common/Card';
 import Badge from '@/components/common/Badge';
 import Button from '@/components/common/Button';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import MessageHistory from '@/components/messages/MessageHistory';
 import { useChild } from '@/hooks/useChildren';
 import { childrenApi } from '@/api/children';
 import { toast } from '@/components/common/Toast';
@@ -204,6 +205,14 @@ export default function ChildDetail(): JSX.Element {
             </ul>
           )}
         </Card>
+      </div>
+
+      <div className="mt-6">
+        <MessageHistory
+          recipientKind="parent"
+          recipientId={id!}
+          composerHref={`/messages/new?parentId=${id}`}
+        />
       </div>
 
       <div className="mt-6">

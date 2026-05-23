@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, Send, Copy, ExternalLink, FileText, Archive } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Send, Copy, ExternalLink, FileText, Archive, Pencil } from 'lucide-react';
 import { useState } from 'react';
 
 import PageHeader from '@/components/common/PageHeader';
@@ -10,7 +10,8 @@ import Modal from '@/components/common/Modal';
 import StatusPillBadge from '@/components/common/StatusPill';
 import Select from '@/components/common/Select';
 import Input from '@/components/common/Input';
-import { useStaffMember, useArchiveStaff } from '@/hooks/useStaff';
+import MessageHistory from '@/components/messages/MessageHistory';
+import { useStaffMember, useArchiveStaff, useUpdateStaff } from '@/hooks/useStaff';
 import { staffApi, ROLE_LABEL, type RequirementStatus, type StaffDetail as StaffDetailT } from '@/api/staff';
 import { toast } from '@/components/common/Toast';
 import { fullName, formatDate, formatPhone } from '@/lib/format';
@@ -25,6 +26,7 @@ export default function StaffDetailPage(): JSX.Element {
   const { data, isLoading, isError, error, refetch } = useStaffMember(id);
   const archive = useArchiveStaff();
   const [reminderOpen, setReminderOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [uploadLink, setUploadLink] = useState<string>('');
 
   async function refreshUploadLink() {
@@ -104,9 +106,18 @@ export default function StaffDetailPage(): JSX.Element {
           </span>
         }
         actions={
-          <Button leftIcon={<Send className="h-4 w-4" />} onClick={() => setReminderOpen(true)}>
-            Send a reminder
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              leftIcon={<Pencil className="h-4 w-4" />}
+              onClick={() => setEditOpen(true)}
+            >
+              Edit
+            </Button>
+            <Button leftIcon={<Send className="h-4 w-4" />} onClick={() => setReminderOpen(true)}>
+              Send a reminder
+            </Button>
+          </div>
         }
       />
 
@@ -258,6 +269,15 @@ export default function StaffDetailPage(): JSX.Element {
         </Card>
       </div>
 
+      {/* REQ-040: per-staff message log */}
+      <div className="mt-6">
+        <MessageHistory
+          recipientKind="staff"
+          recipientId={id!}
+          composerHref={`/messages/new?staffId=${id}`}
+        />
+      </div>
+
       <SendReminderModal
         open={reminderOpen}
         onClose={() => setReminderOpen(false)}
@@ -266,7 +286,126 @@ export default function StaffDetailPage(): JSX.Element {
         defaultChannel={staff.preferredChannel}
         requirements={staff.requiredDocuments}
       />
+
+      <EditStaffModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        staffId={id!}
+        initial={staff}
+      />
     </div>
+  );
+}
+
+// REQ-040: Edit modal that wraps the existing staffApi.update mutation.
+// Binds to name, role, email, phone, hire date, and preferred channel —
+// the fields a director would actually want to fix from this screen.
+function EditStaffModal({
+  open,
+  onClose,
+  staffId,
+  initial,
+}: {
+  open: boolean;
+  onClose: () => void;
+  staffId: string;
+  initial: StaffDetailT;
+}): JSX.Element {
+  const update = useUpdateStaff(staffId);
+  const [firstName, setFirstName] = useState(initial.firstName);
+  const [lastName, setLastName] = useState(initial.lastName);
+  const [role, setRole] = useState(initial.role);
+  const [email, setEmail] = useState(initial.email);
+  const [phone, setPhone] = useState(initial.phone);
+  const [hireDate, setHireDate] = useState(initial.hireDate ?? '');
+  const [preferredChannel, setPreferredChannel] = useState<'email' | 'sms' | 'both'>(initial.preferredChannel);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await update.mutateAsync({
+        first_name: firstName,
+        last_name: lastName,
+        role,
+        email,
+        phone,
+        hire_date: hireDate || undefined,
+        preferred_contact_channel: preferredChannel,
+      });
+      toast.success('Updated.');
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "We couldn't save that.");
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Edit staff profile"
+      description="Update the basics. We'll keep the document history intact."
+      size="lg"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={update.isPending}>
+            Cancel
+          </Button>
+          <Button form="edit-staff-form" type="submit" loading={update.isPending}>
+            Save changes
+          </Button>
+        </>
+      }
+    >
+      <form id="edit-staff-form" onSubmit={submit} className="space-y-3" noValidate>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input label="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+          <Input label="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+        </div>
+        <Select
+          label="Role"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          options={[
+            { value: 'owner', label: 'Owner' },
+            { value: 'director', label: 'Director' },
+            { value: 'lead_teacher', label: 'Lead teacher' },
+            { value: 'assistant_teacher', label: 'Assistant teacher' },
+            { value: 'aide', label: 'Aide' },
+            { value: 'cook', label: 'Cook' },
+            { value: 'driver', label: 'Driver' },
+            { value: 'volunteer', label: 'Volunteer' },
+          ]}
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label="Hire date"
+            type="date"
+            value={hireDate}
+            onChange={(e) => setHireDate(e.target.value)}
+          />
+          <Select
+            label="Preferred channel"
+            value={preferredChannel}
+            onChange={(e) => setPreferredChannel(e.target.value as 'email' | 'sms' | 'both')}
+            options={[
+              { value: 'email', label: 'Email' },
+              { value: 'sms', label: 'Text' },
+              { value: 'both', label: 'Email + text' },
+            ]}
+          />
+        </div>
+      </form>
+    </Modal>
   );
 }
 

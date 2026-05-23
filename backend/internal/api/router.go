@@ -103,6 +103,8 @@ type Deps struct {
 	DataExport      *handlers.DataExportHandler
 	Contact         *handlers.ContactHandler
 	Nag             *handlers.NagHandler
+	Chase           *handlers.ChaseHandler    // REQ-042: Chase Mode dashboard
+	Messages        *handlers.MessagesHandler // REQ-043: free-form message composer
 	Facility        *handlers.FacilityHandler   // REQ-003: 4-step onboarding wizard
 	UploadLink      *handlers.UploadLinkHandler // REQ-004: shareable staff upload link
 	Score           *handlers.ScoreHandler      // REQ-013: synthesised dashboard score
@@ -407,6 +409,26 @@ func NewRouter(d Deps) http.Handler {
 					r.Delete("/{id}", d.EvidencePhotos.Delete)
 				}))
 			})
+		}
+
+		// REQ-042: Chase Mode dashboard. Read endpoints open to both roles;
+		// the trigger reuses the admin-gated NagHandler under the hood.
+		if d.Chase != nil {
+			r.Get("/chase/state", d.Chase.State)
+			r.Get("/chase/activity", d.Chase.Activity)
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Post("/chase/trigger", d.Chase.Trigger)
+			}))
+		}
+
+		// REQ-043: free-form message composer. Read endpoints open;
+		// send is admin-only to keep blast radius bounded.
+		if d.Messages != nil {
+			r.Get("/messages", d.Messages.History)
+			r.Get("/messages/recipients", d.Messages.Recipients)
+			r.Group(adminOnly(func(r chi.Router) {
+				r.Post("/messages/send", d.Messages.Send)
+			}))
 		}
 
 		// Facility & Operations: drills, wall postings, ratio checks.

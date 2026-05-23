@@ -19,6 +19,8 @@ import Children from '@/pages/Children';
 import ChildDetail from '@/pages/ChildDetail';
 import Staff from '@/pages/Staff';
 import StaffDetail from '@/pages/StaffDetail';
+import Chase from '@/pages/Chase';
+import MessageComposer from '@/pages/MessageComposer';
 import Documents from '@/pages/Documents';
 import DocumentDetail from '@/pages/DocumentDetail';
 import Inspections from '@/pages/Inspections';
@@ -189,6 +191,8 @@ export default function App(): JSX.Element {
             <Route path="/children/:id" element={<ChildDetail />} />
             <Route path="/staff" element={<Staff />} />
             <Route path="/staff/:id" element={<StaffDetail />} />
+            <Route path="/chase" element={<Chase />} />
+            <Route path="/messages/new" element={<MessageComposer />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/documents/:id" element={<DocumentDetail />} />
             <Route path="/inspections" element={<Inspections />} />

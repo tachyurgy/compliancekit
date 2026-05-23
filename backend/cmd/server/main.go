@@ -205,6 +205,17 @@ func run() error {
 		FrontendBase: cfg.FrontendBaseURL,
 		Log:          log.With("component", "nag"),
 	}
+	// REQ-038: Chase Mode dashboard reads from existing chase tables and
+	// dispatches manual nags through the NagHandler above.
+	chaseH := &handlers.ChaseHandler{
+		Pool: pool, Nag: nag,
+		Log: log.With("component", "chase_dashboard"),
+	}
+	// REQ-039: free-form message composer.
+	messagesH := &handlers.MessagesHandler{
+		Pool: pool, Emailer: emailer, SMS: sms,
+		Log: log.With("component", "messages"),
+	}
 	facility := &handlers.FacilityHandler{Pool: pool, Log: log.With("component", "facility")}
 	uploadLink := &handlers.UploadLinkHandler{
 		Pool: pool, Magic: magic, FrontendBase: cfg.FrontendBaseURL,
@@ -303,6 +314,8 @@ func run() error {
 		DataExport:      dataExport,
 		Contact:         contact,
 		Nag:             nag,
+		Chase:           chaseH,
+		Messages:        messagesH,
 		Facility:        facility,
 		UploadLink:      uploadLink,
 		Score:           scoreH,

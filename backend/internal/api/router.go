@@ -105,6 +105,7 @@ type Deps struct {
 	UploadLink      *handlers.UploadLinkHandler // REQ-004: shareable staff upload link
 	Score           *handlers.ScoreHandler      // REQ-013: synthesised dashboard score
 	Demo            *handlers.DemoHandler       // REQ-024: Shayna onboarding tour seed + purge
+	Workspace       *handlers.WorkspaceHandler  // REQ-038: top-left workspace switcher
 	Kiosk           *handlers.KioskHandler      // REQ-016: facility-scoped attendance kiosk
 	Attendance      *handlers.AttendanceHandler // REQ-016: today + history + drill roster PDF
 	TestHelpers     *handlers.TestHelperHandler // only mounted when non-production
@@ -377,6 +378,13 @@ func NewRouter(d Deps) http.Handler {
 			r.Group(adminOnly(func(r chi.Router) {
 				r.Post("/demo/purge", d.Demo.Purge)
 			}))
+		}
+
+		// REQ-038 workspace switcher — list workspaces the user can open,
+		// flip which one is active on the session row.
+		if d.Workspace != nil {
+			r.Get("/me/workspaces", d.Workspace.List)
+			r.Post("/me/active-workspace", d.Workspace.SetActive)
 		}
 
 		// Facility & Operations: drills, wall postings, ratio checks.

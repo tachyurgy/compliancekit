@@ -1,8 +1,12 @@
-// REQ-024 (Shayna tour). Read demo-seed status + nuke the seed when the
-// operator hits "Make this mine" at the end of the tour.
+// REQ-024 + REQ-038. /api/demo/status reports whether the current active
+// workspace is the demo one and counts the per-row is_demo flags we still
+// emit for back-compat with the pre-REQ-038 tour beats. /api/demo/purge
+// only acts when the active workspace is demo — see backend handler doc.
 import { apiFetch } from './client';
 
 export interface DemoStatus {
+  // REQ-038: the active workspace is providers.is_demo=1.
+  is_demo_workspace: boolean;
   has_demo_data: boolean;
   demo_staff: number;
   demo_children: number;

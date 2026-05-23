@@ -998,8 +998,12 @@ func (h *ProviderHandler) mintPortalLink(w http.ResponseWriter, r *http.Request,
 // the single sliding-window write path; the SQLite cost is one indexed
 // UPDATE per authed request, which the test bench shows at ~50µs.
 func (h *ProviderHandler) LookupSession(ctx context.Context, token string) (providerID, userID string, err error) {
+	// REQ-038: prefer active_provider_id when set so workspace switches
+	// take effect on the very next request. COALESCE keeps existing
+	// sessions (which were created before the active_provider_id column
+	// existed) pointing at their original provider_id.
 	err = h.Pool.QueryRowContext(ctx, `
-		SELECT provider_id, user_id FROM sessions
+		SELECT COALESCE(active_provider_id, provider_id), user_id FROM sessions
 		 WHERE id = ? AND expires_at > CURRENT_TIMESTAMP AND revoked_at IS NULL`, token).
 		Scan(&providerID, &userID)
 	if err != nil {

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ClipboardList, Send, ShieldCheck, Sparkles, X } from 'lucide-react';
 
 import ShaynaAvatar from './ShaynaAvatar';
-import { demoApi } from '@/api/demo';
 import { useShaynaTour } from '@/hooks/useShaynaTour';
+import {
+  useActiveWorkspace,
+  useSwitchWorkspace,
+  useWorkspaces,
+} from '@/hooks/useWorkspaces';
 
 // REQ-024 — Shayna's 4-beat post-checkout tour. Shape:
 //
@@ -22,15 +24,22 @@ import { useShaynaTour } from '@/hooks/useShaynaTour';
 // once and passes the boolean in.
 
 interface Props {
-  hasDemoData: boolean;
+  // Retained for back-compat with Dashboard.tsx; the component now gates
+  // itself on whether the ACTIVE workspace is the demo one. The boolean
+  // is treated as a hint only.
+  hasDemoData?: boolean;
 }
 
-export default function ShaynaTour({ hasDemoData }: Props): JSX.Element | null {
+export default function ShaynaTour({ hasDemoData = true }: Props): JSX.Element | null {
   const tour = useShaynaTour();
-  const navigate = useNavigate();
-  const qc = useQueryClient();
-  const [purging, setPurging] = useState(false);
+  const active = useActiveWorkspace();
+  const switcher = useSwitchWorkspace();
+  const workspaces = useWorkspaces();
+  const [switching, setSwitching] = useState(false);
   const [sent, setSent] = useState(false);
+
+  // REQ-038: never fire the tour outside the demo workspace.
+  const insideDemo = active?.isDemo ?? false;
 
   // Spotlight overlay class management. We add `tour-spotlight` to the
   // current target element and a class to <body> so its z-index sits above
@@ -78,6 +87,7 @@ export default function ShaynaTour({ hasDemoData }: Props): JSX.Element | null {
   }, []);
 
   if (!tour.isOpen) return null;
+  if (!insideDemo) return null;
   if (!hasDemoData && tour.step !== 'finish') return null;
 
   if (tour.step === 'intro') {
@@ -201,7 +211,10 @@ export default function ShaynaTour({ hasDemoData }: Props): JSX.Element | null {
     );
   }
 
-  // finish
+  // finish — REQ-038: hand the user off to their REAL facility instead
+  // of deleting demo rows in place. The demo workspace stays put so they
+  // can come back to it any time from the workspace switcher.
+  const realWorkspace = workspaces.data?.workspaces.find((w) => !w.isDemo);
   return (
     <ModalShell onSkip={tour.skip}>
       <div className="text-center">
@@ -212,32 +225,28 @@ export default function ShaynaTour({ hasDemoData }: Props): JSX.Element | null {
           You've got this.
         </h2>
         <p className="mt-3 text-ink-700 text-base leading-relaxed max-w-md mx-auto">
-          Click <strong>Make this mine</strong> and we'll clear the example
-          data. Then add your first real staff member or child — we'll do
-          the rest of the chasing for you.
+          Ready to set up your real facility? Switch over and we'll start
+          you fresh. The demo will still be here if you want to come back
+          and poke around.
         </p>
         <div className="mt-7 flex items-center justify-center gap-3">
           <PrimaryButton
             onClick={async () => {
-              setPurging(true);
-              try {
-                await demoApi.purge();
-                await Promise.allSettled([
-                  qc.invalidateQueries({ queryKey: ['score'] }),
-                  qc.invalidateQueries({ queryKey: ['dashboard'] }),
-                  qc.invalidateQueries({ queryKey: ['facility'] }),
-                  qc.invalidateQueries({ queryKey: ['children'] }),
-                  qc.invalidateQueries({ queryKey: ['staff'] }),
-                ]);
+              if (!realWorkspace) {
                 tour.finish();
-                navigate('/staff', { replace: false });
+                return;
+              }
+              setSwitching(true);
+              try {
+                await switcher.mutateAsync(realWorkspace.id);
+                tour.finish();
               } finally {
-                setPurging(false);
+                setSwitching(false);
               }
             }}
-            disabled={purging}
+            disabled={switching || !realWorkspace}
           >
-            {purging ? 'Clearing…' : 'Make this mine'}
+            {switching ? 'Switching…' : 'Switch to your real facility'}
             <ArrowRight className="h-4 w-4 ml-1" />
           </PrimaryButton>
           <SkipButton onClick={() => tour.finish()}>

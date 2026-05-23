@@ -1,5 +1,12 @@
-import { useState } from 'react';
-import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import {
+  NavLink,
+  Outlet,
+  Link,
+  useNavigate,
+  useLocation,
+  useSearchParams,
+} from 'react-router-dom';
 import {
   LayoutDashboard,
   Baby,
@@ -17,8 +24,11 @@ import {
 } from 'lucide-react';
 
 import { useSession } from '@/hooks/useSession';
+import { useActiveWorkspace } from '@/hooks/useWorkspaces';
 import BrandMark from './BrandMark';
 import ToastViewport from './Toast';
+import WorkspaceSwitcher from './WorkspaceSwitcher';
+import DemoBanner from './DemoBanner';
 
 interface NavItem {
   to: string;
@@ -44,6 +54,29 @@ export default function Layout(): JSX.Element {
   const signOut = useSession((s) => s.signOut);
   const navigate = useNavigate();
 
+  // REQ-038: URL reflects active workspace via ?demo=1. We don't fork the
+  // router — one app, one tree — but the query param is the address-bar
+  // indicator the operator asked for, and it survives copy/paste of links
+  // among friends so the recipient lands in the matching mode.
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const active = useActiveWorkspace();
+  useEffect(() => {
+    if (!active) return;
+    const hasParam = params.get('demo') === '1';
+    if (active.isDemo && !hasParam) {
+      const next = new URLSearchParams(params);
+      next.set('demo', '1');
+      setParams(next, { replace: true });
+    } else if (!active.isDemo && hasParam) {
+      const next = new URLSearchParams(params);
+      next.delete('demo');
+      setParams(next, { replace: true });
+    }
+    // location.pathname is included so we re-check on navigation (the
+    // search-params hook doesn't refire on path-only changes).
+  }, [active, params, setParams, location.pathname]);
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/login', { replace: true });
@@ -51,6 +84,7 @@ export default function Layout(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-surface-muted">
+      <DemoBanner />
       {/* Mobile top bar */}
       <div className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 bg-white border-b border-line-soft">
         <BrandMark to="/dashboard" size="sm" />
@@ -74,6 +108,9 @@ export default function Layout(): JSX.Element {
           <div className="h-full flex flex-col">
             <div className="hidden lg:flex items-center px-5 h-16 border-b border-line-soft">
               <BrandMark to="/dashboard" size="md" />
+            </div>
+            <div className="p-3 border-b border-line-soft">
+              <WorkspaceSwitcher />
             </div>
             <nav className="flex-1 p-3 space-y-1">
               {NAV_ITEMS.map((item) => (

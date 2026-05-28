@@ -113,3 +113,32 @@ export async function apiFetch<T = unknown>(
 }
 
 export { API_BASE_URL };
+
+/**
+ * humanizeError — return a short, calm string we'd be willing to render in
+ * the UI. Catches the case where a Zod schema throws and its `.message` is
+ * a 4 KB JSON dump of `invalid_type` errors (operators were seeing the raw
+ * JSON in red text on /children and /settings — REQ-038 follow-up).
+ *
+ * Network/timeout errors and ApiError messages flow through; anything that
+ * looks like a structured payload (starts with `[`/`{`, contains
+ * "invalid_type", or is over 240 chars) is replaced with a calm fallback.
+ */
+export function humanizeError(
+  err: unknown,
+  fallback = "Something went wrong on our end. Give us a moment and try again.",
+): string {
+  if (!err) return fallback;
+  if (err instanceof ApiError) return err.message || fallback;
+  const raw = err instanceof Error ? err.message : String(err);
+  if (!raw) return fallback;
+  const trimmed = raw.trim();
+  const looksStructured =
+    trimmed.startsWith('[') ||
+    trimmed.startsWith('{') ||
+    /invalid_type|ZodError|"code"\s*:/.test(trimmed);
+  if (looksStructured || trimmed.length > 240) {
+    return fallback;
+  }
+  return trimmed;
+}

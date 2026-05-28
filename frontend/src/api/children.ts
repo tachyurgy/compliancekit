@@ -9,20 +9,31 @@ export const ImmunizationStatusSchema = z.enum([
   'unknown',
 ]);
 
+/**
+ * Tolerant of legacy/empty fields. Earlier this schema rejected the entire
+ * roster when ANY child row carried an empty parentEmail (`""` fails .email()
+ * yet isn't null), or had a missing optional column. Operators saw "We
+ * couldn't load your roster" with a 4 KB JSON Zod dump in red. Accept what
+ * the backend returns; let the UI render dashes for blanks.
+ */
+const optionalString = z
+  .union([z.string(), z.null(), z.undefined()])
+  .transform((v) => v ?? null);
+
 export const ChildSchema = z.object({
   id: z.string(),
   providerId: z.string(),
   firstName: z.string(),
   lastName: z.string(),
   dateOfBirth: z.string(),
-  enrollmentDate: z.string().nullable(),
-  parentEmail: z.string().email().nullable(),
-  parentName: z.string().nullable(),
-  parentPhone: z.string().nullable(),
-  immunizationStatus: ImmunizationStatusSchema,
-  requiredDocsCount: z.number().int(),
-  completedDocsCount: z.number().int(),
-  complianceStatus: z.enum(['compliant', 'warning', 'critical']),
+  enrollmentDate: optionalString,
+  parentEmail: optionalString,
+  parentName: optionalString,
+  parentPhone: optionalString,
+  immunizationStatus: ImmunizationStatusSchema.catch('unknown'),
+  requiredDocsCount: z.number().int().catch(0),
+  completedDocsCount: z.number().int().catch(0),
+  complianceStatus: z.enum(['compliant', 'warning', 'critical']).catch('warning'),
   updatedAt: z.string(),
 });
 export type Child = z.infer<typeof ChildSchema>;

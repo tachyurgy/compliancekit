@@ -114,7 +114,7 @@ export default function AddChildModal({
       <form
         id="add-child-form"
         onSubmit={submit}
-        className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0 max-w-full [&>*]:min-w-0"
         noValidate
       >
         <Input

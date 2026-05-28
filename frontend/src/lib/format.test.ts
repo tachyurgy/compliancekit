@@ -7,6 +7,7 @@ import {
   formatCentsAsUSD,
   formatBytes,
   fullName,
+  isMeaningfulDate,
 } from './format';
 
 describe('formatDate', () => {
@@ -60,6 +61,34 @@ describe('formatRelativeDays', () => {
     [day(-7), '7 days ago'],
   ])('formats %s as %s', (input, want) => {
     expect(formatRelativeDays(input)).toBe(want);
+  });
+
+  // Regression for the Operations page rendering "Last run 739759 days ago
+  // (Dec 31, 1)" when a drill row carried the Go zero time.Time sentinel.
+  // formatRelativeDays + formatDate must both return '' for those values so
+  // the caller can render "Never run" instead of a nonsense duration.
+  it.each<[string, string]>([
+    ['0001-01-01T00:00:00Z', 'Go zero time'],
+    ['0001-12-31T00:00:00Z', 'pre-epoch sentinel'],
+    ['1899-12-31T00:00:00Z', 'pre-1900 cutoff'],
+  ])('returns empty string for sentinel %s (%s)', (iso) => {
+    expect(formatRelativeDays(iso)).toBe('');
+    expect(formatDate(iso)).toBe('');
+  });
+});
+
+describe('isMeaningfulDate', () => {
+  // Tight unit on the guard itself. Operations.tsx, Dashboard.tsx, and every
+  // formatter rely on this — a regression here re-introduces the "739759
+  // days ago" rendering across the app.
+  it.each<[string, boolean]>([
+    ['2026-05-29T00:00:00Z', true],
+    ['1900-01-01T00:00:00Z', true],
+    ['1899-12-31T00:00:00Z', false],
+    ['0001-01-01T00:00:00Z', false],
+    ['not a date', false],
+  ])('isMeaningfulDate(%s) === %s', (iso, want) => {
+    expect(isMeaningfulDate(new Date(iso))).toBe(want);
   });
 });
 

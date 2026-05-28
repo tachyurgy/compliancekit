@@ -53,7 +53,7 @@ export default function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative w-full ${sizes[size]} bg-white rounded-lb shadow-elevated border border-line max-h-[calc(100vh-2rem)] flex flex-col`}
+        className={`relative w-full ${sizes[size]} bg-white rounded-lb shadow-elevated border border-line max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden`}
       >
         <button
           type="button"

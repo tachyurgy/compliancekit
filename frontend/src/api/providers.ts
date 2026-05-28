@@ -1,12 +1,21 @@
 import { z } from 'zod';
 import { apiFetch } from './client';
 
-/** The "provider" is the daycare organization. One owner per provider for MVP. */
+/**
+ * The "provider" is the daycare organization. One owner per provider for MVP.
+ *
+ * NOTE on tolerant fields: the launch markets are FL/CA/TX, but pilot accounts
+ * and older test data can carry stateCode '' or any 2-letter state. The Settings
+ * page failed entirely with "Couldn't load your facility" when Zod refused
+ * those rows because the enum was strict. We accept any string here and gate
+ * the marketing-state logic at the UI layer instead. Same for licenseType —
+ * legacy rows can be empty strings.
+ */
 export const ProviderSchema = z.object({
   id: z.string(),
   name: z.string(),
-  stateCode: z.enum(['CA', 'TX', 'FL']),
-  licenseType: z.enum(['center', 'family_home']),
+  stateCode: z.string(),
+  licenseType: z.string(),
   licenseNumber: z.string().nullable(),
   address1: z.string(),
   address2: z.string().nullable(),

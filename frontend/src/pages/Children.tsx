@@ -11,6 +11,7 @@ import EmptyState from '@/components/common/EmptyState';
 import AddChildModal from '@/components/AddChildModal';
 import { useChildren } from '@/hooks/useChildren';
 import { formatDate, fullName } from '@/lib/format';
+import { humanizeError } from '@/api/client';
 
 function statusVariant(status: 'compliant' | 'warning' | 'critical') {
   return status === 'compliant' ? 'compliant' : status === 'warning' ? 'warning' : 'critical';
@@ -83,9 +84,10 @@ export default function Children(): JSX.Element {
               We couldn't load your roster just now
             </div>
             <div className="text-sm text-ink-700 mt-1 leading-relaxed">
-              {error instanceof Error
-                ? error.message
-                : 'Check your internet and try again in a moment.'}
+              {humanizeError(
+                error,
+                'Check your internet and try again in a moment.',
+              )}
             </div>
             <Button
               className="mt-3"

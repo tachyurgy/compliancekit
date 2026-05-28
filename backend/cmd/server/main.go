@@ -335,7 +335,13 @@ func run() error {
 			if strings.EqualFold(cfg.AppEnv, "test") {
 				return mw.NewTokenBucket(10_000, 1_000)
 			}
-			return mw.NewTokenBucket(10, 0.5) // 10 burst, 0.5 tok/sec
+			// 200 burst, 8/sec refill. The old 10/0.5 ceiling was sized for
+			// the auth surface (signup/signin) only, but the same bucket is
+			// applied to the full /api/* tree — one logged-in page load can
+			// fire 5–10 calls and would burn it instantly, leaving operators
+			// stuck on skeleton loaders + raw "too many requests" copy. See
+			// Cosmo Kramer prod-verify session 2026-05-24.
+			return mw.NewTokenBucket(200, 8)
 		}(),
 		FrontendOrigins: parseOrigins(cfg.FrontendBaseURL),
 		PDFSign:         pdfsignRoutes,

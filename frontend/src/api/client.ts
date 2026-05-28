@@ -100,6 +100,12 @@ export async function apiFetch<T = unknown>(
         code: `http_${response.status}`,
         message: response.statusText || 'Request failed',
       };
+    // Soften rate-limit copy so the inspector / dashboard never surfaces
+    // raw "too many requests" to operators — calm voice per brand guide.
+    if (response.status === 429) {
+      errEnvelope.message =
+        "We're going a little fast. Give us a moment and try that again.";
+    }
     throw new ApiError(response.status, errEnvelope);
   }
 

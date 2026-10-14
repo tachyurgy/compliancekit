@@ -12,8 +12,8 @@ Compliance management SaaS for licensed child care providers. Tracks every state
 
 ```bash
 # Clone
-git clone git@github.com:compliancekit/backend.git
-cd backend
+git clone https://github.com/tachyurgy/compliancekit.git
+cd compliancekit/backend
 
 # Environment
 cp .env.example .env
@@ -35,10 +35,9 @@ go run ./cmd/api
 go run ./cmd/worker
 ```
 
-Frontend (separate repo):
+Frontend:
 
 ```bash
-git clone git@github.com:compliancekit/frontend.git
 cd frontend
 npm install
 cp .env.local.example .env.local  # set VITE_API_BASE=http://localhost:8080
@@ -53,17 +52,11 @@ Go backend running under systemd on a single DigitalOcean droplet, reverse-proxi
 
 ---
 
-## Documentation
+## Layout
 
-- [SPEC.md](SPEC.md) — product + technical specification
-- [ARCHITECTURE.md](ARCHITECTURE.md) — technical architecture, data flows, security model
-- [ROADMAP.md](ROADMAP.md) — week-by-week plan, MVP through post-MVP week 8
-- [DECISIONS.md](DECISIONS.md) — architecture decision records (ADRs)
-- [EXTERNAL_SERVICES.md](EXTERNAL_SERVICES.md) — third-party integration register
-- [QUESTIONS.md](QUESTIONS.md) — open questions awaiting review
-
-Planning research (regulatory, state-specific): [planning-docs/](planning-docs/)
-Marketing pages and SEO articles: see `*.html` in repo root.
+- `backend/` - Go API + worker: rules engine (`internal/compliance`, `internal/inspection`), self-hosted PDF e-signature (`internal/pdfsign`), notifications, Stripe billing, migrations, integration tests
+- `frontend/` - React + Vite + TypeScript app, Playwright e2e
+- `docs/pdf-signature-spec.md` - design of the PDF signing pipeline
 
 ---
 

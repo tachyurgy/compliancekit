@@ -51,7 +51,7 @@ export default function SignDocument() {
     );
   }
   if (!session) {
-    return <div style={shellStyle}>Loading your document\u2026</div>;
+    return <div style={shellStyle}>Loading your document…</div>;
   }
   if (completed) {
     return (
@@ -83,7 +83,7 @@ export default function SignDocument() {
       <header style={{ marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 22 }}>Sign document</h1>
         <div style={{ color: "#57606a", fontSize: 14 }}>
-          Signer: {session.signerName} &lt;{session.signerEmail}&gt; \u00b7 Session expires{" "}
+          Signer: {session.signerName} &lt;{session.signerEmail}&gt; · Session expires{" "}
           {new Date(session.expiresAt).toLocaleString()}
         </div>
       </header>

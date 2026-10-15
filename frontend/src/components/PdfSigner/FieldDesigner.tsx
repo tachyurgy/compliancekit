@@ -131,7 +131,7 @@ export function FieldDesigner({
   }, [fields, templateId, onSaved]);
 
   if (!fileForReactPdf) {
-    return <div>Loading template PDF\u2026</div>;
+    return <div>Loading template PDF…</div>;
   }
 
   return (
@@ -188,7 +188,7 @@ export function FieldDesigner({
             cursor: saving ? "wait" : "pointer",
           }}
         >
-          {saving ? "Saving\u2026" : "Save template"}
+          {saving ? "Saving…" : "Save template"}
         </button>
         {saveError && (
           <div role="alert" style={{ color: "#cf222e", marginTop: 8, fontSize: 12 }}>

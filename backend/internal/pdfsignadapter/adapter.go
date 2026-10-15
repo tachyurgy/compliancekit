@@ -37,21 +37,18 @@ func New(svc *pdfsign.Service, store pdfsign.Store, s3 *storage.Client, bucket, 
 	return &Adapter{h: h}
 }
 
-// MountProviderRoutes attaches the pdfsign provider-authenticated routes onto
-// the given chi router. The external package's Register() mounts everything
-// under /api/pdfsign (createSession, getSession, finalize, templates, etc.).
-// Our caller has already nested this router behind session-auth middleware.
+// MountProviderRoutes attaches the operator routes (templates, create session)
+// under /pdfsign on the caller's router, which is the /api subrouter already
+// behind session auth and the paywall, giving /api/pdfsign/*.
 func (a *Adapter) MountProviderRoutes(r chi.Router) {
-	a.h.Register(r)
+	a.h.RegisterProvider(r)
 }
 
-// MountPublicRoutes is a no-op today — the pdfsign flow treats the token in
-// /api/pdfsign/sessions/{token} as its own auth, and the signer UI lives on
-// the frontend at /sign/:token calling the same /api/pdfsign/sessions/{token}
-// endpoints. Left as a hook point for future magic-link-gated public routes.
+// MountPublicRoutes attaches the signer endpoints (GET session, POST
+// finalize) to the root router. The signer UI at /sign/:token calls them with
+// no login; the session token is the credential.
 func (a *Adapter) MountPublicRoutes(r chi.Router) {
-	// intentionally empty
-	_ = r
+	a.h.RegisterSigner(r)
 }
 
 // sessionAuth implements pdfsign.AuthContext by reading the provider_id that
@@ -69,9 +66,9 @@ func (sessionAuth) ProviderID(r *http.Request) (string, bool) {
 // --- BlobStore adapter ---
 
 // NewBlobStore adapts storage.Client to the pdfsign.BlobStore interface.
-// pdfsign writes to the documents bucket and reads signed PDFs by key;
-// PresignGet is used to hand the signer a short-lived download of their
-// finalized copy.
+// Templates, signed PDFs and audit JSON all live in the signed-PDFs bucket
+// under templates/, signed/ and audit/ prefixes; PresignGet mints the
+// short-lived links the signer and the operator download from.
 func NewBlobStore(c *storage.Client) pdfsign.BlobStore {
 	return &blobStoreAdapter{c: c}
 }
@@ -81,14 +78,14 @@ type blobStoreAdapter struct {
 }
 
 func (b *blobStoreAdapter) Put(ctx context.Context, bucket, key string, body io.Reader, contentType string) error {
-	// storage.Client's PutDocument does not take a bucket — it uses the
-	// configured Documents bucket. For MVP we collapse bucket→Documents;
-	// signed/audit writes go to the same S3 bucket under different prefixes.
-	return b.c.PutDocument(ctx, key, contentType, body)
+	// Honor the bucket pdfsign asks for (the signed-PDFs bucket). An earlier
+	// version collapsed every write into the documents bucket while
+	// PresignGet read from signed-PDFs, so a template could never be fetched.
+	return b.c.PutToBucket(ctx, bucket, key, contentType, body)
 }
 
 func (b *blobStoreAdapter) Get(ctx context.Context, bucket, key string) ([]byte, error) {
-	rc, _, err := b.c.GetDocument(ctx, key)
+	rc, _, err := b.c.GetFromBucket(ctx, bucket, key)
 	if err != nil {
 		return nil, err
 	}

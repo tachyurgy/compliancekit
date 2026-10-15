@@ -26,7 +26,32 @@ type Handlers struct {
 	MaxPDFSize int64 // bytes; 0 = 25MB default
 }
 
+// RegisterProvider attaches the operator-facing routes (templates, session
+// creation) under /pdfsign on a router that is already mounted at /api and
+// already enforces a provider session.
+func (h *Handlers) RegisterProvider(r chi.Router) {
+	r.Route("/pdfsign", func(r chi.Router) {
+		r.Post("/sessions", h.createSession)
+		r.Get("/templates", h.listTemplates)
+		r.Post("/templates", h.uploadTemplate)
+		r.Get("/templates/{id}", h.getTemplate)
+		r.Get("/templates/{id}/pdf", h.templatePDF)
+		r.Put("/templates/{id}/fields", h.saveTemplateFields)
+		r.Get("/signatures", h.listSignatures)
+	})
+}
+
+// RegisterSigner attaches the signer-facing routes on the ROOT router. They
+// are authorized by the unguessable session token in the path, not by a
+// login: the parent or staff member signing a form has no account.
+func (h *Handlers) RegisterSigner(r chi.Router) {
+	r.Get("/api/pdfsign/sessions/{token}", h.getSession)
+	r.Post("/api/pdfsign/sessions/{token}/finalize", h.finalize)
+}
+
 // Register attaches all routes to the given chi router under /api/pdfsign.
+// Convenience for tests and standalone use; the app uses RegisterProvider +
+// RegisterSigner so the two halves get different auth.
 func (h *Handlers) Register(r chi.Router) {
 	r.Route("/api/pdfsign", func(r chi.Router) {
 		r.Post("/sessions", h.createSession)
@@ -80,6 +105,10 @@ func (h *Handlers) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 	sess, err := h.Svc.CreateSession(r.Context(), in)
 	if err != nil {
+		if errors.Is(err, ErrTemplateNotFound) {
+			writeTemplateErr(w, err)
+			return
+		}
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -177,12 +206,18 @@ type saveTemplateFieldsRequest struct {
 }
 
 func (h *Handlers) saveTemplateFields(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.Auth.ProviderID(r)
+	providerID, ok := h.Auth.ProviderID(r)
 	if !ok {
 		writeErr(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
 	templateID := chi.URLParam(r, "id")
+	// Tenant check: without it any signed-in provider could overwrite the
+	// field layout of another tenant's template by guessing its id.
+	if _, err := h.Svc.store.GetTemplate(r.Context(), providerID, templateID); err != nil {
+		writeTemplateErr(w, err)
+		return
+	}
 	var req saveTemplateFieldsRequest
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
@@ -197,6 +232,95 @@ func (h *Handlers) saveTemplateFields(w http.ResponseWriter, r *http.Request) {
 }
 
 // Helpers
+
+func (h *Handlers) uploadTemplate(w http.ResponseWriter, r *http.Request) {
+	providerID, ok := h.Auth.ProviderID(r)
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	max := h.MaxPDFSize
+	if max == 0 {
+		max = 25 * 1024 * 1024
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, max+1<<20)
+	if err := r.ParseMultipartForm(8 << 20); err != nil {
+		writeErr(w, http.StatusBadRequest, "parse multipart: "+err.Error())
+		return
+	}
+	f, hdr, err := r.FormFile("pdf")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "missing 'pdf' part")
+		return
+	}
+	defer f.Close()
+	name := r.FormValue("name")
+	if strings.TrimSpace(name) == "" {
+		name = strings.TrimSuffix(hdr.Filename, ".pdf")
+	}
+	t, err := h.Svc.UploadTemplate(r.Context(), providerID, name, f, max)
+	if err != nil {
+		if errors.Is(err, ErrNotAPDF) {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, t)
+}
+
+func (h *Handlers) getTemplate(w http.ResponseWriter, r *http.Request) {
+	providerID, ok := h.Auth.ProviderID(r)
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	t, err := h.Svc.store.GetTemplate(r.Context(), providerID, chi.URLParam(r, "id"))
+	if err != nil {
+		writeTemplateErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, t)
+}
+
+func (h *Handlers) templatePDF(w http.ResponseWriter, r *http.Request) {
+	providerID, ok := h.Auth.ProviderID(r)
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	b, err := h.Svc.TemplatePDF(r.Context(), providerID, chi.URLParam(r, "id"))
+	if err != nil {
+		writeTemplateErr(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Cache-Control", "private, no-store")
+	_, _ = w.Write(b)
+}
+
+func (h *Handlers) listSignatures(w http.ResponseWriter, r *http.Request) {
+	providerID, ok := h.Auth.ProviderID(r)
+	if !ok {
+		writeErr(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	out, err := h.Svc.ListSignatures(r.Context(), providerID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func writeTemplateErr(w http.ResponseWriter, err error) {
+	if errors.Is(err, ErrTemplateNotFound) {
+		writeErr(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeErr(w, http.StatusInternalServerError, err.Error())
+}
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

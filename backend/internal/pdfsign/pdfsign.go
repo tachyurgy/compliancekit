@@ -3,7 +3,7 @@
 // The browser stamps the PDF, hashes it, and uploads the bytes + a JSON audit
 // record. This package validates the session, re-hashes the bytes, persists
 // the signed PDF under `signed/` and the audit JSON under `audit/` in the
-// single ck-files S3 bucket, and records the event in Postgres. See README.md
+// signed-PDFs bucket, and records the event in SQLite. See README.md
 // for security properties and the full sequence diagram.
 package pdfsign
 
@@ -206,6 +206,10 @@ func (s *Service) CreateSession(ctx context.Context, in CreateSessionInput) (*Si
 	if len(in.Fields) == 0 {
 		return nil, errors.New("pdfsign: at least one field is required")
 	}
+	// The template must belong to the caller's tenant.
+	if _, err := s.store.GetTemplate(ctx, in.ProviderID, in.DocumentID); err != nil {
+		return nil, err
+	}
 	token, err := NewToken()
 	if err != nil {
 		return nil, err
@@ -315,6 +319,11 @@ type Store interface {
 
 	// TemplateObjectKey returns the S3 key at which the template PDF is stored.
 	TemplateObjectKey(providerID, documentID string) string
+
+	InsertTemplate(ctx context.Context, t *Template) error
+	// GetTemplate is provider-scoped: another tenant's template is ErrTemplateNotFound.
+	GetTemplate(ctx context.Context, providerID, id string) (*Template, error)
+	ListSignatures(ctx context.Context, providerID string, limit int) ([]SignatureSummary, error)
 }
 
 // TemplateSummary is the abbreviated row returned to the provider UI.

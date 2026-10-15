@@ -89,6 +89,15 @@ func (s *Service) Finalize(ctx context.Context, in FinalizeInput) (*SignatureRec
 	if audit.SHA256Before == "" {
 		return nil, fmt.Errorf("%w: missing sha256Before", ErrAuditMalformed)
 	}
+	// The client says which bytes it started from; check that they are the
+	// template we actually served, so a signer cannot stamp a different PDF.
+	if tpl, err := s.store.GetTemplate(ctx, sess.ProviderID, sess.DocumentID); err == nil {
+		if tpl.SHA256 != "" && tpl.SHA256 != audit.SHA256Before {
+			return nil, fmt.Errorf("%w: sha256Before does not match the template", ErrHashMismatch)
+		}
+	} else if !errors.Is(err, ErrTemplateNotFound) {
+		return nil, err
+	}
 	if audit.Consent.SignerTypedName == "" {
 		return nil, fmt.Errorf("%w: missing consent.signerTypedName", ErrAuditMalformed)
 	}

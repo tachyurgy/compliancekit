@@ -103,3 +103,50 @@ export async function saveTemplateFields(
     throw new Error(`saveTemplateFields: ${resp.status}`);
   }
 }
+
+export interface TemplateDetail {
+  id: string;
+  name: string;
+  pageCount: number;
+  sha256: string;
+  fields: Array<CreateSessionInput["fields"][number] & { id: string }>;
+}
+
+/** GET /api/pdfsign/templates/{id} — template metadata + saved field layout. */
+export async function getTemplate(id: string): Promise<TemplateDetail> {
+  const resp = await fetch(`${API_BASE}/api/pdfsign/templates/${encodeURIComponent(id)}`, {
+    credentials: "include",
+  });
+  return handle<TemplateDetail>(resp);
+}
+
+/** POST /api/pdfsign/templates (multipart) — store a blank PDF as a template. */
+export async function uploadTemplate(name: string, file: File): Promise<TemplateDetail> {
+  const form = new FormData();
+  form.append("name", name);
+  form.append("pdf", file, file.name);
+  const resp = await fetch(`${API_BASE}/api/pdfsign/templates`, {
+    method: "POST",
+    body: form,
+    credentials: "include",
+  });
+  return handle<TemplateDetail>(resp);
+}
+
+export interface SignatureSummary {
+  signatureId: string;
+  documentId: string;
+  templateName: string;
+  signerName: string;
+  signerEmail: string;
+  signedAt: string;
+  sha256After: string;
+  signedPdfUrl?: string;
+  auditUrl?: string;
+}
+
+/** GET /api/pdfsign/signatures — completed signatures with download links. */
+export async function listSignatures(): Promise<SignatureSummary[]> {
+  const resp = await fetch(`${API_BASE}/api/pdfsign/signatures`, { credentials: "include" });
+  return handle<SignatureSummary[]>(resp);
+}

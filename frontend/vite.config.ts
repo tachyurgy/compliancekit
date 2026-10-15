@@ -6,10 +6,16 @@ import fs from 'node:fs';
 // Copy the pdf.js worker into /public on startup so react-pdf can load it from the same origin.
 function copyPdfjsWorker(): void {
   try {
-    const workerSrc = path.resolve(
+    // Use the pdf.js that react-pdf itself depends on (it may nest its own
+    // copy); a worker from a different pdf.js version fails every PDF load
+    // with "API version does not match Worker version".
+    const nested = path.resolve(
       __dirname,
-      'node_modules/pdfjs-dist/build/pdf.worker.min.mjs',
+      'node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs',
     );
+    const workerSrc = fs.existsSync(nested)
+      ? nested
+      : path.resolve(__dirname, 'node_modules/pdfjs-dist/build/pdf.worker.min.mjs');
     const destDir = path.resolve(__dirname, 'public');
     const destPath = path.join(destDir, 'pdf.worker.min.mjs');
     if (fs.existsSync(workerSrc)) {

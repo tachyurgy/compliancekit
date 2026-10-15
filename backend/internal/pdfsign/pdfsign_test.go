@@ -23,6 +23,7 @@ type memStore struct {
 	sigs      map[string]*SignatureRecord
 	templates map[string][]Field
 	summaries []TemplateSummary
+	tpls      map[string]*Template
 }
 
 func newMemStore() *memStore {
@@ -97,6 +98,34 @@ func (m *memStore) ListTemplateSummaries(_ context.Context, _ string) ([]Templat
 
 func (m *memStore) TemplateObjectKey(providerID, documentID string) string {
 	return providerID + "/templates/" + documentID + ".pdf"
+}
+
+func (m *memStore) InsertTemplate(_ context.Context, t *Template) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.tpls == nil {
+		m.tpls = map[string]*Template{}
+	}
+	m.tpls[t.ID] = t
+	return nil
+}
+
+// GetTemplate enforces tenancy for templates registered via InsertTemplate;
+// older tests that never register one get a permissive stub.
+func (m *memStore) GetTemplate(_ context.Context, providerID, id string) (*Template, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if t, ok := m.tpls[id]; ok {
+		if t.ProviderID != providerID {
+			return nil, ErrTemplateNotFound
+		}
+		return t, nil
+	}
+	return &Template{ID: id, ProviderID: providerID}, nil
+}
+
+func (m *memStore) ListSignatures(_ context.Context, _ string, _ int) ([]SignatureSummary, error) {
+	return nil, nil
 }
 
 type memBlobs struct {

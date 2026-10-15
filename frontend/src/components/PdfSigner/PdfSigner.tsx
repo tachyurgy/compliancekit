@@ -275,7 +275,7 @@ export function PdfSigner({ session, onComplete, onError }: PdfSignerProps) {
     return <div role="alert">Failed to load document: {error}</div>;
   }
   if (!fileForReactPdf) {
-    return <div>Loading document\u2026</div>;
+    return <div>Loading document…</div>;
   }
 
   return (
@@ -288,7 +288,7 @@ export function PdfSigner({ session, onComplete, onError }: PdfSignerProps) {
         file={fileForReactPdf}
         onLoadSuccess={onDocumentLoad}
         onLoadError={(e) => setError(e.message)}
-        loading={<div>Rendering\u2026</div>}
+        loading={<div>Rendering…</div>}
       >
         {Array.from({ length: pageCount }, (_, idx) => {
           const ps = pageSizes[idx];
@@ -446,7 +446,7 @@ export function PdfSigner({ session, onComplete, onError }: PdfSignerProps) {
               opacity: submitting ? 0.6 : 1,
             }}
           >
-            {submitting ? "Finalizing\u2026" : "Finalize signature"}
+            {submitting ? "Finalizing…" : "Finalize signature"}
           </button>
         </div>
       </section>

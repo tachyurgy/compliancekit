@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -16,8 +17,10 @@ import (
 	"github.com/tachyurgy/compliancekit/backend/internal/billing"
 	"github.com/tachyurgy/compliancekit/backend/internal/config"
 	"github.com/tachyurgy/compliancekit/backend/internal/db"
+	"github.com/tachyurgy/compliancekit/backend/internal/demoaccount"
 	"github.com/tachyurgy/compliancekit/backend/internal/handlers"
 	"github.com/tachyurgy/compliancekit/backend/internal/magiclink"
+	"github.com/tachyurgy/compliancekit/backend/internal/migrate"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
 	"github.com/tachyurgy/compliancekit/backend/internal/notify"
 	"github.com/tachyurgy/compliancekit/backend/internal/ocr"
@@ -25,7 +28,9 @@ import (
 	"github.com/tachyurgy/compliancekit/backend/internal/pdfsignadapter"
 	"github.com/tachyurgy/compliancekit/backend/internal/retention"
 	"github.com/tachyurgy/compliancekit/backend/internal/storage"
+	"github.com/tachyurgy/compliancekit/backend/internal/web"
 	"github.com/tachyurgy/compliancekit/backend/internal/workers"
+	"github.com/tachyurgy/compliancekit/backend/migrations"
 )
 
 func main() {
@@ -53,6 +58,14 @@ func run() error {
 	defer pool.Close()
 	log.Info("db connected")
 
+	if cfg.AutoMigrate {
+		n, err := migrate.Up(rootCtx, pool, migrations.FS, log.With("component", "migrate"))
+		if err != nil {
+			return fmt.Errorf("migrate: %w", err)
+		}
+		log.Info("migrations up to date", "applied", n)
+	}
+
 	// ---- AWS S3 + SES ----
 	s3Client, err := storage.New(rootCtx, storage.Config{
 		Region:          cfg.AWSRegion,
@@ -65,27 +78,38 @@ func run() error {
 			AuditTrail: cfg.S3BucketAuditTrail,
 			RawUploads: cfg.S3BucketRawUploads,
 		},
+		LocalDir:      cfg.StorageLocalDir,
+		PublicBaseURL: cfg.AppBaseURL,
+		URLSigningKey: []byte(cfg.MagicLinkSigningKey),
 	})
 	if err != nil {
 		return fmt.Errorf("storage: %w", err)
 	}
 
-	emailer, err := notify.NewEmailer(rootCtx, notify.EmailerConfig{
-		Region:          cfg.AWSRegion,
-		AccessKeyID:     cfg.AWSAccessKeyID,
-		SecretAccessKey: cfg.AWSSecretAccessKey,
-		From:            cfg.SESFromEmail,
-	})
-	if err != nil {
-		log.Warn("emailer init failed (continuing without SES)", "err", err)
+	var emailer *notify.Emailer
+	var sms *notify.SMSSender
+	if cfg.OutboundDisabled {
+		// Demo / local: every email and SMS is logged, never sent.
+		emailer = notify.NewLogEmailer(log.With("component", "email_sink"))
+		sms = notify.NewLogSMSSender(log.With("component", "sms_sink"))
+		log.Info("outbound email + SMS disabled (log-only senders)")
+	} else {
+		emailer, err = notify.NewEmailer(rootCtx, notify.EmailerConfig{
+			Region:          cfg.AWSRegion,
+			AccessKeyID:     cfg.AWSAccessKeyID,
+			SecretAccessKey: cfg.AWSSecretAccessKey,
+			From:            cfg.SESFromEmail,
+		})
+		if err != nil {
+			log.Warn("emailer init failed (continuing without SES)", "err", err)
+		}
+		sms = notify.NewSMSSender(notify.SMSConfig{
+			AccountSID:          cfg.TwilioAccountSID,
+			AuthToken:           cfg.TwilioAuthToken,
+			From:                cfg.TwilioFromNumber,
+			MessagingServiceSID: cfg.TwilioMessagingServiceSID,
+		})
 	}
-
-	sms := notify.NewSMSSender(notify.SMSConfig{
-		AccountSID:          cfg.TwilioAccountSID,
-		AuthToken:           cfg.TwilioAuthToken,
-		From:                cfg.TwilioFromNumber,
-		MessagingServiceSID: cfg.TwilioMessagingServiceSID,
-	})
 
 	// ---- magic link + billing ----
 	magic := magiclink.NewService(pool, cfg.MagicLinkSigningKey)
@@ -287,6 +311,34 @@ func run() error {
 	})
 	pdfsignRoutes := pdfsignadapter.New(pdfsignSvc, pdfsignStore, s3Client, cfg.S3BucketSignedPDFs, cfg.FrontendBaseURL)
 
+	// ---- demo mode (public demo deployment only) ----
+	var demoSandbox *handlers.DemoSandboxHandler
+	if cfg.DemoMode {
+		prov := &demoaccount.Provisioner{
+			DB: pool,
+			// Give every demo tenant a ready-to-send e-signature template.
+			AfterCreate: func(ctx context.Context, providerID string) error {
+				t, err := pdfsignSvc.UploadTemplate(ctx, providerID, "Field Trip Permission Slip (sample)",
+					bytes.NewReader(demoaccount.PermissionSlipPDF), 0)
+				if err != nil {
+					return err
+				}
+				return pdfsignStore.UpsertTemplateFields(ctx, t.ID, demoaccount.PermissionSlipFields())
+			},
+		}
+		demoSandbox = &handlers.DemoSandboxHandler{
+			Pool: pool, Provisioner: prov,
+			CookieDomain: cfg.SessionCookieDomain, SecureCookie: cfg.IsProduction(),
+			Log: log.With("component", "demo_sandbox"),
+		}
+		go prov.Janitor(rootCtx, cfg.DemoAccountEmail, cfg.DemoAccountPassword,
+			log.With("component", "demo_janitor"))
+	}
+	var static http.Handler
+	if cfg.StaticDir != "" {
+		static = web.SPA(cfg.StaticDir)
+	}
+
 	// ---- router ----
 	handler := api.NewRouter(api.Deps{
 		Logger:          log,
@@ -345,6 +397,9 @@ func run() error {
 		}(),
 		FrontendOrigins: parseOrigins(cfg.FrontendBaseURL),
 		PDFSign:         pdfsignRoutes,
+		DemoSandbox:     demoSandbox,
+		Blob:            s3Client.BlobHandler(),
+		Static:          static,
 	})
 
 	srv := &http.Server{

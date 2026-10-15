@@ -3,6 +3,7 @@ package notify
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -15,6 +16,19 @@ import (
 type Emailer struct {
 	ses  *ses.Client
 	from string
+	// sink, when set, makes Send log the message and report success instead
+	// of calling SES. Used by the public demo so no real mail ever leaves.
+	sink *slog.Logger
+}
+
+// NewLogEmailer returns an Emailer that never sends: every message is logged
+// (recipient + subject only) and Send returns nil, so the calling flows behave
+// exactly as they would in production.
+func NewLogEmailer(log *slog.Logger) *Emailer {
+	if log == nil {
+		log = slog.Default()
+	}
+	return &Emailer{sink: log, from: "demo@localhost"}
 }
 
 type EmailerConfig struct {
@@ -47,6 +61,10 @@ type EmailMessage struct {
 }
 
 func (e *Emailer) Send(ctx context.Context, m EmailMessage) error {
+	if e != nil && e.sink != nil {
+		e.sink.Info("email suppressed (outbound disabled)", "to", m.To, "subject", m.Subject)
+		return nil
+	}
 	if e == nil || e.ses == nil {
 		return fmt.Errorf("notify: emailer not initialized")
 	}

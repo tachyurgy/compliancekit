@@ -32,6 +32,9 @@ type Client struct {
 	// state where presign will happily mint URLs that return 403 on upload.
 	// Handlers check this via IsConfigured() and return 503 instead.
 	hasCreds bool
+	// local is non-nil when the client runs in filesystem mode (LocalDir
+	// set): every method below short-circuits to it. See local.go.
+	local *localFS
 }
 
 type Config struct {
@@ -40,9 +43,23 @@ type Config struct {
 	SecretAccessKey string
 	EndpointURL     string // optional override (MinIO / LocalStack)
 	Buckets         Buckets
+
+	// LocalDir switches the client to filesystem mode (no S3 at all).
+	// PublicBaseURL is the origin presigned URLs point at, and URLSigningKey
+	// signs them. All three are required together.
+	LocalDir      string
+	PublicBaseURL string
+	URLSigningKey []byte
 }
 
 func New(ctx context.Context, cfg Config) (*Client, error) {
+	if cfg.LocalDir != "" {
+		l, err := newLocalFS(cfg.LocalDir, cfg.PublicBaseURL, cfg.URLSigningKey, cfg.Buckets)
+		if err != nil {
+			return nil, err
+		}
+		return &Client{buckets: cfg.Buckets, hasCreds: true, local: l}, nil
+	}
 	loadOpts := []func(*awsconfig.LoadOptions) error{
 		awsconfig.WithRegion(cfg.Region),
 	}
@@ -109,6 +126,9 @@ func (c *Client) GetFromBucket(ctx context.Context, bucket, key string) (io.Read
 	if bucket == "" {
 		bucket = c.buckets.Documents
 	}
+	if c.local != nil {
+		return c.local.get(bucket, key)
+	}
 	out, err := c.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -128,6 +148,9 @@ func (c *Client) PresignPutURL(ctx context.Context, bucket, key, mimeType string
 	if bucket == "" {
 		bucket = c.buckets.RawUploads
 	}
+	if c.local != nil {
+		return c.local.presign("PUT", bucket, key, ttl)
+	}
 	req, err := c.presign.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
@@ -143,6 +166,9 @@ func (c *Client) PresignPutURL(ctx context.Context, bucket, key, mimeType string
 func (c *Client) PresignGetURL(ctx context.Context, bucket, key string, ttl time.Duration) (string, error) {
 	if bucket == "" {
 		bucket = c.buckets.Documents
+	}
+	if c.local != nil {
+		return c.local.presign("GET", bucket, key, ttl)
 	}
 	req, err := c.presign.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
@@ -171,6 +197,10 @@ func (c *Client) PutObject(ctx context.Context, bucket, key, mimeType string, bo
 
 // GetObject fetches an arbitrary object. Caller must Close the reader.
 func (c *Client) GetObject(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+	if c.local != nil {
+		rc, _, err := c.local.get(bucket, key)
+		return rc, err
+	}
 	out, err := c.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -185,6 +215,9 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string) (io.ReadClos
 // Callers paginate server-side; we return a fully materialized slice because
 // the expected result size (per-tenant exports) is small.
 func (c *Client) ListPrefix(ctx context.Context, bucket, prefix string) ([]string, error) {
+	if c.local != nil {
+		return c.local.list(bucket, prefix)
+	}
 	var keys []string
 	var continuation *string
 	for {
@@ -222,6 +255,9 @@ func (c *Client) DeleteAllForProvider(ctx context.Context, providerID string) er
 }
 
 func (c *Client) put(ctx context.Context, bucket, key, mimeType string, body io.Reader) error {
+	if c.local != nil {
+		return c.local.put(bucket, key, mimeType, body)
+	}
 	_, err := c.s3.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
@@ -235,6 +271,9 @@ func (c *Client) put(ctx context.Context, bucket, key, mimeType string, body io.
 }
 
 func (c *Client) deletePrefix(ctx context.Context, bucket, prefix string) error {
+	if c.local != nil {
+		return c.local.deletePrefix(bucket, prefix)
+	}
 	var continuation *string
 	for {
 		out, err := c.s3.ListObjectsV2(ctx, &s3.ListObjectsV2Input{

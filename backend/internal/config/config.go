@@ -49,6 +49,24 @@ type Config struct {
 	GeminiAPIKey  string `env:"GEMINI_API_KEY"`
 
 	MagicLinkSigningKey string `env:"MAGIC_LINK_SIGNING_KEY,required"`
+
+	// ---- single-host / demo options (all off by default) ----
+
+	// AutoMigrate applies the embedded migrations on boot.
+	AutoMigrate bool `env:"AUTO_MIGRATE" envDefault:"false"`
+	// StaticDir, when set, serves the built React app from this directory
+	// on the same origin as the API.
+	StaticDir string `env:"STATIC_DIR"`
+	// StorageLocalDir switches object storage from S3 to the local
+	// filesystem (presigned URLs are served by /blob/*).
+	StorageLocalDir string `env:"STORAGE_LOCAL_DIR"`
+	// OutboundDisabled replaces SES and Twilio with log-only senders.
+	OutboundDisabled bool `env:"OUTBOUND_DISABLED" envDefault:"false"`
+	// DemoMode mounts POST /api/auth/demo (one-click sandbox tenants) and
+	// keeps the shared demo login seeded.
+	DemoMode            bool   `env:"DEMO_MODE" envDefault:"false"`
+	DemoAccountEmail    string `env:"DEMO_ACCOUNT_EMAIL"`
+	DemoAccountPassword string `env:"DEMO_ACCOUNT_PASSWORD"`
 }
 
 func Load() (*Config, error) {

@@ -14,6 +14,7 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
   readonly VITE_FRONTEND_BASE_URL?: string;
   readonly VITE_SENTRY_DSN?: string;
+  readonly VITE_DEMO_MODE?: string;
   readonly MODE: 'development' | 'production' | 'test';
   readonly DEV: boolean;
   readonly PROD: boolean;

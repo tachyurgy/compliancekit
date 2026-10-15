@@ -120,6 +120,11 @@ type Deps struct {
 	RateLimit       *mw.TokenBucket
 	FrontendOrigins []string
 	PDFSign         PDFSignRoutes // provided by the pdfsign package; may be nil
+
+	// Optional single-host extras (used by the public demo deployment):
+	DemoSandbox *handlers.DemoSandboxHandler // POST /api/auth/demo one-click sandbox
+	Blob        http.Handler                 // /blob/* presigned URLs in local-storage mode
+	Static      http.Handler                 // serves the built React app for unmatched GETs
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -163,6 +168,9 @@ func NewRouter(d Deps) http.Handler {
 		r.Post("/api/auth/logout", d.Providers.Logout)
 		// REQ-011: alias /signout for the new frontend; /logout remains for back-compat.
 		r.Post("/api/auth/signout", d.Providers.Logout)
+		if d.DemoSandbox != nil {
+			r.Post("/api/auth/demo", d.DemoSandbox.Start)
+		}
 		if d.Auth != nil {
 			r.Post("/api/auth/forgot-password", d.Auth.ForgotPassword)
 			r.Post("/api/auth/reset-password", d.Auth.ResetPassword)
@@ -553,6 +561,23 @@ func NewRouter(d Deps) http.Handler {
 	// pdfsign package mounts its own magic-link-gated sign endpoints.
 	if d.PDFSign != nil {
 		d.PDFSign.MountPublicRoutes(r)
+	}
+
+	if d.Blob != nil {
+		r.Handle("/blob/*", d.Blob)
+	}
+	// Anything no route claimed falls through to the SPA. chi propagates
+	// NotFound into the /api and /portal subrouters, so the static handler
+	// itself answers /api/* misses with a JSON 404 instead of index.html.
+	if d.Static != nil {
+		r.NotFound(d.Static.ServeHTTP)
+		r.MethodNotAllowed(func(w http.ResponseWriter, req *http.Request) {
+			if req.Method == http.MethodGet || req.Method == http.MethodHead {
+				d.Static.ServeHTTP(w, req)
+				return
+			}
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		})
 	}
 
 	return r

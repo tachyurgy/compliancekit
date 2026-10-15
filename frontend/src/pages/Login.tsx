@@ -11,6 +11,8 @@ import { zodResolver } from '@/lib/zodResolver';
 import { providersApi } from '@/api/providers';
 import { ApiError } from '@/api/client';
 import { useSession } from '@/hooks/useSession';
+import DemoLaunchButton from '@/components/common/DemoLaunchButton';
+import { DEMO_MODE } from '@/lib/demo';
 
 /**
  * REQ-011 sign-in page. Adds:
@@ -77,6 +79,18 @@ export default function Login(): JSX.Element {
         </>
       }
     >
+      {DEMO_MODE ? (
+        <div className="mb-6 rounded-lb-sm bg-brand-50 px-4 py-4 ring-1 ring-brand-100">
+          <p className="text-sm text-ink-800">
+            This is a public demo with fictional data. Jump into a private
+            sandbox, or sign in with <strong>demo@example.com</strong> /{' '}
+            <strong>inspection-ready</strong>.
+          </p>
+          <div className="mt-3">
+            <DemoLaunchButton size="md" fullWidth label="Open a private demo sandbox" />
+          </div>
+        </div>
+      ) : null}
       <form onSubmit={onSubmit} className="space-y-5" noValidate>
         <Input
           label="Email"

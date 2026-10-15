@@ -2,7 +2,9 @@ package notify
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/twilio/twilio-go"
 	twilioapi "github.com/twilio/twilio-go/rest/api/v2010"
@@ -12,6 +14,16 @@ type SMSSender struct {
 	client     *twilio.RestClient
 	from       string // E.164 sender — used when not empty
 	serviceSID string // Twilio Messaging Service SID — used when From is empty
+	sink       *slog.Logger
+}
+
+// NewLogSMSSender returns a sender that logs instead of calling Twilio and
+// reports success with a synthetic SID. Used by the public demo.
+func NewLogSMSSender(log *slog.Logger) *SMSSender {
+	if log == nil {
+		log = slog.Default()
+	}
+	return &SMSSender{sink: log}
 }
 
 type SMSConfig struct {
@@ -34,6 +46,10 @@ func NewSMSSender(cfg SMSConfig) *SMSSender {
 
 // Send sends a single SMS. Returns the provider message SID on success.
 func (s *SMSSender) Send(to, body string) (string, error) {
+	if s != nil && s.sink != nil {
+		s.sink.Info("sms suppressed (outbound disabled)", "to", to, "chars", len(body))
+		return fmt.Sprintf("SMdemo%d", time.Now().UnixNano()), nil
+	}
 	if s == nil || s.client == nil {
 		return "", fmt.Errorf("notify: sms client not initialized")
 	}

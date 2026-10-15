@@ -2,6 +2,8 @@ import { Link, Navigate } from 'react-router-dom';
 import { CheckCircle2, AlertTriangle, FileCheck2 } from 'lucide-react';
 
 import Button from '@/components/common/Button';
+import DemoLaunchButton from '@/components/common/DemoLaunchButton';
+import { ARCHITECTURE_URL, DEMO_MODE } from '@/lib/demo';
 import BrandMark from '@/components/common/BrandMark';
 import { useSession } from '@/hooks/useSession';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -50,9 +52,11 @@ export default function Landing(): JSX.Element {
             <Link to="/login">
               <Button variant="ghost" size="sm">Sign in</Button>
             </Link>
-            <Link to="/signup">
-              <Button size="sm">Start free trial</Button>
-            </Link>
+            {DEMO_MODE ? null : (
+              <Link to="/signup">
+                <Button size="sm">Start free trial</Button>
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -75,19 +79,37 @@ export default function Landing(): JSX.Element {
             pre-inspection panic with a single dashboard that tracks every
             requirement, deadline, and document your DCF inspector will ask for.
           </p>
-          <div className="mt-9 flex items-center justify-center gap-3 flex-wrap">
-            <Link to="/signup">
-              <Button size="lg">Start your free trial</Button>
-            </Link>
-            <a href="/compliancekit-product-overview.html">
-              <Button size="lg" variant="secondary">
-                See how it works
-              </Button>
-            </a>
-          </div>
-          <p className="mt-5 text-sm text-ink-500">
-            14 days free · No card hassle · Cancel any time
-          </p>
+          {DEMO_MODE ? (
+            <>
+              <div className="mt-9 flex items-center justify-center gap-3 flex-wrap">
+                <DemoLaunchButton />
+                <a href={ARCHITECTURE_URL}>
+                  <Button size="lg" variant="secondary">
+                    Read the architecture
+                  </Button>
+                </a>
+              </div>
+              <p className="mt-5 text-sm text-ink-500">
+                Public demo · fictional data · email, SMS and payments are switched off
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="mt-9 flex items-center justify-center gap-3 flex-wrap">
+                <Link to="/signup">
+                  <Button size="lg">Start your free trial</Button>
+                </Link>
+                <a href="/compliancekit-product-overview.html">
+                  <Button size="lg" variant="secondary">
+                    See how it works
+                  </Button>
+                </a>
+              </div>
+              <p className="mt-5 text-sm text-ink-500">
+                14 days free · No card hassle · Cancel any time
+              </p>
+            </>
+          )}
         </div>
       </section>
 

@@ -1,73 +1,73 @@
 # ComplianceKit
 
-Compliance management SaaS for licensed child care providers. Tracks every state-specific regulatory requirement, deadline, and document against a deterministic rules engine. Replaces paper binders, spreadsheets, and pre-inspection panic.
+Licensing-compliance software for child care centers. It tracks every state requirement, deadline and document an inspector will ask for, scores how inspection-ready a center is today, chases parents and staff for expiring paperwork, and collects signatures on forms with a self-hosted PDF e-signature flow.
 
-**Tagline:** "Be inspection-ready every single day."
+**Go backend** (single static binary, SQLite, `net/http` + chi) and a **React + TypeScript** frontend.
 
-**Launch markets (MVP):** California, Texas, Florida.
+- **Live demo:** https://compliancekit.levelbrook.com
+  - Click **Explore the live demo** for a private, pre-seeded sandbox (deleted after 24 hours), or
+  - sign in with **`demo@example.com`** / **`inspection-ready`** (shared account; its sample data is restored hourly if someone deletes it).
+  - All data is fictional. Email, SMS and payments are switched off; signing links are shown on screen instead of emailed.
+- **Architecture, design and why Go:** [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Release history:** [RELEASES.md](RELEASES.md)
 
----
+## Things to try in the demo
 
-## Quickstart (development)
-
-```bash
-# Clone
-git clone https://github.com/tachyurgy/compliancekit.git
-cd compliancekit/backend
-
-# Environment
-cp .env.example .env
-# Edit .env — fill in:
-#   DATABASE_URL  (defaults to ./ck.db — local SQLite file, ADR-017)
-#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY + S3_BUCKET=ck-files
-#   CK_SES_*, CK_TWILIO_*, CK_STRIPE_*, CK_MISTRAL_API_KEY, CK_GEMINI_API_KEY
-
-# Optional: MinIO stand-in for S3 (the DB is just a file, no DB container needed)
-docker-compose up -d
-
-# Run migrations
-go run ./cmd/migrate up
-
-# Start API
-go run ./cmd/api
-
-# In a second terminal, start the worker
-go run ./cmd/worker
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm install
-cp .env.local.example .env.local  # set VITE_API_BASE=http://localhost:8080
-npm run dev
-```
-
----
-
-## Architecture (one paragraph)
-
-Go backend running under systemd on a single DigitalOcean droplet, reverse-proxied by Caddy with auto-TLS. React (Vite + TypeScript) frontend hosted on GitHub Pages. SQLite (WAL mode, pure-Go `modernc.org/sqlite` driver) as the primary datastore — one file on the droplet, backed up nightly to S3 (see ADR-017). Four dedicated S3 buckets partition document storage by lifecycle and access pattern. Stripe for billing, SES for email, Twilio for SMS. Mistral OCR extracts text from uploaded documents with Gemini Flash as fallback; Gemini Flash is also used for structured metadata extraction and an onboarding chat. The compliance rules engine is a pure Go package — deterministic, fully unit-tested, no LLM at runtime. Authentication is magic-link only, two-part: owner login and per-parent/per-staff upload portals.
-
----
+1. **Dashboard:** the readiness score and top gaps for a fictional Florida center (Sunshine Kids of Hialeah).
+2. **Staff / Children:** per-person required documents, with what is missing and what is expiring.
+3. **Inspections:** run a mock inspection against Florida's CF-FSP 5316 checklist. **Open Inspector View** shows the read-only screen a center hands to the inspector.
+4. **Templates → Send for signature:** create a signing link for the sample permission slip, open it, fill and sign it, then download the signed PDF (with its certificate page) and the JSON audit record.
+5. **Chase Mode / Send a message:** reminder history and manual nudges. They are recorded but not delivered in the demo.
 
 ## Layout
 
-- `backend/` - Go API + worker: rules engine (`internal/compliance`, `internal/inspection`), self-hosted PDF e-signature (`internal/pdfsign`), notifications, Stripe billing, migrations, integration tests
-- `frontend/` - React + Vite + TypeScript app, Playwright e2e
-- `docs/pdf-signature-spec.md` - design of the PDF signing pipeline
+```
+backend/    Go API, rules engine, pdfsign, workers, migrations (cmd/server is the entry point)
+frontend/   React 18 + Vite + TypeScript app, Vitest + Playwright tests
+docs/       pdf-signature-spec.md (the e-signature design)
+deploy/     demo runtime image, env template, deploy script
+Dockerfile  multi-stage from-source build of the whole thing
+```
 
----
+## Run it locally
 
-## Contributing
+Requires Go 1.25+ and Node 20+.
 
-Solo for now. If that changes, this section becomes real.
+```bash
+# 1. Build the frontend in demo mode (same-origin API)
+cd frontend
+npm ci
+VITE_DEMO_MODE=1 VITE_API_BASE_URL= npm run build
+cd ../backend
 
----
+# 2. Run the API + UI on :8080 with local storage and no outbound email/SMS
+export APP_BASE_URL=http://localhost:8080 FRONTEND_BASE_URL=http://localhost:8080 \
+  SESSION_COOKIE_DOMAIN=localhost DATABASE_URL=./ck.db AUTO_MIGRATE=true \
+  STATIC_DIR=../frontend/dist STORAGE_LOCAL_DIR=./blobs OUTBOUND_DISABLED=true \
+  DEMO_MODE=true DEMO_ACCOUNT_EMAIL=demo@example.com DEMO_ACCOUNT_PASSWORD=inspection-ready \
+  S3_BUCKET_DOCUMENTS=documents S3_BUCKET_SIGNED_PDFS=signed-pdfs \
+  S3_BUCKET_AUDIT_TRAIL=audit-trail S3_BUCKET_RAW_UPLOADS=raw-uploads \
+  SES_FROM_EMAIL=no-reply@example.com STRIPE_SECRET_KEY=sk_test_disabled \
+  STRIPE_WEBHOOK_SECRET=whsec_disabled STRIPE_PRICE_PRO=price_disabled \
+  MAGIC_LINK_SIGNING_KEY=$(openssl rand -hex 32)
+go run ./cmd/server
+```
+
+Open http://localhost:8080. For frontend development with hot reload, run `npm run dev` in `frontend/` with `VITE_API_BASE_URL=http://localhost:8080`.
+
+Or with Docker: `docker build -t compliancekit .`, then run it with the variables from `deploy/demo.env.example` (set `APP_BASE_URL`, `FRONTEND_BASE_URL` and `SESSION_COOKIE_DOMAIN` for your host).
+
+## Tests
+
+```bash
+cd backend && go test ./...          # 400 Go tests incl. HTTP integration tests on a fresh SQLite per test
+cd frontend && npx tsc -b && npx vitest run
+```
+
+CI runs both on every push (`.github/workflows/`).
 
 ## License
 
-Proprietary. All rights reserved. Not open source. Unauthorized use, copying, or distribution prohibited.
+Proprietary. All rights reserved. The source is published for review. It is not open source, and it may not be used, copied or distributed without permission.
 
 Copyright © 2026 ComplianceKit (Washington LLC).

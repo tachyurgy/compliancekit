@@ -32,11 +32,16 @@ const PasswordResetExpiryMinutes = 30
 // PasswordResetData fills the password-reset template's named placeholders.
 //
 // FirstName        — the user's first name; falls back to "there" when empty
-//                    (handled by firstNameOnly).
+//
+//	(handled by firstNameOnly).
+//
 // ResetURL         — the absolute URL the recipient clicks to set a new
-//                    password, e.g. https://app.levelbrook.com/reset-password/<raw-token>.
+//
+//	password, e.g. https://app.levelbrook.com/reset-password/<raw-token>.
+//
 // ExpiresInMinutes — surfaces the TTL in the body copy. Defaults to
-//                    PasswordResetExpiryMinutes when zero.
+//
+//	PasswordResetExpiryMinutes when zero.
 type PasswordResetData struct {
 	FirstName        string
 	ResetURL         string

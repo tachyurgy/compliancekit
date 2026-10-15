@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 	"github.com/stripe/stripe-go/v79/webhook"
+	"github.com/tachyurgy/compliancekit/backend/internal/base62"
 )
 
 const testWebhookSecret = "whsec_test_1234567890abcdef"

@@ -25,13 +25,19 @@ var trialConvertedTXT string
 // FirstName       — operator's first name; falls back to "there".
 // FacilityName    — daycare display name; falls back to "your account".
 // PlanName        — human-readable plan ("Monthly", "Annual"); the body
-//                   prefixes "Levelbrook Professional" — the meta row
-//                   shows just this label. Falls back to "Levelbrook
-//                   Professional Monthly".
+//
+//	prefixes "Levelbrook Professional" — the meta row
+//	shows just this label. Falls back to "Levelbrook
+//	Professional Monthly".
+//
 // AmountCharged   — pre-formatted dollar string like "99.00" (no $ sign;
-//                   template renders the dollar sign).
+//
+//	template renders the dollar sign).
+//
 // NextChargeOn    — formatted date like "Jun 26, 2026". Falls back to a
-//                   helpful placeholder so the email is never blank.
+//
+//	helpful placeholder so the email is never blank.
+//
 // AppURL          — app base URL with no trailing slash.
 type TrialConvertedData struct {
 	FirstName     string

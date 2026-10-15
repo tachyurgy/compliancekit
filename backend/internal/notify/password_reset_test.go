@@ -20,10 +20,10 @@ func TestRenderPasswordReset_HappyPath(t *testing.T) {
 		t.Fatalf("subject = %q", subject)
 	}
 	for _, want := range []string{
-		"Sarah",                                                                          // first name only
-		"https://app.levelbrook.com/reset-password/Bx7kPmQ2nT9rW4yL3vZ8aH6cJ5dF1gE0M",     // reset URL
-		"30",                                                                             // default expiry minutes
-		"levelbrookteam@gmail.com",                                                       // footer support address
+		"Sarah", // first name only
+		"https://app.levelbrook.com/reset-password/Bx7kPmQ2nT9rW4yL3vZ8aH6cJ5dF1gE0M", // reset URL
+		"30",                       // default expiry minutes
+		"levelbrookteam@gmail.com", // footer support address
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("HTML body missing %q", want)

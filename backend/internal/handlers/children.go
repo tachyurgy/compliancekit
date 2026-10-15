@@ -641,4 +641,3 @@ func (h *ChildHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.RenderJSON(w, http.StatusOK, out)
 }
-

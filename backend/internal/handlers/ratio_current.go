@@ -110,7 +110,7 @@ type RoomRatioStatus struct {
 	RoomName        string `json:"room_name"`
 	AgeBand         string `json:"age_band"`
 	AgeBandLabel    string `json:"age_band_label"`
-	MandatedRatio   int    `json:"mandated_ratio"`    // max children per single staff
+	MandatedRatio   int    `json:"mandated_ratio"` // max children per single staff
 	ChildrenPresent int    `json:"children_present"`
 	StaffPresent    int    `json:"staff_present"`
 	Status          string `json:"status"` // "compliant" | "tight" | "out_of_ratio" | "unknown"
@@ -119,12 +119,12 @@ type RoomRatioStatus struct {
 
 // RatioCurrentResponse is the top-level shape /api/ratio/current returns.
 type RatioCurrentResponse struct {
-	State          string            `json:"state"`
-	AsOf           string            `json:"as_of"`
-	StaffPresent   int               `json:"staff_present_total"`
-	ChildrenTotal  int               `json:"children_present_total"`
-	Rooms          []RoomRatioStatus `json:"rooms"`
-	AnyOutOfRatio  bool              `json:"any_out_of_ratio"`
+	State         string            `json:"state"`
+	AsOf          string            `json:"as_of"`
+	StaffPresent  int               `json:"staff_present_total"`
+	ChildrenTotal int               `json:"children_present_total"`
+	Rooms         []RoomRatioStatus `json:"rooms"`
+	AnyOutOfRatio bool              `json:"any_out_of_ratio"`
 }
 
 // Get handles GET /api/ratio/current. Read-only — no DB writes.

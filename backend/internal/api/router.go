@@ -95,16 +95,16 @@ type Deps struct {
 	Drills          *handlers.DrillHandler
 	Postings        *handlers.PostingHandler
 	Ratio           *handlers.RatioHandler
-	EvidencePhotos  *handlers.EvidencePhotoHandler  // REQ-038
-	RatioCurrent    *handlers.RatioCurrentHandler   // REQ-039: per-room computed ratio
+	EvidencePhotos  *handlers.EvidencePhotoHandler // REQ-038
+	RatioCurrent    *handlers.RatioCurrentHandler  // REQ-039: per-room computed ratio
 	Inspections     *handlers.InspectionHandler
 	InspectionMode  *handlers.InspectionModeHandler
 	AuditLog        *handlers.AuditLogHandler
 	DataExport      *handlers.DataExportHandler
 	Contact         *handlers.ContactHandler
 	Nag             *handlers.NagHandler
-	Chase           *handlers.ChaseHandler    // REQ-042: Chase Mode dashboard
-	Messages        *handlers.MessagesHandler // REQ-043: free-form message composer
+	Chase           *handlers.ChaseHandler      // REQ-042: Chase Mode dashboard
+	Messages        *handlers.MessagesHandler   // REQ-043: free-form message composer
 	Facility        *handlers.FacilityHandler   // REQ-003: 4-step onboarding wizard
 	UploadLink      *handlers.UploadLinkHandler // REQ-004: shareable staff upload link
 	Score           *handlers.ScoreHandler      // REQ-013: synthesised dashboard score

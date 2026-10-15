@@ -33,18 +33,18 @@ type InspectionHandler struct {
 // --- DTOs returned to the frontend ---
 
 type inspectionRunDTO struct {
-	ID           string     `json:"id"`
-	ProviderID   string     `json:"provider_id"`
-	State        string     `json:"state"`
-	FormRef      string     `json:"form_ref"`
-	StartedAt    time.Time  `json:"started_at"`
-	CompletedAt  *time.Time `json:"completed_at,omitempty"`
-	Score        *int       `json:"score,omitempty"`
-	TotalItems   int        `json:"total_items"`
-	ItemsPassed  int        `json:"items_passed"`
-	ItemsFailed  int        `json:"items_failed"`
-	ItemsNA      int        `json:"items_na"`
-	ItemsAnswered int       `json:"items_answered"`
+	ID            string     `json:"id"`
+	ProviderID    string     `json:"provider_id"`
+	State         string     `json:"state"`
+	FormRef       string     `json:"form_ref"`
+	StartedAt     time.Time  `json:"started_at"`
+	CompletedAt   *time.Time `json:"completed_at,omitempty"`
+	Score         *int       `json:"score,omitempty"`
+	TotalItems    int        `json:"total_items"`
+	ItemsPassed   int        `json:"items_passed"`
+	ItemsFailed   int        `json:"items_failed"`
+	ItemsNA       int        `json:"items_na"`
+	ItemsAnswered int        `json:"items_answered"`
 }
 
 type responseDTO struct {
@@ -56,12 +56,12 @@ type responseDTO struct {
 }
 
 type domainBreakdown struct {
-	Name        string `json:"name"`
-	Total       int    `json:"total"`
-	Passed      int    `json:"passed"`
-	Failed      int    `json:"failed"`
-	NA          int    `json:"na"`
-	Unanswered  int    `json:"unanswered"`
+	Name       string `json:"name"`
+	Total      int    `json:"total"`
+	Passed     int    `json:"passed"`
+	Failed     int    `json:"failed"`
+	NA         int    `json:"na"`
+	Unanswered int    `json:"unanswered"`
 }
 
 type citationRisk struct {
@@ -75,11 +75,11 @@ type citationRisk struct {
 }
 
 type runDetailDTO struct {
-	Run        inspectionRunDTO      `json:"run"`
-	Checklist  inspection.Checklist  `json:"checklist"`
-	Responses  []responseDTO         `json:"responses"`
-	Domains    []domainBreakdown     `json:"domain_breakdown,omitempty"`
-	Citations  []citationRisk        `json:"predicted_citations,omitempty"`
+	Run       inspectionRunDTO     `json:"run"`
+	Checklist inspection.Checklist `json:"checklist"`
+	Responses []responseDTO        `json:"responses"`
+	Domains   []domainBreakdown    `json:"domain_breakdown,omitempty"`
+	Citations []citationRisk       `json:"predicted_citations,omitempty"`
 }
 
 // --- POST /api/inspections ---
@@ -319,12 +319,12 @@ func (h *InspectionHandler) Finalize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	auditlog.EmitInspectionFinalize(r.Context(), h.Pool, pid, mw.UserIDFrom(r.Context()), runID, map[string]any{
-		"score":           score,
-		"items_passed":    run.ItemsPassed,
-		"items_failed":    run.ItemsFailed,
-		"items_na":        run.ItemsNA,
-		"total_items":     run.TotalItems,
-		"state":           run.State,
+		"score":        score,
+		"items_passed": run.ItemsPassed,
+		"items_failed": run.ItemsFailed,
+		"items_na":     run.ItemsNA,
+		"total_items":  run.TotalItems,
+		"state":        run.State,
 	}, r)
 	httpx.RenderJSON(w, http.StatusOK, runDetailDTO{
 		Run:       run,

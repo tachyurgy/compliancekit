@@ -344,24 +344,24 @@ func (h *ProviderHandler) Me(w http.ResponseWriter, r *http.Request) {
 
 	httpx.RenderJSON(w, http.StatusOK, map[string]any{
 		// Provider-shape fields (backend consumers).
-		"id":                  p.ID,
-		"name":                p.Name,
-		"legal_name":          p.LegalName,
-		"state_code":          p.StateCode,
-		"license_number":      p.LicenseNumber,
-		"owner_email":         p.OwnerEmail,
-		"phone":               p.OwnerPhone,
-		"capacity":            p.Capacity,
-		"timezone":            p.Timezone,
-		"stripe_customer_id":  p.StripeCustID,
-		"created_at":          p.CreatedAt,
-		"updated_at":          p.UpdatedAt,
+		"id":                 p.ID,
+		"name":               p.Name,
+		"legal_name":         p.LegalName,
+		"state_code":         p.StateCode,
+		"license_number":     p.LicenseNumber,
+		"owner_email":        p.OwnerEmail,
+		"phone":              p.OwnerPhone,
+		"capacity":           p.Capacity,
+		"timezone":           p.Timezone,
+		"stripe_customer_id": p.StripeCustID,
+		"created_at":         p.CreatedAt,
+		"updated_at":         p.UpdatedAt,
 		// SessionUser-shape fields (frontend consumers).
-		"email":               p.OwnerEmail,
-		"fullName":            userName,
-		"providerId":          p.ID,
-		"role":                "owner",
-		"onboardingComplete":  onboarded,
+		"email":              p.OwnerEmail,
+		"fullName":           userName,
+		"providerId":         p.ID,
+		"role":               "owner",
+		"onboardingComplete": onboarded,
 	})
 }
 
@@ -450,9 +450,9 @@ func (h *ProviderHandler) DeleteMe(w http.ResponseWriter, r *http.Request) {
 		UserAgent:  r.UserAgent(),
 	})
 	httpx.RenderJSON(w, http.StatusOK, map[string]any{
-		"status":             "scheduled_for_deletion",
-		"grace_period_days":  90,
-		"message":            "Your account is scheduled for deletion. All data will be permanently removed in 90 days unless you contact support to cancel.",
+		"status":            "scheduled_for_deletion",
+		"grace_period_days": 90,
+		"message":           "Your account is scheduled for deletion. All data will be permanently removed in 90 days unless you contact support to cancel.",
 	})
 }
 
@@ -647,10 +647,10 @@ func (h *ProviderHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Requ
 		TargetKind: auditlog.TargetKindProvider,
 		TargetID:   pid,
 		Metadata: map[string]any{
-			"state_code":    stateUpper,
-			"license_type":  in.LicenseType,
-			"capacity":      in.Capacity,
-			"staff_count":   len(in.Staff),
+			"state_code":     stateUpper,
+			"license_type":   in.LicenseType,
+			"capacity":       in.Capacity,
+			"staff_count":    len(in.Staff),
 			"children_count": len(in.Children),
 		},
 		IP:        auditlog.ClientIP(r),
@@ -663,8 +663,8 @@ func (h *ProviderHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Requ
 		outID, outName, outStateCode, outLicenseType, outAddr1, outCity, outStateRegion, outPostal string
 		outLicenseNumber, outAddr2                                                                 sql.NullString
 		outCapacity, outMinMonths, outMaxMonths                                                    int
-		outOnboarded                                                                                bool
-		outCreatedStr                                                                               string
+		outOnboarded                                                                               bool
+		outCreatedStr                                                                              string
 	)
 	err = h.Pool.QueryRowContext(r.Context(), `
 		SELECT id,
@@ -845,7 +845,7 @@ func (h *ProviderHandler) mintPortalLink(w http.ResponseWriter, r *http.Request,
 	// simpler than a UNION and keeps the FK semantics explicit.
 	var (
 		firstName, lastName, email string
-		found                       bool
+		found                      bool
 	)
 	switch subjectKind {
 	case "child":
@@ -983,11 +983,11 @@ func (h *ProviderHandler) mintPortalLink(w http.ResponseWriter, r *http.Request,
 	})
 
 	httpx.RenderJSON(w, http.StatusOK, map[string]any{
-		"url":         url,
-		"expires_at":  expiresAt.Format(time.RFC3339),
-		"subject_id":  subjectID,
+		"url":          url,
+		"expires_at":   expiresAt.Format(time.RFC3339),
+		"subject_id":   subjectID,
 		"subject_kind": subjectKind,
-		"emailed":     emailed,
+		"emailed":      emailed,
 	})
 }
 

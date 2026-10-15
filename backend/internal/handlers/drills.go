@@ -213,6 +213,7 @@ func (h *DrillHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // SQLite emits two formats depending on how the value was inserted:
 //   - "2006-01-02 15:04:05"           (CURRENT_TIMESTAMP default)
 //   - "2006-01-02T15:04:05Z"          (Go time.Time encoded via driver)
+//
 // Falls back to zero time on parse failure rather than erroring the whole
 // request — the UI can tolerate a blank timestamp; 500 on a list endpoint
 // cannot.

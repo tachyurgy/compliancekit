@@ -3,10 +3,10 @@
 // REQ-002 + REQ-011 auth surfaces beyond the legacy ProviderHandler.Signup /
 // .Signin (which we keep for back-compat). This file owns:
 //
-//   * Sliding-window 90-day session refresh on every authenticated request.
-//   * Forgot-password / reset-password (email-link, 30-min, single-use).
-//   * Signout-everywhere (revoke all sessions for a user).
-//   * GET /api/auth/sessions for the /settings/security UI.
+//   - Sliding-window 90-day session refresh on every authenticated request.
+//   - Forgot-password / reset-password (email-link, 30-min, single-use).
+//   - Signout-everywhere (revoke all sessions for a user).
+//   - GET /api/auth/sessions for the /settings/security UI.
 //
 // We deliberately keep Signup/Signin in handlers/providers.go (where the
 // existing tests + frontend call sites live) and only add the new endpoints

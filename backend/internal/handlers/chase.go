@@ -21,9 +21,9 @@ import (
 // (REQ-042). It reads from the existing chase-related tables and exposes
 // three endpoints:
 //
-//   GET  /api/chase/state    — outstanding chases + stuck items
-//   GET  /api/chase/activity — recent nag log (defaults to last 30 days)
-//   POST /api/chase/trigger  — fires a fresh nag, reusing NagHandler
+//	GET  /api/chase/state    — outstanding chases + stuck items
+//	GET  /api/chase/activity — recent nag log (defaults to last 30 days)
+//	POST /api/chase/trigger  — fires a fresh nag, reusing NagHandler
 //
 // No new background workers. No new templates. The handler is a thin
 // read layer on top of the existing chase tables plus a trigger that
@@ -42,11 +42,11 @@ type ChaseRow struct {
 	RecipientRole  string `json:"recipientRole"`
 	RecipientPhone string `json:"recipientPhone,omitempty"`
 	RecipientEmail string `json:"recipientEmail,omitempty"`
-	ItemKind       string `json:"itemKind"`             // "doc_required"
-	ItemLabel      string `json:"itemLabel"`            // e.g. "DH-680"
-	DueOn          string `json:"dueOn,omitempty"`      // ISO date or empty
-	Channel        string `json:"channel"`              // recipient's preferred channel
-	LastNagAt      string `json:"lastNagAt,omitempty"`  // ISO timestamp
+	ItemKind       string `json:"itemKind"`            // "doc_required"
+	ItemLabel      string `json:"itemLabel"`           // e.g. "DH-680"
+	DueOn          string `json:"dueOn,omitempty"`     // ISO date or empty
+	Channel        string `json:"channel"`             // recipient's preferred channel
+	LastNagAt      string `json:"lastNagAt,omitempty"` // ISO timestamp
 	LastNagChannel string `json:"lastNagChannel,omitempty"`
 	LastNagStatus  string `json:"lastNagStatus,omitempty"`
 	NagCount       int    `json:"nagCount"`
@@ -314,11 +314,11 @@ func (h *ChaseHandler) loadStaffOutstanding(r *http.Request, pid string) ([]Chas
 	out := make([]ChaseRow, 0)
 	for rows.Next() {
 		var (
-			sid, ct, st, dueOn string
-			first, last, role  string
-			email, phone, ch   string
+			sid, ct, st, dueOn     string
+			first, last, role      string
+			email, phone, ch       string
 			lastAt, lastCh, lastSt sql.NullString
-			nagCount           int
+			nagCount               int
 		)
 		if err := rows.Scan(&sid, &ct, &st, &dueOn, &first, &last, &role,
 			&email, &phone, &ch, &lastAt, &lastCh, &lastSt, &nagCount); err != nil {
@@ -410,11 +410,11 @@ func (h *ChaseHandler) loadParentOutstanding(r *http.Request, pid string) ([]Cha
 	out := make([]ChaseRow, 0)
 	for rows.Next() {
 		var (
-			cid, dt, st, dueOn string
+			cid, dt, st, dueOn                string
 			childFirst, childLast, parentName string
-			email, phone, ch   string
-			lastAt, lastCh, lastSt sql.NullString
-			nagCount           int
+			email, phone, ch                  string
+			lastAt, lastCh, lastSt            sql.NullString
+			nagCount                          int
 		)
 		if err := rows.Scan(&cid, &dt, &st, &dueOn, &childFirst, &childLast,
 			&parentName, &email, &phone, &ch, &lastAt, &lastCh, &lastSt, &nagCount); err != nil {

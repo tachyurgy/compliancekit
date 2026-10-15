@@ -27,12 +27,12 @@ type PostingHandler struct {
 // PostingItem is one entry on the wall-postings checklist. state_specific is
 // true when the key only exists in one state (UI can surface that as a hint).
 type PostingItem struct {
-	Key              string     `json:"key"`
-	Label            string     `json:"label"`
-	StateSpecific    bool       `json:"state_specific"`
-	Required         bool       `json:"required"`
-	PostedAt         *time.Time `json:"posted_at,omitempty"`
-	PhotoDocumentID  string     `json:"photo_document_id,omitempty"`
+	Key             string     `json:"key"`
+	Label           string     `json:"label"`
+	StateSpecific   bool       `json:"state_specific"`
+	Required        bool       `json:"required"`
+	PostedAt        *time.Time `json:"posted_at,omitempty"`
+	PhotoDocumentID string     `json:"photo_document_id,omitempty"`
 }
 
 // postingDef is the static per-state definition; user data is overlaid onto it.
@@ -91,8 +91,8 @@ type postingEntry struct {
 }
 
 type postingsResponse struct {
-	Items              []PostingItem `json:"items"`
-	AllRequiredPosted  bool          `json:"all_required_posted"`
+	Items             []PostingItem `json:"items"`
+	AllRequiredPosted bool          `json:"all_required_posted"`
 }
 
 // GET /api/facility/postings

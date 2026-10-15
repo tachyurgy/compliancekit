@@ -9,10 +9,10 @@ import (
 // unexported symbols.
 func TestClassifyRoom(t *testing.T) {
 	cases := []struct {
-		name                                   string
-		children, staff, mandated              int
-		wantStatus                             string
-		wantSubstr                             string
+		name                      string
+		children, staff, mandated int
+		wantStatus                string
+		wantSubstr                string
 	}{
 		{"no children", 0, 1, 4, "compliant", "No children"},
 		{"children no staff", 3, 0, 4, "out_of_ratio", "at least one staff"},

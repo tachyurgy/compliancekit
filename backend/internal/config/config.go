@@ -40,9 +40,9 @@ type Config struct {
 	StripePriceMonthly string `env:"STRIPE_PRICE_MONTHLY"`
 	StripePriceAnnual  string `env:"STRIPE_PRICE_ANNUAL"`
 
-	TwilioAccountSID         string `env:"TWILIO_ACCOUNT_SID"`
-	TwilioAuthToken          string `env:"TWILIO_AUTH_TOKEN"`
-	TwilioFromNumber         string `env:"TWILIO_FROM_NUMBER"`
+	TwilioAccountSID          string `env:"TWILIO_ACCOUNT_SID"`
+	TwilioAuthToken           string `env:"TWILIO_AUTH_TOKEN"`
+	TwilioFromNumber          string `env:"TWILIO_FROM_NUMBER"`
 	TwilioMessagingServiceSID string `env:"TWILIO_MESSAGING_SERVICE_SID"`
 
 	MistralAPIKey string `env:"MISTRAL_API_KEY"`

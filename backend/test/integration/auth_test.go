@@ -24,10 +24,10 @@ func TestHealthz(t *testing.T) {
 }
 
 // Password-auth contract (post-2026-05-08 commit 4a2286a):
-//   * POST /api/auth/signup expects { name|facility_name, owner_email|email,
+//   - POST /api/auth/signup expects { name|facility_name, owner_email|email,
 //     state_code, password } where password is ≥12 chars.
 //     Success returns HTTP 200 with a `ck_sess` cookie set.
-//   * POST /api/auth/signin expects { email, password }. 200 + cookie on
+//   - POST /api/auth/signin expects { email, password }. 200 + cookie on
 //     success; 401 ("authentication required") on unknown email or wrong
 //     password — this endpoint must NOT leak account existence.
 const testSignupPassword = "QABot-Strong-12345" // ≥12 chars

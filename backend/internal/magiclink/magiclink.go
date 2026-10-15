@@ -116,11 +116,11 @@ func (s *Service) Consume(ctx context.Context, token string) (*Claim, error) {
 	hash := s.hash(token)
 
 	var (
-		id, kindStr     string
-		providerID      *string
-		subjectID       *string
-		expiresAtRaw    string
-		consumedAtRaw   sql.NullString
+		id, kindStr   string
+		providerID    *string
+		subjectID     *string
+		expiresAtRaw  string
+		consumedAtRaw sql.NullString
 	)
 	err := s.pool.QueryRowContext(ctx, `
 		SELECT id, kind, provider_id, subject_id, expires_at, consumed_at

@@ -14,16 +14,17 @@ import (
 // requirements for POST/GET/DELETE /api/drills.
 //
 // KNOWN BUG (surfaced by this test, 2026-04-20):
-//   The GET /api/drills handler scans drill_logs.drill_date (a TEXT column)
-//   into a Go time.Time. The modernc.org/sqlite driver returns TEXT columns
-//   as strings, and database/sql will NOT auto-parse a string into a
-//   time.Time — so any GET after a POST fails with:
-//     "sql: Scan error on column index 3, name \"drill_date\":
-//      unsupported Scan, storing driver.Value type string into type *time.Time"
-//   Fix: handler should scan into a string and time.Parse it, OR the DTO
-//   should use a string field, OR Register a NullTime-backed column type.
-//   Until fixed, the test verifies behaviour through direct DB inspection
-//   instead of GET calls.
+//
+//	The GET /api/drills handler scans drill_logs.drill_date (a TEXT column)
+//	into a Go time.Time. The modernc.org/sqlite driver returns TEXT columns
+//	as strings, and database/sql will NOT auto-parse a string into a
+//	time.Time — so any GET after a POST fails with:
+//	  "sql: Scan error on column index 3, name \"drill_date\":
+//	   unsupported Scan, storing driver.Value type string into type *time.Time"
+//	Fix: handler should scan into a string and time.Parse it, OR the DTO
+//	should use a string field, OR Register a NullTime-backed column type.
+//	Until fixed, the test verifies behaviour through direct DB inspection
+//	instead of GET calls.
 func TestDrills_CRUD_And_Isolation(t *testing.T) {
 	h := NewHarness(t)
 

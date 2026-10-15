@@ -84,7 +84,8 @@ func (h *KioskHandler) IssueSession(w http.ResponseWriter, r *http.Request) {
 // POST /kiosk/sign-in
 //
 // Body: { "kind":"child_in"|"staff_in", "subject_id":"...", "pin":"1234",
-//         "dropped_off_by":"name (children only)", "room_id":"...","notes":"..." }
+//
+//	"dropped_off_by":"name (children only)", "room_id":"...","notes":"..." }
 func (h *KioskHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	h.handleEvent(w, r, true)
 }

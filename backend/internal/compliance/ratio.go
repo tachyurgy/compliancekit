@@ -52,12 +52,12 @@ type bandStats struct {
 // ByBand is the per-band breakdown returned alongside the floor; the
 // dashboard renders these as a small chip strip.
 type ByBand struct {
-	Under1   bandStats `json:"under_1"`
-	M12To24  bandStats `json:"m12_24"`
-	M24To36  bandStats `json:"m24_36"`
-	M36To48  bandStats `json:"m36_48"`
-	M48To60  bandStats `json:"m48_60"`
-	M60Plus  bandStats `json:"m60_plus"`
+	Under1  bandStats `json:"under_1"`
+	M12To24 bandStats `json:"m12_24"`
+	M24To36 bandStats `json:"m24_36"`
+	M36To48 bandStats `json:"m36_48"`
+	M48To60 bandStats `json:"m48_60"`
+	M60Plus bandStats `json:"m60_plus"`
 }
 
 // Warning is a single calm coral coaching message surfaced on the dashboard.

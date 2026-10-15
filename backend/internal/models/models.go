@@ -15,18 +15,18 @@ const (
 )
 
 type Provider struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	LegalName     string    `json:"legal_name,omitempty"`
-	StateCode     StateCode `json:"state_code"`
-	LicenseNumber string    `json:"license_number,omitempty"`
-	OwnerEmail    string    `json:"owner_email"`
-	OwnerPhone    string    `json:"owner_phone,omitempty"`
-	Capacity      int       `json:"capacity"`
-	Timezone      string    `json:"timezone"`
-	StripeCustID  string    `json:"stripe_customer_id,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	LegalName     string     `json:"legal_name,omitempty"`
+	StateCode     StateCode  `json:"state_code"`
+	LicenseNumber string     `json:"license_number,omitempty"`
+	OwnerEmail    string     `json:"owner_email"`
+	OwnerPhone    string     `json:"owner_phone,omitempty"`
+	Capacity      int        `json:"capacity"`
+	Timezone      string     `json:"timezone"`
+	StripeCustID  string     `json:"stripe_customer_id,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 	DeletedAt     *time.Time `json:"deleted_at,omitempty"`
 }
 
@@ -51,18 +51,18 @@ type Child struct {
 }
 
 type Staff struct {
-	ID              string    `json:"id"`
-	ProviderID      string    `json:"provider_id"`
-	FirstName       string    `json:"first_name"`
-	LastName        string    `json:"last_name"`
-	Role            string    `json:"role"` // director | teacher | aide | cook
-	Email           string    `json:"email"`
-	Phone           string    `json:"phone,omitempty"`
-	HireDate        time.Time `json:"hire_date"`
+	ID              string     `json:"id"`
+	ProviderID      string     `json:"provider_id"`
+	FirstName       string     `json:"first_name"`
+	LastName        string     `json:"last_name"`
+	Role            string     `json:"role"` // director | teacher | aide | cook
+	Email           string     `json:"email"`
+	Phone           string     `json:"phone,omitempty"`
+	HireDate        time.Time  `json:"hire_date"`
 	BackgroundCheck *time.Time `json:"background_check_date,omitempty"`
-	Status          string    `json:"status"` // active | terminated
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	Status          string     `json:"status"` // active | terminated
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 // DocumentKind drives the chase/compliance logic.
@@ -85,23 +85,23 @@ const (
 )
 
 type Document struct {
-	ID                          string       `json:"id"`
-	ProviderID                  string       `json:"provider_id"`
-	SubjectKind                 string       `json:"subject_kind"` // child | staff | facility
-	SubjectID                   string       `json:"subject_id,omitempty"`
-	Kind                        DocumentKind `json:"kind"`
-	Title                       string       `json:"title"`
-	StorageBucket               string       `json:"storage_bucket"`
-	StorageKey                  string       `json:"storage_key"`
-	MIMEType                    string       `json:"mime_type"`
-	SizeBytes                   int64        `json:"size_bytes"`
-	IssuedAt                    *time.Time   `json:"issued_at,omitempty"`
-	ExpiresAt                   *time.Time   `json:"expires_at,omitempty"`
-	OCRConfidence               float64      `json:"ocr_confidence,omitempty"`
-	OCRSource                   string       `json:"ocr_source,omitempty"` // mistral | gemini | manual
-	UploadedBy                  string       `json:"uploaded_by,omitempty"`
-	UploadedVia                 string       `json:"uploaded_via,omitempty"` // provider | parent_portal | staff_portal
-	LastChaseSentAt             *time.Time   `json:"last_chase_sent_at,omitempty"`
+	ID              string       `json:"id"`
+	ProviderID      string       `json:"provider_id"`
+	SubjectKind     string       `json:"subject_kind"` // child | staff | facility
+	SubjectID       string       `json:"subject_id,omitempty"`
+	Kind            DocumentKind `json:"kind"`
+	Title           string       `json:"title"`
+	StorageBucket   string       `json:"storage_bucket"`
+	StorageKey      string       `json:"storage_key"`
+	MIMEType        string       `json:"mime_type"`
+	SizeBytes       int64        `json:"size_bytes"`
+	IssuedAt        *time.Time   `json:"issued_at,omitempty"`
+	ExpiresAt       *time.Time   `json:"expires_at,omitempty"`
+	OCRConfidence   float64      `json:"ocr_confidence,omitempty"`
+	OCRSource       string       `json:"ocr_source,omitempty"` // mistral | gemini | manual
+	UploadedBy      string       `json:"uploaded_by,omitempty"`
+	UploadedVia     string       `json:"uploaded_via,omitempty"` // provider | parent_portal | staff_portal
+	LastChaseSentAt *time.Time   `json:"last_chase_sent_at,omitempty"`
 	// REQ-006 OCR confirmation fields. *Extracted values are append-only AI
 	// output; the corresponding mutable fields (Kind, ExpiresAt) are what the
 	// chase engine actually reads.
@@ -117,15 +117,15 @@ type Document struct {
 }
 
 type Subscription struct {
-	ID                 string     `json:"id"`
-	ProviderID         string     `json:"provider_id"`
-	StripeSubID        string     `json:"stripe_subscription_id"`
-	StripePriceID      string     `json:"stripe_price_id"`
-	Status             string     `json:"status"` // trialing | active | past_due | canceled
-	CurrentPeriodEnd   time.Time  `json:"current_period_end"`
-	CancelAt           *time.Time `json:"cancel_at,omitempty"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID               string     `json:"id"`
+	ProviderID       string     `json:"provider_id"`
+	StripeSubID      string     `json:"stripe_subscription_id"`
+	StripePriceID    string     `json:"stripe_price_id"`
+	Status           string     `json:"status"` // trialing | active | past_due | canceled
+	CurrentPeriodEnd time.Time  `json:"current_period_end"`
+	CancelAt         *time.Time `json:"cancel_at,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 type MagicKind string
@@ -139,15 +139,15 @@ const (
 )
 
 type MagicLinkToken struct {
-	ID         string    `json:"id"`
-	Kind       MagicKind `json:"kind"`
-	SubjectID  string    `json:"subject_id"` // provider.id | child.id | staff.id | document.id
-	ProviderID string    `json:"provider_id"`
-	TokenHash  []byte    `json:"-"`
-	ExpiresAt  time.Time `json:"expires_at"`
+	ID         string     `json:"id"`
+	Kind       MagicKind  `json:"kind"`
+	SubjectID  string     `json:"subject_id"` // provider.id | child.id | staff.id | document.id
+	ProviderID string     `json:"provider_id"`
+	TokenHash  []byte     `json:"-"`
+	ExpiresAt  time.Time  `json:"expires_at"`
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	ConsumedAt *time.Time `json:"consumed_at,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 type AuditLogEntry struct {
@@ -164,13 +164,13 @@ type AuditLogEntry struct {
 }
 
 type PolicyVersion struct {
-	ID         string    `json:"id"`
-	ProviderID string    `json:"provider_id"`
-	Kind       string    `json:"kind"` // parent_handbook | staff_handbook | emergency_plan
-	Version    int       `json:"version"`
-	StorageKey string    `json:"storage_key"`
+	ID          string    `json:"id"`
+	ProviderID  string    `json:"provider_id"`
+	Kind        string    `json:"kind"` // parent_handbook | staff_handbook | emergency_plan
+	Version     int       `json:"version"`
+	StorageKey  string    `json:"storage_key"`
 	EffectiveAt time.Time `json:"effective_at"`
-	CreatedAt  time.Time `json:"created_at"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type Signature struct {

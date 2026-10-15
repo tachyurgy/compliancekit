@@ -6,15 +6,15 @@
 // demoseed.SeedDemoFacility. These endpoints stay on the same routes for
 // back-compat with the frontend tour glue, but their behavior changes:
 //
-//   GET  /api/demo/status  reports whether the CURRENT active provider is
-//                          the demo one (providers.is_demo=1). The old
-//                          per-row counts are still emitted for the few
-//                          legacy tenants who haven't switched workspaces
-//                          yet.
-//   POST /api/demo/purge   only acts when the active provider is is_demo=1.
-//                          When the user is on their real facility the
-//                          endpoint is a no-op — we can never delete real
-//                          rows from this entry point.
+//	GET  /api/demo/status  reports whether the CURRENT active provider is
+//	                       the demo one (providers.is_demo=1). The old
+//	                       per-row counts are still emitted for the few
+//	                       legacy tenants who haven't switched workspaces
+//	                       yet.
+//	POST /api/demo/purge   only acts when the active provider is is_demo=1.
+//	                       When the user is on their real facility the
+//	                       endpoint is a no-op — we can never delete real
+//	                       rows from this entry point.
 package handlers
 
 import (
@@ -94,10 +94,10 @@ func (h *DemoHandler) Purge(w http.ResponseWriter, r *http.Request) {
 		// this endpoint. Return 200 so the old frontend doesn't blow up
 		// on a 4xx.
 		httpx.RenderJSON(w, http.StatusOK, map[string]any{
-			"status":             "ok",
-			"is_demo_workspace":  false,
-			"has_demo_data":      false,
-			"skipped":            "not_demo_workspace",
+			"status":            "ok",
+			"is_demo_workspace": false,
+			"has_demo_data":     false,
+			"skipped":           "not_demo_workspace",
 		})
 		return
 	}
@@ -116,8 +116,8 @@ func (h *DemoHandler) Purge(w http.ResponseWriter, r *http.Request) {
 		UserAgent:  r.UserAgent(),
 	})
 	httpx.RenderJSON(w, http.StatusOK, map[string]any{
-		"status":             "ok",
-		"is_demo_workspace":  true,
-		"has_demo_data":      false,
+		"status":            "ok",
+		"is_demo_workspace": true,
+		"has_demo_data":     false,
 	})
 }

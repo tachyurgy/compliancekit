@@ -38,8 +38,8 @@ type startResponse struct {
 
 // finalizeResponse adds domains + citations to the detail DTO.
 type finalizeResponse struct {
-	Run             runDTO          `json:"run"`
-	Checklist       checklistDTO    `json:"checklist"`
+	Run             runDTO       `json:"run"`
+	Checklist       checklistDTO `json:"checklist"`
 	DomainBreakdown []struct {
 		Name   string `json:"name"`
 		Total  int    `json:"total"`

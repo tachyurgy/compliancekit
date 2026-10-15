@@ -11,16 +11,16 @@ import (
 
 // TestRetention_PurgesOnlyExpiredProviders verifies the core contract of the
 // purge worker:
-//   1. A provider whose canceled_at is more than 90 days old AND whose
-//      subscriptions.status='canceled' IS purged — rows in children/staff/
-//      documents disappear.
-//   2. A provider whose canceled_at is less than 90 days old is NOT purged
-//      even if their subscription is canceled.
-//   3. A provider with no subscription at all and no deleted_at is NOT purged.
-//   4. A provider whose deleted_at is more than 90 days old IS purged
-//      regardless of subscription state.
-//   5. An audit_log row survives the purge (with provider_id set to NULL
-//      thanks to ON DELETE SET NULL).
+//  1. A provider whose canceled_at is more than 90 days old AND whose
+//     subscriptions.status='canceled' IS purged — rows in children/staff/
+//     documents disappear.
+//  2. A provider whose canceled_at is less than 90 days old is NOT purged
+//     even if their subscription is canceled.
+//  3. A provider with no subscription at all and no deleted_at is NOT purged.
+//  4. A provider whose deleted_at is more than 90 days old IS purged
+//     regardless of subscription state.
+//  5. An audit_log row survives the purge (with provider_id set to NULL
+//     thanks to ON DELETE SET NULL).
 func TestRetention_PurgesOnlyExpiredProviders(t *testing.T) {
 	h := NewHarness(t)
 	ctx := context.Background()

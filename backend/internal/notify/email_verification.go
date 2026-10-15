@@ -31,9 +31,12 @@ const EmailVerificationExpiryHours = 24
 // FirstName       — the operator's first name; falls back to "there" when empty.
 // FacilityName    — the daycare's display name; falls back to "your account".
 // VerifyURL       — absolute confirm URL, e.g.
-//                   https://app.levelbrook.com/verify-email/<raw-token>.
+//
+//	https://app.levelbrook.com/verify-email/<raw-token>.
+//
 // ExpiresInHours  — surfaces the TTL in the body copy. Defaults to
-//                   EmailVerificationExpiryHours when zero.
+//
+//	EmailVerificationExpiryHours when zero.
 type EmailVerificationData struct {
 	FirstName      string
 	FacilityName   string

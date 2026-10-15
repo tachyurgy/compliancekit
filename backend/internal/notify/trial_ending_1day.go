@@ -25,7 +25,9 @@ var trialEnding1DayTXT string
 //
 // TrialEndsOn   — formatted date like "May 26, 2026".
 // CardBrand     — e.g. "Visa".  When CardLast4 is empty, the body omits
-//                 the "ending in" phrase (template uses an {{if}} guard).
+//
+//	the "ending in" phrase (template uses an {{if}} guard).
+//
 // CardLast4     — e.g. "4242".
 // BillingURL    — Stripe Billing Portal session URL.
 type TrialEnding1DayData struct {

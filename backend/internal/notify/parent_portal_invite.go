@@ -30,7 +30,8 @@ const ParentPortalInviteExpiryDays = 7
 // OperatorName     — sender (manager/director); falls back to "Your child's center".
 // UploadURL        — absolute /u/<token> URL.
 // ExpiresInDays    — TTL in days surfaced in body; defaults to
-//                    ParentPortalInviteExpiryDays when zero.
+//
+//	ParentPortalInviteExpiryDays when zero.
 type ParentPortalInviteData struct {
 	FirstName      string
 	ChildFirstName string

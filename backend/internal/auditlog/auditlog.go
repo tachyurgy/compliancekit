@@ -31,33 +31,33 @@ import (
 //
 //	actor_kind IN ('system','provider_admin','staff','parent','webhook')
 const (
-	ActorKindSystem         = "system"
-	ActorKindProviderAdmin  = "provider_admin"
-	ActorKindStaff          = "staff"
-	ActorKindParent         = "parent"
-	ActorKindWebhook        = "webhook"
+	ActorKindSystem        = "system"
+	ActorKindProviderAdmin = "provider_admin"
+	ActorKindStaff         = "staff"
+	ActorKindParent        = "parent"
+	ActorKindWebhook       = "webhook"
 )
 
 // Common action string constants. Kept centralized so the dashboard filter
 // dropdown stays in sync with what handlers actually emit. New events should
 // add a constant here before wiring it into a handler.
 const (
-	ActionLogin             = "auth.login"
-	ActionSignup            = "auth.signup"
-	ActionMeUpdate          = "provider.me.update"
-	ActionChildCreate       = "child.create"
-	ActionChildUpdate       = "child.update"
-	ActionChildDelete       = "child.delete"
-	ActionStaffCreate       = "staff.create"
-	ActionStaffUpdate       = "staff.update"
-	ActionStaffDelete       = "staff.delete"
-	ActionDocumentUpload    = "document.finalize"
-	ActionDocumentDelete    = "document.delete"
-	ActionDrillCreate       = "drill.create"
-	ActionDrillDelete       = "drill.delete"
-	ActionPostingUpdate     = "posting.update"
-	ActionRatioCheck        = "ratio.check"
-	ActionInspectionStart   = "inspection.start"
+	ActionLogin              = "auth.login"
+	ActionSignup             = "auth.signup"
+	ActionMeUpdate           = "provider.me.update"
+	ActionChildCreate        = "child.create"
+	ActionChildUpdate        = "child.update"
+	ActionChildDelete        = "child.delete"
+	ActionStaffCreate        = "staff.create"
+	ActionStaffUpdate        = "staff.update"
+	ActionStaffDelete        = "staff.delete"
+	ActionDocumentUpload     = "document.finalize"
+	ActionDocumentDelete     = "document.delete"
+	ActionDrillCreate        = "drill.create"
+	ActionDrillDelete        = "drill.delete"
+	ActionPostingUpdate      = "posting.update"
+	ActionRatioCheck         = "ratio.check"
+	ActionInspectionStart    = "inspection.start"
 	ActionInspectionFinalize = "inspection.finalize"
 )
 

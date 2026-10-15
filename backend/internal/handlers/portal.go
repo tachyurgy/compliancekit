@@ -39,13 +39,13 @@ type PortalHandler struct {
 // Same shape for parent and staff variants — the only difference upstream is
 // which entity_type we filter document_requirements on.
 type portalRequiredDoc struct {
-	ID          string `json:"id"`           // requirement row id
-	DocKind     string `json:"doc_kind"`     // matches documents.kind
-	Label       string `json:"label"`
-	Required    bool   `json:"required"`
-	Status      string `json:"status"`        // on_file | expiring_soon | expired | missing | awaiting_upload
-	DocumentID  string `json:"document_id,omitempty"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	ID         string     `json:"id"`       // requirement row id
+	DocKind    string     `json:"doc_kind"` // matches documents.kind
+	Label      string     `json:"label"`
+	Required   bool       `json:"required"`
+	Status     string     `json:"status"` // on_file | expiring_soon | expired | missing | awaiting_upload
+	DocumentID string     `json:"document_id,omitempty"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
 }
 
 // GET /portal/parent  (magic-link gated)
@@ -261,8 +261,8 @@ type presignInput struct {
 // POST /portal/upload (magic-link gated for parent/staff)
 //
 // Two response shapes:
-//   * single-file upload  → { document_id, upload_url, storage_key }
-//   * multi-shot upload   → { document_id, parts: [{upload_url, storage_key}], multi_page: N }
+//   - single-file upload  → { document_id, upload_url, storage_key }
+//   - multi-shot upload   → { document_id, parts: [{upload_url, storage_key}], multi_page: N }
 //
 // In the multi-shot case the browser uploads each part to its own presigned
 // URL, then POSTs to /portal/upload/{id}/finalize, which downloads each part,
@@ -619,9 +619,9 @@ func pdfFromImages(imgs []image.Image) ([]byte, error) {
 	//     contentId = 4 + 3*i
 	//     imageId   = 5 + 3*i
 	var (
-		buf       bytes.Buffer
-		offsets   = []int{0}
-		writeObj  = func(id int, body string) {
+		buf      bytes.Buffer
+		offsets  = []int{0}
+		writeObj = func(id int, body string) {
 			offsets = append(offsets, buf.Len())
 			fmt.Fprintf(&buf, "%d 0 obj\n%s\nendobj\n", id, body)
 		}

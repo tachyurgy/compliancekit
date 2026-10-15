@@ -27,9 +27,9 @@ func NewLogSMSSender(log *slog.Logger) *SMSSender {
 }
 
 type SMSConfig struct {
-	AccountSID        string
-	AuthToken         string
-	From              string // E.164. Optional if MessagingServiceSID is set.
+	AccountSID          string
+	AuthToken           string
+	From                string // E.164. Optional if MessagingServiceSID is set.
 	MessagingServiceSID string // MGxxxx... Optional alternative to From; required for trial accounts that don't own a phone number.
 }
 

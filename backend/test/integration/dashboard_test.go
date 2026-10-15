@@ -29,15 +29,15 @@ import (
 
 // dashboardResp mirrors the JSON shape DashboardHandler.Get writes.
 type dashboardResp struct {
-	Score             int `json:"score"`
-	Violations        []struct {
+	Score      int `json:"score"`
+	Violations []struct {
 		RuleID   string `json:"rule_id"`
 		Severity string `json:"severity"`
 	} `json:"violations"`
-	UpcomingDeadlines []any   `json:"upcoming_deadlines"`
-	RulesEvaluated   int     `json:"rules_evaluated"`
-	State            string  `json:"state"`
-	Counts struct {
+	UpcomingDeadlines []any  `json:"upcoming_deadlines"`
+	RulesEvaluated    int    `json:"rules_evaluated"`
+	State             string `json:"state"`
+	Counts            struct {
 		Children int `json:"children"`
 		Staff    int `json:"staff"`
 	} `json:"counts"`

@@ -86,8 +86,8 @@ func (m *Mistral) Extract(ctx context.Context, r io.Reader, mimeType string) (Re
 	var docField map[string]any
 	if mimeType == "application/pdf" {
 		docField = map[string]any{
-			"type":         "document_url",
-			"document_url": dataURI,
+			"type":          "document_url",
+			"document_url":  dataURI,
 			"document_name": "upload." + extFromMIME(mimeType),
 		}
 	} else {

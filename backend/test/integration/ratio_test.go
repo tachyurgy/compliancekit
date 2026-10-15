@@ -18,9 +18,9 @@ type ratioCheckResponse struct {
 }
 
 // TestRatio_TX_InfantFailsThenPasses covers:
-//  - TX infant room (0-11mo, 5 kids / 1 staff) is out of ratio (cap 1:4).
-//  - TX preschool 3 (36-47mo, 15 kids / 1 staff) is in ratio (cap 1:15).
-//  - providers.ratio_ok is 0 after the mixed result, 1 once infant is fixed.
+//   - TX infant room (0-11mo, 5 kids / 1 staff) is out of ratio (cap 1:4).
+//   - TX preschool 3 (36-47mo, 15 kids / 1 staff) is in ratio (cap 1:15).
+//   - providers.ratio_ok is 0 after the mixed result, 1 once infant is fixed.
 func TestRatio_TX_InfantFailsThenPasses(t *testing.T) {
 	h := NewHarness(t)
 

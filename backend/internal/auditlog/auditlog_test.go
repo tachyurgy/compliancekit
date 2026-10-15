@@ -178,29 +178,45 @@ func TestEmitHelpers(t *testing.T) {
 		{"MeUpdate", auditlog.ActionMeUpdate, auditlog.TargetKindProvider,
 			func(ctx context.Context, p *sql.DB, r *http.Request) { auditlog.EmitMeUpdate(ctx, p, "p1", "u1", r) }},
 		{"ChildCreate", auditlog.ActionChildCreate, auditlog.TargetKindChild,
-			func(ctx context.Context, p *sql.DB, r *http.Request) { auditlog.EmitChildCreate(ctx, p, "p1", "u1", "c1", r) }},
+			func(ctx context.Context, p *sql.DB, r *http.Request) {
+				auditlog.EmitChildCreate(ctx, p, "p1", "u1", "c1", r)
+			}},
 		{"ChildUpdate", auditlog.ActionChildUpdate, auditlog.TargetKindChild,
-			func(ctx context.Context, p *sql.DB, r *http.Request) { auditlog.EmitChildUpdate(ctx, p, "p1", "u1", "c1", r) }},
+			func(ctx context.Context, p *sql.DB, r *http.Request) {
+				auditlog.EmitChildUpdate(ctx, p, "p1", "u1", "c1", r)
+			}},
 		{"ChildDelete", auditlog.ActionChildDelete, auditlog.TargetKindChild,
-			func(ctx context.Context, p *sql.DB, r *http.Request) { auditlog.EmitChildDelete(ctx, p, "p1", "u1", "c1", r) }},
+			func(ctx context.Context, p *sql.DB, r *http.Request) {
+				auditlog.EmitChildDelete(ctx, p, "p1", "u1", "c1", r)
+			}},
 		{"StaffCreate", auditlog.ActionStaffCreate, auditlog.TargetKindStaff,
-			func(ctx context.Context, p *sql.DB, r *http.Request) { auditlog.EmitStaffCreate(ctx, p, "p1", "u1", "s1", r) }},
+			func(ctx context.Context, p *sql.DB, r *http.Request) {
+				auditlog.EmitStaffCreate(ctx, p, "p1", "u1", "s1", r)
+			}},
 		{"StaffUpdate", auditlog.ActionStaffUpdate, auditlog.TargetKindStaff,
-			func(ctx context.Context, p *sql.DB, r *http.Request) { auditlog.EmitStaffUpdate(ctx, p, "p1", "u1", "s1", r) }},
+			func(ctx context.Context, p *sql.DB, r *http.Request) {
+				auditlog.EmitStaffUpdate(ctx, p, "p1", "u1", "s1", r)
+			}},
 		{"StaffDelete", auditlog.ActionStaffDelete, auditlog.TargetKindStaff,
-			func(ctx context.Context, p *sql.DB, r *http.Request) { auditlog.EmitStaffDelete(ctx, p, "p1", "u1", "s1", r) }},
+			func(ctx context.Context, p *sql.DB, r *http.Request) {
+				auditlog.EmitStaffDelete(ctx, p, "p1", "u1", "s1", r)
+			}},
 		{"DocumentUpload", auditlog.ActionDocumentUpload, auditlog.TargetKindDocument,
 			func(ctx context.Context, p *sql.DB, r *http.Request) {
 				auditlog.EmitDocumentUpload(ctx, p, "p1", "u1", "d1", map[string]any{"conf": 0.9}, r)
 			}},
 		{"DocumentDelete", auditlog.ActionDocumentDelete, auditlog.TargetKindDocument,
-			func(ctx context.Context, p *sql.DB, r *http.Request) { auditlog.EmitDocumentDelete(ctx, p, "p1", "u1", "d1", r) }},
+			func(ctx context.Context, p *sql.DB, r *http.Request) {
+				auditlog.EmitDocumentDelete(ctx, p, "p1", "u1", "d1", r)
+			}},
 		{"DrillCreate", auditlog.ActionDrillCreate, auditlog.TargetKindDrill,
 			func(ctx context.Context, p *sql.DB, r *http.Request) {
 				auditlog.EmitDrillCreate(ctx, p, "p1", "u1", "dr1", map[string]any{"kind": "fire"}, r)
 			}},
 		{"DrillDelete", auditlog.ActionDrillDelete, auditlog.TargetKindDrill,
-			func(ctx context.Context, p *sql.DB, r *http.Request) { auditlog.EmitDrillDelete(ctx, p, "p1", "u1", "dr1", r) }},
+			func(ctx context.Context, p *sql.DB, r *http.Request) {
+				auditlog.EmitDrillDelete(ctx, p, "p1", "u1", "dr1", r)
+			}},
 		{"PostingUpdate", auditlog.ActionPostingUpdate, auditlog.TargetKindPosting,
 			func(ctx context.Context, p *sql.DB, r *http.Request) {
 				auditlog.EmitPostingUpdate(ctx, p, "p1", "u1", "license", nil, r)
@@ -210,7 +226,9 @@ func TestEmitHelpers(t *testing.T) {
 				auditlog.EmitRatioCheck(ctx, p, "p1", "u1", map[string]any{"ok": true}, r)
 			}},
 		{"InspectionStart", auditlog.ActionInspectionStart, auditlog.TargetKindInspection,
-			func(ctx context.Context, p *sql.DB, r *http.Request) { auditlog.EmitInspectionStart(ctx, p, "p1", "u1", "run1", r) }},
+			func(ctx context.Context, p *sql.DB, r *http.Request) {
+				auditlog.EmitInspectionStart(ctx, p, "p1", "u1", "run1", r)
+			}},
 		{"InspectionFinalize", auditlog.ActionInspectionFinalize, auditlog.TargetKindInspection,
 			func(ctx context.Context, p *sql.DB, r *http.Request) {
 				auditlog.EmitInspectionFinalize(ctx, p, "p1", "u1", "run1", map[string]any{"score": 92}, r)

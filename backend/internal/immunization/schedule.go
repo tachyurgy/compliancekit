@@ -16,10 +16,10 @@ const (
 
 // Immunization describes one dose requirement at a given age window.
 type Immunization struct {
-	Vaccine     string `json:"vaccine"`      // DTaP, IPV, MMR, Varicella, HepB, HepA, Hib, PCV13, RV, Influenza
-	DoseNumber  int    `json:"dose_number"`  // 1..N
+	Vaccine     string `json:"vaccine"`     // DTaP, IPV, MMR, Varicella, HepB, HepA, Hib, PCV13, RV, Influenza
+	DoseNumber  int    `json:"dose_number"` // 1..N
 	MinAgeMonth int    `json:"min_age_mo"`
-	MaxAgeMonth int    `json:"max_age_mo"`  // 0 means ongoing/annual
+	MaxAgeMonth int    `json:"max_age_mo"` // 0 means ongoing/annual
 	Notes       string `json:"notes,omitempty"`
 }
 

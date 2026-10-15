@@ -191,9 +191,9 @@ func latestDocsByKind(ctx context.Context, db *sql.DB, providerID, staffID strin
 	out := map[string]docRow{}
 	for rows.Next() {
 		var (
-			id, kind, src, uploader   string
-			issuedStr, expiresStr     sql.NullString
-			createdStr                string
+			id, kind, src, uploader string
+			issuedStr, expiresStr   sql.NullString
+			createdStr              string
 		)
 		if err := rows.Scan(&id, &kind, &issuedStr, &expiresStr, &src, &uploader, &createdStr); err != nil {
 			return nil, err
@@ -295,12 +295,12 @@ func computeRollup(ctx context.Context, db *sql.DB, providerID, staffID, role st
 			rc.AwaitingUpload++
 		}
 		rs := requirementStatus{
-			DocKind:    req.DocKind,
-			Label:      req.Label,
-			Authority:  req.Authority,
-			Frequency:  req.Frequency,
-			Status:     st,
-			SortOrder:  req.SortOrder,
+			DocKind:   req.DocKind,
+			Label:     req.Label,
+			Authority: req.Authority,
+			Frequency: req.Frequency,
+			Status:    st,
+			SortOrder: req.SortOrder,
 		}
 		if ok {
 			rs.DocumentID = d.ID
@@ -380,16 +380,16 @@ func (h *StaffHandler) ListWithRollup(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 	type staffRow struct {
-		ID              string       `json:"id"`
-		FirstName       string       `json:"firstName"`
-		LastName        string       `json:"lastName"`
-		Role            string       `json:"role"`
-		Email           string       `json:"email"`
-		Phone           string       `json:"phone"`
-		PreferredChannel string      `json:"preferredChannel"`
-		HireDate        string       `json:"hireDate,omitempty"`
-		Status          string       `json:"status"`
-		Rollup          rollupCounts `json:"rollup"`
+		ID               string       `json:"id"`
+		FirstName        string       `json:"firstName"`
+		LastName         string       `json:"lastName"`
+		Role             string       `json:"role"`
+		Email            string       `json:"email"`
+		Phone            string       `json:"phone"`
+		PreferredChannel string       `json:"preferredChannel"`
+		HireDate         string       `json:"hireDate,omitempty"`
+		Status           string       `json:"status"`
+		Rollup           rollupCounts `json:"rollup"`
 	}
 	out := make([]staffRow, 0)
 	now := time.Now().UTC()
@@ -440,22 +440,22 @@ func (h *StaffHandler) ListWithRollup(w http.ResponseWriter, r *http.Request) {
 // staffDetailResponse is the payload for GET /api/staff/:id used by the
 // REQ-004 detail page.
 type staffDetailResponse struct {
-	ID                 string              `json:"id"`
-	FirstName          string              `json:"firstName"`
-	LastName           string              `json:"lastName"`
-	Role               string              `json:"role"`
-	Email              string              `json:"email"`
-	Phone              string              `json:"phone"`
-	PreferredChannel   string              `json:"preferredChannel"`
-	HireDate           string              `json:"hireDate,omitempty"`
-	Status             string              `json:"status"`
-	ArchivedAt         *string             `json:"archivedAt,omitempty"`
-	Rollup             rollupCounts        `json:"rollup"`
-	RequiredDocuments  []requirementStatus `json:"requiredDocuments"`
-	OtherDocuments     []otherDocument     `json:"otherDocuments"`
-	Activity           []activityEvent     `json:"activity"`
-	UploadLink         string              `json:"uploadLink,omitempty"`
-	UploadLinkExpires  string              `json:"uploadLinkExpiresAt,omitempty"`
+	ID                string              `json:"id"`
+	FirstName         string              `json:"firstName"`
+	LastName          string              `json:"lastName"`
+	Role              string              `json:"role"`
+	Email             string              `json:"email"`
+	Phone             string              `json:"phone"`
+	PreferredChannel  string              `json:"preferredChannel"`
+	HireDate          string              `json:"hireDate,omitempty"`
+	Status            string              `json:"status"`
+	ArchivedAt        *string             `json:"archivedAt,omitempty"`
+	Rollup            rollupCounts        `json:"rollup"`
+	RequiredDocuments []requirementStatus `json:"requiredDocuments"`
+	OtherDocuments    []otherDocument     `json:"otherDocuments"`
+	Activity          []activityEvent     `json:"activity"`
+	UploadLink        string              `json:"uploadLink,omitempty"`
+	UploadLinkExpires string              `json:"uploadLinkExpiresAt,omitempty"`
 }
 
 type otherDocument struct {
@@ -488,9 +488,9 @@ func (h *StaffHandler) GetDetail(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	var (
-		out                staffDetailResponse
-		archivedAt         sql.NullString
-		hireDate           sql.NullString
+		out        staffDetailResponse
+		archivedAt sql.NullString
+		hireDate   sql.NullString
 	)
 	err := h.Pool.QueryRowContext(r.Context(), `
 		SELECT id, COALESCE(first_name,''), COALESCE(last_name,''),
@@ -728,8 +728,8 @@ func (u *UploadLinkHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	expiresAt := time.Now().Add(magiclink.TTLFor(magiclink.KindStaffUpload)).UTC().Format(time.RFC3339)
 	httpx.RenderJSON(w, http.StatusOK, map[string]string{
-		"url":         u.FrontendBase + path,
-		"expiresAt":   expiresAt,
+		"url":       u.FrontendBase + path,
+		"expiresAt": expiresAt,
 	})
 }
 

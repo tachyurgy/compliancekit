@@ -86,7 +86,7 @@ func (h *FacilityHandler) loadFacility(ctx context.Context, pid string) (*facili
 // complete-onboarding can re-read in the same shape after writing.
 func loadFacilityRow(ctx context.Context, db *sql.DB, pid string) (*facilityResponse, error) {
 	var (
-		out                                                        facilityResponse
+		out                                                         facilityResponse
 		licNum, addr1, addr2, city, stateReg, postal, phone, county sql.NullString
 		ownerEmail, ownerFullName, directorEmail, directorFullName  sql.NullString
 		licExp, onbCompleted                                        sql.NullString
@@ -301,12 +301,12 @@ func (h *FacilityHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Requ
 // ---------- Rooms CRUD ----------------------------------------------------
 
 type facilityRoomResponse struct {
-	ID                string `json:"id"`
-	Name              string `json:"name"`
-	AgeBand           string `json:"ageBand"`
-	LicensedCapacity  *int   `json:"licensedCapacity,omitempty"`
-	IndoorSqft        *int   `json:"indoorSqft,omitempty"`
-	CreatedAt         string `json:"createdAt"`
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	AgeBand          string `json:"ageBand"`
+	LicensedCapacity *int   `json:"licensedCapacity,omitempty"`
+	IndoorSqft       *int   `json:"indoorSqft,omitempty"`
+	CreatedAt        string `json:"createdAt"`
 }
 
 // GET /api/rooms

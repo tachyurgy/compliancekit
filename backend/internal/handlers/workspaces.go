@@ -5,8 +5,8 @@
 // row carries which one is currently active. These endpoints back the
 // top-left workspace switcher in the React app.
 //
-//   GET  /api/me/workspaces        list every provider the user can open
-//   POST /api/me/active-workspace  flip the active provider on the session
+//	GET  /api/me/workspaces        list every provider the user can open
+//	POST /api/me/active-workspace  flip the active provider on the session
 package handlers
 
 import (
@@ -101,8 +101,8 @@ func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.RenderJSON(w, http.StatusOK, map[string]any{
-		"workspaces":          workspaces,
-		"active_provider_id":  active,
+		"workspaces":         workspaces,
+		"active_provider_id": active,
 	})
 }
 

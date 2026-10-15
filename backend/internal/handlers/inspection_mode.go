@@ -42,15 +42,15 @@ type InspectionModeHandler struct {
 // ----------------------------------------------------------------------------
 
 type inspectionEventDTO struct {
-	ID              string  `json:"id"`
-	FacilityID      string  `json:"facility_id"`
-	StartedAt       string  `json:"started_at"`
-	EndedAt         *string `json:"ended_at,omitempty"`
-	CounselorName   string  `json:"counselor_name,omitempty"`
-	Type            string  `json:"type"`
-	Sample          sampleBlob `json:"sample"`
-	Findings        []finding   `json:"findings"`
-	PlanPDFPath     string  `json:"plan_of_correction_pdf_path,omitempty"`
+	ID            string     `json:"id"`
+	FacilityID    string     `json:"facility_id"`
+	StartedAt     string     `json:"started_at"`
+	EndedAt       *string    `json:"ended_at,omitempty"`
+	CounselorName string     `json:"counselor_name,omitempty"`
+	Type          string     `json:"type"`
+	Sample        sampleBlob `json:"sample"`
+	Findings      []finding  `json:"findings"`
+	PlanPDFPath   string     `json:"plan_of_correction_pdf_path,omitempty"`
 }
 
 // sampleBlob is the JSON-encoded random sample persisted on inspection_events.
@@ -411,15 +411,15 @@ func (h *InspectionModeHandler) DownloadPlan(w http.ResponseWriter, r *http.Requ
 // closed one if none is open) so re-entering the view shows the same
 // names the inspector already saw.
 type snapshotResponse struct {
-	Facility       facilityCard       `json:"facility"`
-	LastInspection *lastInspection    `json:"last_inspection,omitempty"`
-	StaffSample    []staffCard        `json:"staff_sample"`
-	ChildSample    []childCard        `json:"child_sample"`
-	FacilityRecords []recordRow       `json:"facility_records"`
-	Postings       []postingRow       `json:"postings"`
-	Drills         drillsBlock        `json:"drills"`
-	OpenSessionID  string             `json:"open_session_id,omitempty"`
-	GeneratedAt    string             `json:"generated_at"`
+	Facility        facilityCard    `json:"facility"`
+	LastInspection  *lastInspection `json:"last_inspection,omitempty"`
+	StaffSample     []staffCard     `json:"staff_sample"`
+	ChildSample     []childCard     `json:"child_sample"`
+	FacilityRecords []recordRow     `json:"facility_records"`
+	Postings        []postingRow    `json:"postings"`
+	Drills          drillsBlock     `json:"drills"`
+	OpenSessionID   string          `json:"open_session_id,omitempty"`
+	GeneratedAt     string          `json:"generated_at"`
 }
 
 type facilityCard struct {
@@ -442,11 +442,11 @@ type lastInspection struct {
 }
 
 type staffCard struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Role        string         `json:"role,omitempty"`
-	HireDate    string         `json:"hire_date,omitempty"`
-	Items       []personnelItem `json:"items"` // Handbook § 7.4 rollup
+	ID       string          `json:"id"`
+	Name     string          `json:"name"`
+	Role     string          `json:"role,omitempty"`
+	HireDate string          `json:"hire_date,omitempty"`
+	Items    []personnelItem `json:"items"` // Handbook § 7.4 rollup
 }
 
 // personnelItem is one Handbook § 7.4 row for a sampled staff member.
@@ -460,13 +460,13 @@ type personnelItem struct {
 }
 
 type childCard struct {
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	DOB           string         `json:"date_of_birth,omitempty"`
-	Enrolled      string         `json:"enrollment_date,omitempty"`
-	Allergies     string         `json:"allergies,omitempty"`
-	MedicalNotes  string         `json:"medical_notes,omitempty"`
-	Items         []personnelItem `json:"items"` // Handbook § 7.3
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	DOB          string          `json:"date_of_birth,omitempty"`
+	Enrolled     string          `json:"enrollment_date,omitempty"`
+	Allergies    string          `json:"allergies,omitempty"`
+	MedicalNotes string          `json:"medical_notes,omitempty"`
+	Items        []personnelItem `json:"items"` // Handbook § 7.3
 }
 
 type recordRow struct {
@@ -478,17 +478,17 @@ type recordRow struct {
 }
 
 type postingRow struct {
-	Kind            string  `json:"kind"`
-	Label           string  `json:"label"`
-	Required        bool    `json:"required"`
-	RoomID          string  `json:"room_id,omitempty"`
-	PhotoPath       string  `json:"photo_path,omitempty"`
-	LastVerifiedAt  *string `json:"last_verified_at,omitempty"`
+	Kind           string  `json:"kind"`
+	Label          string  `json:"label"`
+	Required       bool    `json:"required"`
+	RoomID         string  `json:"room_id,omitempty"`
+	PhotoPath      string  `json:"photo_path,omitempty"`
+	LastVerifiedAt *string `json:"last_verified_at,omitempty"`
 }
 
 type drillsBlock struct {
-	WindowDays int           `json:"window_days"`
-	Logged     []drillEntry  `json:"logged"`
+	WindowDays int            `json:"window_days"`
+	Logged     []drillEntry   `json:"logged"`
 	Counts     map[string]int `json:"counts_by_kind"`
 }
 
@@ -793,9 +793,9 @@ func (h *InspectionModeHandler) childCard(r *http.Request, pid, id string) (*chi
 
 // ownedDoc is the slice of fields we read from documents to score a checklist row.
 type ownedDoc struct {
-	ID         string
-	DocType    string
-	ExpiresAt  string // empty if no expiration captured
+	ID        string
+	DocType   string
+	ExpiresAt string // empty if no expiration captured
 }
 
 func (h *InspectionModeHandler) docsByOwner(r *http.Request, pid, kind, id string) ([]ownedDoc, error) {
@@ -868,9 +868,9 @@ func (h *InspectionModeHandler) postingsRollup(r *http.Request, pid, stateCode s
 	}
 	defer rows.Close()
 	type entry struct {
-		PhotoPath  string
-		Verified   string
-		RoomID     string
+		PhotoPath string
+		Verified  string
+		RoomID    string
 	}
 	by := map[string]entry{}
 	for rows.Next() {
@@ -937,9 +937,9 @@ func (h *InspectionModeHandler) drillsBlock(r *http.Request, pid string) (drills
 // ----------------------------------------------------------------------------
 
 type handbookDef struct {
-	Label     string   // operator-friendly label (used inside Inspector Mode header text)
-	FormName  string   // formal form/handbook reference shown to the inspector
-	DocTypes  []string // doc_type strings that satisfy this row, in priority order
+	Label    string   // operator-friendly label (used inside Inspector Mode header text)
+	FormName string   // formal form/handbook reference shown to the inspector
+	DocTypes []string // doc_type strings that satisfy this row, in priority order
 }
 
 // handbookSection74 mirrors active/product/florida-inspection-coverage.md

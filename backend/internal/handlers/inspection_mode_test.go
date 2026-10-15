@@ -55,9 +55,9 @@ func TestPickRandom_EmptyPool(t *testing.T) {
 // 90 days, and past.
 func TestExpirationStatus(t *testing.T) {
 	cases := []struct {
-		name    string
-		input   string
-		want    string
+		name  string
+		input string
+		want  string
 	}{
 		{"empty", "", "On file"},
 		{"future_far", time.Now().AddDate(1, 0, 0).Format("2006-01-02"), "On file"},

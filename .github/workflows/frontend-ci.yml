@@ -1,0 +1,31 @@
+# Frontend CI: typecheck, unit tests (Vitest) and a production build.
+name: frontend-ci
+
+on:
+  pull_request:
+    paths: ['frontend/**', '.github/workflows/frontend-ci.yml']
+  push:
+    branches: [main]
+    paths: ['frontend/**', '.github/workflows/frontend-ci.yml']
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc -b
+      - run: npx vitest run
+      - run: npm run build

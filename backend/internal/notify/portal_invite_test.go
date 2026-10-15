@@ -20,9 +20,9 @@ func TestRenderStaffPortalInvite_HappyPath(t *testing.T) {
 		t.Fatalf("subject missing facility name: %q", subject)
 	}
 	for _, want := range []string{
-		"Maria",                       // first name only
+		"Maria", // first name only
 		"Sunny Days Learning Center",
-		"Linda Chen",                  // operator
+		"Linda Chen", // operator
 		"https://app.levelbrook.com/u/Bx7kPmQ2nT9rW4yL3vZ8aH6cJ5dF1gE0M",
 		"7", // default ExpiresInDays
 		"levelbrookteam@gmail.com",
@@ -91,8 +91,8 @@ func TestRenderParentPortalInvite_HappyPath(t *testing.T) {
 		t.Fatalf("subject missing tokens: %q", subject)
 	}
 	for _, want := range []string{
-		"Jamal",                       // first name only
-		"Maya",                        // child first name only
+		"Jamal", // first name only
+		"Maya",  // child first name only
 		"Sunny Days Learning Center",
 		"Linda Chen",
 		"https://app.levelbrook.com/u/Bx7kPmQ2nT9rW4yL3vZ8aH6cJ5dF1gE0M",

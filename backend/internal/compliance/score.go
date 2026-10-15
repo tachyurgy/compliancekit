@@ -14,12 +14,12 @@ import (
 // CF-FSP 5316 rule pack, but it is *not* the number we want a tired Florida
 // director to glance at on the dashboard.  Two reasons:
 //
-//   1. The engine score weights rules uniformly by Severity.  A center with
-//      one missing background check (Critical) and a center with one missing
-//      menu posting (Minor) both get a score that is hard to rank by impact.
-//   2. The engine has no notion of "top 4 things to fix today".  REQ-013
-//      requires four GapAction cards, deterministically ordered by impact
-//      and deadline proximity.
+//  1. The engine score weights rules uniformly by Severity.  A center with
+//     one missing background check (Critical) and a center with one missing
+//     menu posting (Minor) both get a score that is hard to rank by impact.
+//  2. The engine has no notion of "top 4 things to fix today".  REQ-013
+//     requires four GapAction cards, deterministically ordered by impact
+//     and deadline proximity.
 //
 // `Score` here lives between the engine and the dashboard handler.  It
 // consumes the engine's Report (Violations + UpcomingDeadlines90d) and
@@ -27,26 +27,27 @@ import (
 // and the four highest-impact GapActions.
 //
 // Severity-class weights — chosen to make the math reward progress:
-//   class-1            -15 each, capped at 4 instances (-60)
-//   class-1-procedural  -8 each, capped at 4 instances (-32)
-//   class-2             -4 each, capped at 5 instances (-20)
-//   class-2-posting     -3 each, capped at 5 instances (-15)
-//   class-3             -1 each, no cap                  (advisory)
+//
+//	class-1            -15 each, capped at 4 instances (-60)
+//	class-1-procedural  -8 each, capped at 4 instances (-32)
+//	class-2             -4 each, capped at 5 instances (-20)
+//	class-2-posting     -3 each, capped at 5 instances (-15)
+//	class-3             -1 each, no cap                  (advisory)
 //
 // The cap matters: without it, a center with 12 missing background checks
 // scores 0 forever and the dashboard becomes useless. We surface the top
 // four; once those are fixed the score recalculates and surfaces the next
 // four. See REQ-013 § Non-obvious decisions.
 const (
-	weightClass1            = 15
-	weightClass1Procedural  = 8
-	weightClass2            = 4
-	weightClass2Posting     = 3
-	weightClass3            = 1
-	capClass1               = 4
-	capClass1Procedural     = 4
-	capClass2               = 5
-	capClass2Posting        = 5
+	weightClass1           = 15
+	weightClass1Procedural = 8
+	weightClass2           = 4
+	weightClass2Posting    = 3
+	weightClass3           = 1
+	capClass1              = 4
+	capClass1Procedural    = 4
+	capClass2              = 5
+	capClass2Posting       = 5
 )
 
 // Band labels — used by the dashboard hero card to pick a color and copy.
@@ -60,16 +61,16 @@ const (
 // GapAction is one tap-card on the dashboard hero. The frontend renders it as
 // a one-line title + subtitle + CTA that deep-links into the relevant flow.
 type GapAction struct {
-	Kind      string `json:"kind"`                // staff_doc_expired, child_imm_missing, posting_missing, drill_missing, ...
-	Title     string `json:"title"`               // <= 6 words, plain English
-	Subtitle  string `json:"subtitle"`            // <= 14 words
-	CTALabel  string `json:"cta_label"`           // "Send reminder" / "Mark posted" / "Log drill"
-	CTARoute  string `json:"cta_route"`           // app deep link, e.g. /staff/abc?action=nag
-	StaffID   string `json:"staff_id,omitempty"`
-	ChildID   string `json:"child_id,omitempty"`
-	DueAt     *time.Time `json:"due_at,omitempty"`
-	severity  Severity
-	weight    int
+	Kind     string     `json:"kind"`      // staff_doc_expired, child_imm_missing, posting_missing, drill_missing, ...
+	Title    string     `json:"title"`     // <= 6 words, plain English
+	Subtitle string     `json:"subtitle"`  // <= 14 words
+	CTALabel string     `json:"cta_label"` // "Send reminder" / "Mark posted" / "Log drill"
+	CTARoute string     `json:"cta_route"` // app deep link, e.g. /staff/abc?action=nag
+	StaffID  string     `json:"staff_id,omitempty"`
+	ChildID  string     `json:"child_id,omitempty"`
+	DueAt    *time.Time `json:"due_at,omitempty"`
+	severity Severity
+	weight   int
 }
 
 // BreakdownRow lets the dashboard render a "why isn't it 100?" expander
@@ -82,11 +83,11 @@ type BreakdownRow struct {
 
 // Synth is the synthesised score result that the dashboard handler returns.
 type Synth struct {
-	Score             int            `json:"score"`
-	Band              string         `json:"band"`
-	LastCalculatedAt  time.Time      `json:"last_calculated_at"`
-	TopGaps           []GapAction    `json:"top_gaps"`
-	Breakdown         []BreakdownRow `json:"breakdown"`
+	Score            int            `json:"score"`
+	Band             string         `json:"band"`
+	LastCalculatedAt time.Time      `json:"last_calculated_at"`
+	TopGaps          []GapAction    `json:"top_gaps"`
+	Breakdown        []BreakdownRow `json:"breakdown"`
 }
 
 // classify maps an engine Violation to a (severity-class, weight, cap, kind)

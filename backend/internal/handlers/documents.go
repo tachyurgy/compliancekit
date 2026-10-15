@@ -143,11 +143,11 @@ func (h *DocumentHandler) runFinalize(w http.ResponseWriter, r *http.Request, pi
 	defer body.Close()
 
 	var (
-		expiresStr   string
-		expires      *time.Time
+		expiresStr    string
+		expires       *time.Time
 		ocrConfidence float64
-		extractConf  float64
-		source       string
+		extractConf   float64
+		source        string
 	)
 	if h.OCR != nil && h.ExpiryExtra != nil {
 		res, err := h.OCR.Extract(r.Context(), body, mime)
@@ -304,7 +304,7 @@ func (h *DocumentHandler) runConfirm(w http.ResponseWriter, r *http.Request, pid
 		UserAgent: r.UserAgent(),
 	})
 	httpx.RenderJSON(w, http.StatusOK, map[string]any{
-		"document_id":              id,
+		"document_id":             id,
 		"expiration_confirmed_at": time.Now().UTC().Format(time.RFC3339),
 		"does_not_expire":         in.DoesNotExpire,
 	})

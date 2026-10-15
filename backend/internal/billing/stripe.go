@@ -58,16 +58,16 @@ type TrialConvertedNotifier interface {
 }
 
 type Service struct {
-	pool                  *sql.DB
-	secretKey             string
-	webhookSecret         string
-	frontendBaseURL       string
-	priceMonthly          string
-	priceAnnual           string
+	pool                   *sql.DB
+	secretKey              string
+	webhookSecret          string
+	frontendBaseURL        string
+	priceMonthly           string
+	priceAnnual            string
 	notifier               PostCheckoutNotifier
 	paymentFailedNotifier  PaymentFailedNotifier
 	trialConvertedNotifier TrialConvertedNotifier
-	log                   *slog.Logger
+	log                    *slog.Logger
 }
 
 type Config struct {
@@ -164,14 +164,14 @@ func (s *Service) CreateCheckoutSession(ctx context.Context, providerID, priceID
 // URLs explicitly so /onboarding/legal lands the operator on the right page,
 // and turn on a 14-day trial with card-on-file required.
 type CheckoutInput struct {
-	ProviderID  string
-	PriceID     string
-	Email       string
-	Name        string
-	PromoCode   string
-	SuccessURL  string // optional override
-	CancelURL   string // optional override
-	TrialDays   int64  // 0 = none; 14 = REQ-002 default
+	ProviderID string
+	PriceID    string
+	Email      string
+	Name       string
+	PromoCode  string
+	SuccessURL string // optional override
+	CancelURL  string // optional override
+	TrialDays  int64  // 0 = none; 14 = REQ-002 default
 }
 
 // CreateCheckoutSessionV2 is the REQ-002 entry point — it sets up the trial,

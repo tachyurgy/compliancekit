@@ -45,9 +45,9 @@ type ProviderFacts struct {
 	// key: subjectKind|subjectID|kind
 	Documents map[string][]models.Document
 	// Facility-level (subjectKind = "facility") docs are under "facility||<kind>"
-	RatioOK         bool // caller computed; if false engine flags
+	RatioOK          bool // caller computed; if false engine flags
 	PostingsComplete bool
-	DrillsLast90d   int
+	DrillsLast90d    int
 }
 
 // DocsFor returns every non-deleted document of the given kind for a subject.
@@ -88,11 +88,11 @@ func (f ProviderFacts) MostRecent(subjectKind, subjectID string, kind models.Doc
 
 // Report is the engine's full output.
 type Report struct {
-	Score                 int                `json:"score"` // 0..100
-	Violations            []Violation        `json:"violations"`
-	UpcomingDeadlines90d  []UpcomingDeadline `json:"upcoming_deadlines_90d"`
-	GeneratedAt           time.Time          `json:"generated_at"`
-	RulesEvaluated        int                `json:"rules_evaluated"`
+	Score                int                `json:"score"` // 0..100
+	Violations           []Violation        `json:"violations"`
+	UpcomingDeadlines90d []UpcomingDeadline `json:"upcoming_deadlines_90d"`
+	GeneratedAt          time.Time          `json:"generated_at"`
+	RulesEvaluated       int                `json:"rules_evaluated"`
 }
 
 type Violation struct {
@@ -106,13 +106,13 @@ type Violation struct {
 }
 
 type UpcomingDeadline struct {
-	RuleID    string    `json:"rule_id"`
-	Title     string    `json:"title"`
-	DueAt     time.Time `json:"due_at"`
-	DaysAway  int       `json:"days_away"`
-	Severity  Severity  `json:"severity"`
-	FormRef   string    `json:"form_ref,omitempty"`
-	FixHint   string    `json:"fix_hint,omitempty"`
+	RuleID   string    `json:"rule_id"`
+	Title    string    `json:"title"`
+	DueAt    time.Time `json:"due_at"`
+	DaysAway int       `json:"days_away"`
+	Severity Severity  `json:"severity"`
+	FormRef  string    `json:"form_ref,omitempty"`
+	FixHint  string    `json:"fix_hint,omitempty"`
 }
 
 // Evaluate runs every rule for the state and returns a Report.

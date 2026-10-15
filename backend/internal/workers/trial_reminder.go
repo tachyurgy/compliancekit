@@ -58,8 +58,8 @@ func (w *TrialReminderWorker) runOnce(ctx context.Context, now time.Time) {
 
 	// Window: trial_ends_at falls in [now+2.5d, now+3.5d] AND we haven't
 	// already sent the 3-day reminder for this trial.
-	windowStart := now.Add(60 * time.Hour)  // +2.5d
-	windowEnd := now.Add(84 * time.Hour)    // +3.5d
+	windowStart := now.Add(60 * time.Hour) // +2.5d
+	windowEnd := now.Add(84 * time.Hour)   // +3.5d
 
 	rows, err := w.Pool.QueryContext(ctx, `
 		SELECT p.id,
@@ -86,11 +86,11 @@ func (w *TrialReminderWorker) runOnce(ctx context.Context, now time.Time) {
 	defer rows.Close()
 
 	type cand struct {
-		id         string
-		email      string
-		name       string
-		fullName   string
-		trialEnds  string
+		id        string
+		email     string
+		name      string
+		fullName  string
+		trialEnds string
 	}
 	var candidates []cand
 	for rows.Next() {

@@ -3,9 +3,9 @@
 // REQ-002 billing handlers beyond the legacy CreateCheckout/Portal that
 // already lived in webhook_stripe.go. We add:
 //
-//   * POST /api/billing/checkout-session  — REQ-002 shape: { plan: "monthly_99"|"annual_948" } returns Stripe URL
-//   * POST /api/billing/portal-session    — REQ-002 alias of /portal
-//   * GET  /api/billing/subscription      — frontend reads this on /settings/billing
+//   - POST /api/billing/checkout-session  — REQ-002 shape: { plan: "monthly_99"|"annual_948" } returns Stripe URL
+//   - POST /api/billing/portal-session    — REQ-002 alias of /portal
+//   - GET  /api/billing/subscription      — frontend reads this on /settings/billing
 //
 // We deliberately keep the legacy /api/billing/checkout + /api/billing/portal
 // routes in webhook_stripe.go so existing tests/UI continue to work; the new
@@ -134,10 +134,10 @@ func (h *BillingV2Handler) GetSubscription(w http.ResponseWriter, r *http.Reques
 		TrialEndsAt       *string `json:"trialEndsAt,omitempty"`
 	}
 	var (
-		plan       sql.NullString
-		status     sql.NullString
-		periodEnd  sql.NullString
-		trialEnd   sql.NullString
+		plan        sql.NullString
+		status      sql.NullString
+		periodEnd   sql.NullString
+		trialEnd    sql.NullString
 		stripeSubID sql.NullString
 	)
 	err := h.Pool.QueryRowContext(r.Context(), `
@@ -172,10 +172,10 @@ func (h *BillingV2Handler) GetSubscription(w http.ResponseWriter, r *http.Reques
 // PostCheckoutNotifier implementation — sends the welcome email and writes
 // trial_ends_at on the provider row. Wired via Service.SetNotifier in main.go.
 type CheckoutNotifier struct {
-	Pool         *sql.DB
-	Emailer      *notify.Emailer
-	AppBase      string
-	Log          *slog.Logger
+	Pool    *sql.DB
+	Emailer *notify.Emailer
+	AppBase string
+	Log     *slog.Logger
 }
 
 func (n *CheckoutNotifier) OnCheckoutCompleted(providerID, sessionID string) {

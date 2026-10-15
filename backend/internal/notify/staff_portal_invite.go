@@ -28,10 +28,13 @@ const StaffPortalInviteExpiryDays = 7
 // FirstName       — recipient (staff) first name; falls back to "there".
 // FacilityName    — daycare display name.
 // OperatorName    — sender's name (the manager/director); the staff member
-//                   replies to this person via Reply-To. Falls back to "Your director".
+//
+//	replies to this person via Reply-To. Falls back to "Your director".
+//
 // UploadURL       — absolute /u/<token> URL.
 // ExpiresInDays   — TTL in days surfaced in body; defaults to
-//                   StaffPortalInviteExpiryDays when zero.
+//
+//	StaffPortalInviteExpiryDays when zero.
 type StaffPortalInviteData struct {
 	FirstName     string
 	FacilityName  string

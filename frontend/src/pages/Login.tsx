@@ -13,6 +13,7 @@ import { ApiError } from '@/api/client';
 import { useSession } from '@/hooks/useSession';
 import DemoLaunchButton from '@/components/common/DemoLaunchButton';
 import { DEMO_MODE } from '@/lib/demo';
+import { DEMO_EMAIL, DEMO_PASSWORD } from '@/components/common/DemoDeploymentNotice';
 
 /**
  * REQ-011 sign-in page. Adds:
@@ -38,7 +39,10 @@ export default function Login(): JSX.Element {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
-    defaultValues: { rememberMe: true },
+    // Demo build: pre-fill the shared demo login so one click signs in.
+    defaultValues: DEMO_MODE
+      ? { email: DEMO_EMAIL, password: DEMO_PASSWORD, rememberMe: true }
+      : { rememberMe: true },
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -83,8 +87,7 @@ export default function Login(): JSX.Element {
         <div className="mb-6 rounded-lb-sm bg-brand-50 px-4 py-4 ring-1 ring-brand-100">
           <p className="text-sm text-ink-800">
             This is a public demo with fictional data. Jump into a private
-            sandbox, or sign in with <strong>demo@example.com</strong> /{' '}
-            <strong>inspection-ready</strong>.
+            sandbox of your own, or sign in below with the shared demo login.
           </p>
           <div className="mt-3">
             <DemoLaunchButton size="md" fullWidth label="Open a private demo sandbox" />
@@ -99,6 +102,22 @@ export default function Login(): JSX.Element {
           error={errors.email?.message}
           {...register('email')}
         />
+        {DEMO_MODE ? (
+          <div
+            data-testid="demo-credentials"
+            className="rounded-lb-sm border border-brand-200 bg-brand-50/60 px-4 py-3"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+              Demo login
+            </p>
+            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+              <dt className="text-ink-700">Email</dt>
+              <dd className="font-mono text-ink-900 select-all">{DEMO_EMAIL}</dd>
+              <dt className="text-ink-700">Password</dt>
+              <dd className="font-mono text-ink-900 select-all">{DEMO_PASSWORD}</dd>
+            </dl>
+          </div>
+        ) : null}
         <Input
           label="Password"
           type="password"

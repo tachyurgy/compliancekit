@@ -7,6 +7,7 @@ import { ARCHITECTURE_URL, DEMO_MODE } from '@/lib/demo';
 import BrandMark from '@/components/common/BrandMark';
 import { useSession } from '@/hooks/useSession';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import DemoDeploymentNotice from '@/components/common/DemoDeploymentNotice';
 
 const FEATURES = [
   {
@@ -43,6 +44,7 @@ export default function Landing(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-surface-muted">
+      <DemoDeploymentNotice />
       <header
         className="border-b border-line bg-white/85 backdrop-blur sticky top-0 z-50"
       >

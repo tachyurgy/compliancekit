@@ -1,5 +1,13 @@
 # Releases
 
+## 2026-10-15 — Demo login shown on sign-in, site-wide demo notice
+- **What deployed:** https://compliancekit.levelbrook.com (same single container, Go API + React build).
+- **Changed:**
+  - Sign-in page (demo build only): a bordered "Demo login" callout with `demo@example.com` / `inspection-ready` sits directly above the password field, and both inputs are pre-filled so one click signs in.
+  - New `DemoDeploymentNotice` strip at the top of the landing page, every auth page (sign-in, signup, password reset) and the signed-in app shell: "Demo deployment: fictional data, sandboxes reset after 24h. Sign in with demo@example.com / inspection-ready." Renders nothing unless `VITE_DEMO_MODE=1`.
+- **How:** `HOST=root@<demo-host> deploy/deploy-demo.sh`.
+- **Verified:** curl `POST /api/auth/signin` with the demo login 200 and `/api/me` 200 before and after the deploy; headless Chromium (desktop 1366px and mobile 390px) shows the notice on landing and sign-in, the callout between the email and password inputs with both pre-filled, and clicking Sign in lands on `/dashboard` with the notice in the app shell and the dashboard populated. tsc and Vitest (72 tests) pass.
+
 ## 2026-10-14 — Public demo at compliancekit.levelbrook.com
 - **What deployed:** https://compliancekit.levelbrook.com, a single container (Go API + React build) on a Hetzner VM behind kamal-proxy (Let's Encrypt TLS). Demo mode: a shared login (`demo@example.com` / `inspection-ready`) and one-click private sandboxes, all fictional data; email, SMS and Stripe disabled.
 - **Changed:**

@@ -31,6 +31,7 @@ import BrandMark from './BrandMark';
 import ToastViewport from './Toast';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import DemoBanner from './DemoBanner';
+import DemoDeploymentNotice from './DemoDeploymentNotice';
 
 interface NavItem {
   to: string;
@@ -88,6 +89,7 @@ export default function Layout(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-surface-muted">
+      <DemoDeploymentNotice />
       <DemoBanner />
       {/* Mobile top bar */}
       <div className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 bg-white border-b border-line-soft">

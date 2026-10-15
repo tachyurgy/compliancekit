@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ShieldCheck, Sparkles, Lock } from 'lucide-react';
 
 import BrandMark from './BrandMark';
+import DemoDeploymentNotice from './DemoDeploymentNotice';
 
 interface AuthShellProps {
   title: string;
@@ -30,6 +31,7 @@ export default function AuthShell({
           'radial-gradient(ellipse 80% 50% at 0% 100%, rgba(197,119,74,0.06), transparent 60%)',
       }}
     >
+      <DemoDeploymentNotice />
       <header className="max-w-6xl mx-auto px-6 h-16 flex items-center">
         <BrandMark to="/" size="md" />
       </header>

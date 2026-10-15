@@ -251,7 +251,7 @@ Files:
 
 ## 11. Testing
 
-- **Go:** 400 test functions in 71 files. Rules, ratios, schedules and scores are covered by table tests. pdfsign uses in-memory `Store` and `BlobStore` fakes. `test/integration/` starts the real router on `httptest.Server` against a fresh SQLite file with every migration applied, and drives it with a cookie-jar client. CI (`.github/workflows/backend-ci.yml`) runs `gofmt`, `go vet`, a static build and `go test -race`.
+- **Go:** 400 test functions in 71 files. Rules, ratios, schedules and scores are covered by table tests. pdfsign uses in-memory `Store` and `BlobStore` fakes. `test/integration/` starts the real router on `httptest.Server` against a fresh SQLite file with every migration applied, and drives it with a cookie-jar client. CI (`.github/workflows/backend-ci.yml`) runs `gofmt`, `go vet`, a static build, the unit packages under `-race`, and the integration suite.
 - **Frontend:** Vitest for the API client, validation and formatting. Playwright specs in `frontend/e2e/` cover sign-up, CRUD, uploads, inspections and portals. CI runs `tsc -b`, Vitest and a production build.
 - **Demo verification:** the deployed demo was exercised end to end in headless Chromium: one-click sandbox, every main page, and a full e-signature (send, open the link, fill the four fields, draw a signature, finalize, download the signed PDF and the audit JSON).
 

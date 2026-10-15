@@ -32,5 +32,15 @@ jobs:
         run: go vet ./...
       - name: go build (static)
         run: CGO_ENABLED=0 go build ./...
-      - name: go test
-        run: go test -race -count=1 ./...
+      # Unit packages run under the race detector. The HTTP integration
+      # suite is bcrypt-heavy and takes ~5 minutes with -race, so it runs
+      # without it. No AWS credentials exist in CI; disabling the EC2
+      # metadata probe keeps the SDK from waiting on it.
+      - name: go test (unit, -race)
+        env:
+          AWS_EC2_METADATA_DISABLED: "true"
+        run: go test -race -count=1 $(go list ./... | grep -v /test/integration)
+      - name: go test (integration)
+        env:
+          AWS_EC2_METADATA_DISABLED: "true"
+        run: go test -count=1 -timeout 10m ./test/integration/

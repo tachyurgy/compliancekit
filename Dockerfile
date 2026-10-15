@@ -4,7 +4,7 @@
 FROM node:20-alpine AS web
 WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm install -g npm@11.12.1 && npm ci --no-audit --no-fund
 COPY frontend/ ./
 ARG VITE_DEMO_MODE=1
 ENV VITE_API_BASE_URL=

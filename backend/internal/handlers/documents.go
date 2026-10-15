@@ -76,13 +76,24 @@ func (h *DocumentHandler) Presign(w http.ResponseWriter, r *http.Request) {
 	if title == "" {
 		title = strings.ReplaceAll(in.Kind, "_", " ")
 	}
+	// The documents table carries the canonical 000004 columns (owner_kind,
+	// owner_id, doc_type, s3_key, all NOT NULL) alongside the later
+	// handler-era aliases; write both, the same way the portal upload does.
+	// owner_kind only admits child|staff|facility, so a provider-level
+	// document is recorded as a facility document owned by the provider.
+	ownerKind, ownerID := in.SubjectKind, in.SubjectID
+	if ownerKind == "provider" || ownerKind == "facility" || ownerID == "" {
+		ownerKind, ownerID = "facility", pid
+	}
 	// insert pending row — OCR fills expires_at later
 	if _, err := h.Pool.ExecContext(r.Context(), `
-		INSERT INTO documents (id, provider_id, subject_kind, subject_id, kind, title,
+		INSERT INTO documents (id, provider_id, owner_kind, owner_id, doc_type, s3_key,
+		                      subject_kind, subject_id, kind, title,
 		                      storage_bucket, storage_key, mime_type, size_bytes,
 		                      uploaded_by, uploaded_via, created_at, updated_at)
-		VALUES (?,?,?,NULLIF(?,''),?,?,?,?,?,0,?,'provider',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
-		docID, pid, in.SubjectKind, in.SubjectID, in.Kind, title, bucket, key, in.MIMEType, mw.UserIDFrom(r.Context())); err != nil {
+		VALUES (?,?,?,?,?,?,?,NULLIF(?,''),?,?,?,?,?,0,?,'provider',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+		docID, pid, ownerKind, ownerID, in.Kind, key,
+		in.SubjectKind, in.SubjectID, in.Kind, title, bucket, key, in.MIMEType, mw.UserIDFrom(r.Context())); err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
@@ -443,6 +454,9 @@ func (h *DocumentHandler) loadDocument(ctx context.Context, pid, id string) (mod
 	var d models.Document
 	var kind string
 	var dne int
+	// TEXT timestamp columns scan through dbtime (modernc will not parse
+	// them into time.Time; see dashboard.go loadDocs).
+	var issued, expires, lastChase, confirmed, created, updated, deleted dbtime.NullTime
 	err := h.Pool.QueryRowContext(ctx, `
 		SELECT id, provider_id, subject_kind, COALESCE(subject_id,''), kind, title,
 		       storage_bucket, storage_key, mime_type, size_bytes,
@@ -455,15 +469,25 @@ func (h *DocumentHandler) loadDocument(ctx context.Context, pid, id string) (mod
 		FROM documents WHERE id = ? AND provider_id = ?`, id, pid).
 		Scan(&d.ID, &d.ProviderID, &d.SubjectKind, &d.SubjectID, &kind, &d.Title,
 			&d.StorageBucket, &d.StorageKey, &d.MIMEType, &d.SizeBytes,
-			&d.IssuedAt, &d.ExpiresAt, &d.OCRConfidence, &d.OCRSource,
-			&d.UploadedBy, &d.UploadedVia, &d.LastChaseSentAt,
+			&issued, &expires, &d.OCRConfidence, &d.OCRSource,
+			&d.UploadedBy, &d.UploadedVia, &lastChase,
 			&d.ExpirationExtractedValue, &d.DocumentTypeExtractedValue,
-			&d.ExtractionConfidence, &d.ExpirationConfirmedAt,
+			&d.ExtractionConfidence, &confirmed,
 			&d.ExpirationConfirmedByUserID, &dne,
-			&d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
+			&created, &updated, &deleted)
 	if err != nil {
 		return models.Document{}, err
 	}
+	ptr := func(n dbtime.NullTime) *time.Time {
+		if !n.Valid {
+			return nil
+		}
+		t := n.Time
+		return &t
+	}
+	d.IssuedAt, d.ExpiresAt, d.LastChaseSentAt = ptr(issued), ptr(expires), ptr(lastChase)
+	d.ExpirationConfirmedAt, d.DeletedAt = ptr(confirmed), ptr(deleted)
+	d.CreatedAt, d.UpdatedAt = created.ValueOrZero(), updated.ValueOrZero()
 	d.Kind = models.DocumentKind(kind)
 	d.DoesNotExpire = dne != 0
 	return d, nil

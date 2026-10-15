@@ -105,3 +105,10 @@ func TestFromNullString(t *testing.T) {
 		t.Fatalf("unexpected %v", got)
 	}
 }
+
+func TestParseDriverTimeString(t *testing.T) {
+	got, err := Parse("2026-10-10 15:00:00 +0000 UTC")
+	if err != nil || !got.Equal(time.Date(2026, 10, 10, 15, 0, 0, 0, time.UTC)) {
+		t.Fatalf("got %v %v", got, err)
+	}
+}

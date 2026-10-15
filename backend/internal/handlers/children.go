@@ -12,6 +12,7 @@ import (
 
 	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
+	"github.com/tachyurgy/compliancekit/backend/internal/dbtime"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	"github.com/tachyurgy/compliancekit/backend/internal/magiclink"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
@@ -625,12 +626,12 @@ func (h *ChildHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 		var dne int
 		if err := rows.Scan(&d.ID, &d.ProviderID, &d.SubjectKind, &d.SubjectID, &kind, &d.Title,
 			&d.StorageBucket, &d.StorageKey, &d.MIMEType, &d.SizeBytes,
-			&d.IssuedAt, &d.ExpiresAt, &d.OCRConfidence, &d.OCRSource,
-			&d.UploadedBy, &d.UploadedVia, &d.LastChaseSentAt,
+			dbtime.IntoPtr(&d.IssuedAt), dbtime.IntoPtr(&d.ExpiresAt), &d.OCRConfidence, &d.OCRSource,
+			&d.UploadedBy, &d.UploadedVia, dbtime.IntoPtr(&d.LastChaseSentAt),
 			&d.ExpirationExtractedValue, &d.DocumentTypeExtractedValue,
-			&d.ExtractionConfidence, &d.ExpirationConfirmedAt,
+			&d.ExtractionConfidence, dbtime.IntoPtr(&d.ExpirationConfirmedAt),
 			&d.ExpirationConfirmedByUserID, &dne,
-			&d.CreatedAt, &d.UpdatedAt, &d.DeletedAt); err != nil {
+			dbtime.Into(&d.CreatedAt), dbtime.Into(&d.UpdatedAt), dbtime.IntoPtr(&d.DeletedAt)); err != nil {
 			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 			return
 		}

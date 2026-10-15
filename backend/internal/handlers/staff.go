@@ -10,6 +10,7 @@ import (
 
 	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
+	"github.com/tachyurgy/compliancekit/backend/internal/dbtime"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
 	"github.com/tachyurgy/compliancekit/backend/internal/models"
@@ -116,7 +117,7 @@ func (h *StaffHandler) Get(w http.ResponseWriter, r *http.Request) {
 		       hire_date, background_check_date, status, created_at, updated_at
 		FROM staff WHERE id = ? AND provider_id = ?`, id, pid).
 		Scan(&s.ID, &s.ProviderID, &s.FirstName, &s.LastName, &s.Role, &s.Email, &s.Phone,
-			&s.HireDate, &s.BackgroundCheck, &s.Status, &s.CreatedAt, &s.UpdatedAt)
+			dbtime.Into(&s.HireDate), dbtime.IntoPtr(&s.BackgroundCheck), &s.Status, dbtime.Into(&s.CreatedAt), dbtime.Into(&s.UpdatedAt))
 	if err != nil {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrNotFound, err))
 		return
@@ -210,9 +211,9 @@ func (h *StaffHandler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 		var kind string
 		if err := rows.Scan(&d.ID, &d.ProviderID, &d.SubjectKind, &d.SubjectID, &kind, &d.Title,
 			&d.StorageBucket, &d.StorageKey, &d.MIMEType, &d.SizeBytes,
-			&d.IssuedAt, &d.ExpiresAt, &d.OCRConfidence, &d.OCRSource,
-			&d.UploadedBy, &d.UploadedVia, &d.LastChaseSentAt,
-			&d.CreatedAt, &d.UpdatedAt, &d.DeletedAt); err != nil {
+			dbtime.IntoPtr(&d.IssuedAt), dbtime.IntoPtr(&d.ExpiresAt), &d.OCRConfidence, &d.OCRSource,
+			&d.UploadedBy, &d.UploadedVia, dbtime.IntoPtr(&d.LastChaseSentAt),
+			dbtime.Into(&d.CreatedAt), dbtime.Into(&d.UpdatedAt), dbtime.IntoPtr(&d.DeletedAt)); err != nil {
 			httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 			return
 		}

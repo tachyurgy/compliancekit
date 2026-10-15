@@ -31,6 +31,9 @@ var layouts = []string{
 	time.RFC3339Nano,
 	time.RFC3339,
 	"2006-01-02",
+	// What the modernc driver writes when a Go time.Time is bound to a
+	// TEXT column: time.Time.String() without the monotonic suffix.
+	"2006-01-02 15:04:05.999999999 -0700 MST",
 }
 
 // Parse parses a SQLite text timestamp. Empty / "NULL" yield zero time, nil.
@@ -117,4 +120,42 @@ func (n NullTime) ValueOrZero() time.Time {
 		return time.Time{}
 	}
 	return n.Time
+}
+
+// Into adapts a *time.Time as a sql.Scanner for a TEXT timestamp column, so
+// call sites can keep scanning straight into struct fields:
+//
+//	rows.Scan(&d.ID, dbtime.Into(&d.CreatedAt))
+//
+// NULL or empty leaves the zero time.
+func Into(dst *time.Time) sql.Scanner { return intoScanner{dst: dst} }
+
+// IntoPtr is Into for nullable *time.Time fields: NULL or empty sets nil.
+func IntoPtr(dst **time.Time) sql.Scanner { return intoPtrScanner{dst: dst} }
+
+type intoScanner struct{ dst *time.Time }
+
+func (s intoScanner) Scan(src any) error {
+	var n NullTime
+	if err := n.Scan(src); err != nil {
+		return err
+	}
+	*s.dst = n.ValueOrZero()
+	return nil
+}
+
+type intoPtrScanner struct{ dst **time.Time }
+
+func (s intoPtrScanner) Scan(src any) error {
+	var n NullTime
+	if err := n.Scan(src); err != nil {
+		return err
+	}
+	if !n.Valid {
+		*s.dst = nil
+		return nil
+	}
+	t := n.Time
+	*s.dst = &t
+	return nil
 }

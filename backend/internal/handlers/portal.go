@@ -20,6 +20,7 @@ import (
 
 	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
+	"github.com/tachyurgy/compliancekit/backend/internal/dbtime"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	"github.com/tachyurgy/compliancekit/backend/internal/magiclink"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
@@ -180,7 +181,7 @@ func (h *PortalHandler) rollupForSubject(ctx context.Context, providerID, entity
 		var d portalDoc
 		var dne int
 		var confirmedAt sql.NullString
-		if err := docRows.Scan(&d.ID, &d.Kind, &d.Title, &d.ExpiresAt, &confirmedAt, &dne, &d.CreatedAt); err != nil {
+		if err := docRows.Scan(&d.ID, &d.Kind, &d.Title, dbtime.IntoPtr(&d.ExpiresAt), &confirmedAt, &dne, dbtime.Into(&d.CreatedAt)); err != nil {
 			return nil, nil, err
 		}
 		d.DoesNotExpire = dne != 0

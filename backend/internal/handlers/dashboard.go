@@ -117,10 +117,15 @@ func (h *DashboardHandler) loadChildren(r *http.Request, pid string) ([]models.C
 	var out []models.Child
 	for rows.Next() {
 		var c models.Child
-		if err := rows.Scan(&c.ID, &c.ProviderID, &c.FirstName, &c.LastName, &c.DOB, &c.EnrollDate,
-			&c.ParentEmail, &c.ParentPhone, &c.Classroom, &c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		// TEXT date columns: scan via dbtime (see loadDocs) — modernc will
+		// not auto-parse them into time.Time.
+		var dob, enroll, created, updated dbtime.NullTime
+		if err := rows.Scan(&c.ID, &c.ProviderID, &c.FirstName, &c.LastName, &dob, &enroll,
+			&c.ParentEmail, &c.ParentPhone, &c.Classroom, &c.Status, &created, &updated); err != nil {
 			return nil, err
 		}
+		c.DOB, c.EnrollDate = dob.ValueOrZero(), enroll.ValueOrZero()
+		c.CreatedAt, c.UpdatedAt = created.ValueOrZero(), updated.ValueOrZero()
 		out = append(out, c)
 	}
 	return out, rows.Err()
@@ -138,10 +143,17 @@ func (h *DashboardHandler) loadStaff(r *http.Request, pid string) ([]models.Staf
 	var out []models.Staff
 	for rows.Next() {
 		var s models.Staff
+		var hire, bg, created, updated dbtime.NullTime
 		if err := rows.Scan(&s.ID, &s.ProviderID, &s.FirstName, &s.LastName, &s.Role, &s.Email, &s.Phone,
-			&s.HireDate, &s.BackgroundCheck, &s.Status, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			&hire, &bg, &s.Status, &created, &updated); err != nil {
 			return nil, err
 		}
+		s.HireDate = hire.ValueOrZero()
+		if bg.Valid {
+			t := bg.Time
+			s.BackgroundCheck = &t
+		}
+		s.CreatedAt, s.UpdatedAt = created.ValueOrZero(), updated.ValueOrZero()
 		out = append(out, s)
 	}
 	return out, rows.Err()

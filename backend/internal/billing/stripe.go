@@ -19,6 +19,7 @@ import (
 	"github.com/stripe/stripe-go/v79/webhook"
 
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
+	"github.com/tachyurgy/compliancekit/backend/internal/dbtime"
 )
 
 // PostCheckoutNotifier is the contract the handlers package implements to
@@ -494,17 +495,23 @@ func nullIfEmpty(s string) any {
 // HasActiveSubscription implements middleware.BillingChecker.
 func (s *Service) HasActiveSubscription(ctx context.Context, providerID string) (bool, error) {
 	var status string
-	var periodEnd time.Time
+	// current_period_end is a TEXT column; scan through dbtime so the
+	// modernc driver does not reject it (a time.Time target failed the scan
+	// and silently reported every subscriber as inactive).
+	var periodEndCol dbtime.NullTime
 	err := s.pool.QueryRowContext(ctx, `
 		SELECT status, current_period_end
 		FROM subscriptions
 		WHERE provider_id = ?
 		ORDER BY updated_at DESC
-		LIMIT 1`, providerID).Scan(&status, &periodEnd)
-	if err != nil {
-		// no subscription found -> not active (but not an error).
-		return false, nil
+		LIMIT 1`, providerID).Scan(&status, &periodEndCol)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil // no subscription -> not active, not an error
 	}
+	if err != nil {
+		return false, fmt.Errorf("billing: subscription lookup: %w", err)
+	}
+	periodEnd := periodEndCol.ValueOrZero()
 	if status == "active" || status == "trialing" {
 		return true, nil
 	}

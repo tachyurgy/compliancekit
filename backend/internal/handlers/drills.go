@@ -10,6 +10,7 @@ import (
 
 	"github.com/tachyurgy/compliancekit/backend/internal/auditlog"
 	"github.com/tachyurgy/compliancekit/backend/internal/base62"
+	"github.com/tachyurgy/compliancekit/backend/internal/dbtime"
 	"github.com/tachyurgy/compliancekit/backend/internal/httpx"
 	mw "github.com/tachyurgy/compliancekit/backend/internal/middleware"
 )
@@ -105,7 +106,7 @@ func (h *DrillHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Hydrate created_at/updated_at from the DB so the client sees canonical values.
 	_ = h.Pool.QueryRowContext(r.Context(),
 		`SELECT created_at, updated_at FROM drill_logs WHERE id = ?`, out.ID).
-		Scan(&out.CreatedAt, &out.UpdatedAt)
+		Scan(dbtime.Into(&out.CreatedAt), dbtime.Into(&out.UpdatedAt))
 
 	auditlog.EmitDrillCreate(r.Context(), h.Pool, pid, uid, out.ID, map[string]any{
 		"drill_kind": out.DrillKind,
@@ -216,13 +217,8 @@ func (h *DrillHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // request — the UI can tolerate a blank timestamp; 500 on a list endpoint
 // cannot.
 func parseSQLiteTime(s string) time.Time {
-	if s == "" {
-		return time.Time{}
-	}
-	for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02 15:04:05", "2006-01-02T15:04:05"} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t
-		}
-	}
-	return time.Time{}
+	// Delegate to dbtime so every TEXT timestamp format the app writes
+	// (CURRENT_TIMESTAMP, RFC 3339, and the driver's time.Time.String()
+	// encoding) parses the same way everywhere.
+	return dbtime.MustParse(s)
 }

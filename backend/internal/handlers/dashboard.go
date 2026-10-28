@@ -3,6 +3,8 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"strings"
+	"time"
 
 	"database/sql"
 
@@ -31,19 +33,135 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		httpx.RenderError(w, r, httpx.Wrap(httpx.ErrInternal, err))
 		return
 	}
-	report := compliance.Evaluate(state, facts)
+	now := time.Now()
+	report := compliance.EvaluateAt(state, facts, now)
+	// Same score the /api/compliance/score hero shows, so the two never disagree.
+	synth := compliance.SynthesizeScore(report, facts, now)
+
+	alerts := make([]map[string]any, 0, len(report.Violations))
+	critical, warning := 0, 0
+	for _, v := range report.Violations {
+		sev := alertSeverity(v.Severity)
+		switch sev {
+		case "critical":
+			critical++
+		case "warning":
+			warning++
+		}
+		alerts = append(alerts, map[string]any{
+			"id":          v.RuleID,
+			"severity":    sev,
+			"title":       v.Title,
+			"description": v.Description,
+			"href":        alertHref(v.RuleID, v.Category),
+			"dueDate":     nil,
+			"category":    alertCategory(v.RuleID, v.Category),
+		})
+	}
+	timeline := make([]map[string]any, 0, len(report.UpcomingDeadlines90d))
+	for _, d := range report.UpcomingDeadlines90d {
+		timeline = append(timeline, map[string]any{
+			"id":       d.RuleID + "|" + d.DueAt.Format("2006-01-02"),
+			"date":     d.DueAt.Format(time.RFC3339),
+			"label":    d.Title,
+			"category": alertCategory(d.RuleID, d.Category),
+			"severity": alertSeverity(d.Severity),
+			"href":     alertHref(d.RuleID, d.Category),
+		})
+	}
+	docCount := 0
+	for _, ds := range facts.Documents {
+		docCount += len(ds)
+	}
 
 	httpx.RenderJSON(w, http.StatusOK, map[string]any{
+		// Shape the SPA's DashboardSchema (frontend/src/api/dashboard.ts) parses.
+		"complianceScore": synth.Score,
+		"scoreDelta":      h.scoreDelta(r, pid, synth.Score),
+		"updatedAt":       now.UTC().Format(time.RFC3339),
+		"alerts":          alerts,
+		"timeline":        timeline,
+		// Raw engine output, kept for API clients and the integration tests.
 		"score":              report.Score,
 		"violations":         report.Violations,
 		"upcoming_deadlines": report.UpcomingDeadlines90d,
 		"rules_evaluated":    report.RulesEvaluated,
 		"state":              state,
 		"counts": map[string]int{
-			"children": len(facts.Children),
-			"staff":    len(facts.Staff),
+			"children":       len(facts.Children),
+			"staff":          len(facts.Staff),
+			"documents":      docCount,
+			"criticalAlerts": critical,
+			"warningAlerts":  warning,
 		},
 	})
+}
+
+// scoreDelta compares today's score with the newest daily snapshot that is at
+// least a week old. No history yet means no movement to report.
+func (h *DashboardHandler) scoreDelta(r *http.Request, pid string, score int) int {
+	var prev int
+	err := h.Pool.QueryRowContext(r.Context(), `
+		SELECT score FROM compliance_score_snapshots
+		WHERE provider_id = ? AND calculated_at <= datetime('now', '-7 days')
+		ORDER BY calculated_at DESC LIMIT 1`, pid).Scan(&prev)
+	if err != nil {
+		return 0
+	}
+	return score - prev
+}
+
+// alertSeverity maps engine severities onto the UI's critical/warning/info.
+func alertSeverity(s compliance.Severity) string {
+	switch s {
+	case compliance.SeverityCritical:
+		return "critical"
+	case compliance.SeverityMajor:
+		return "warning"
+	default:
+		return "info"
+	}
+}
+
+// alertCategory maps a rule onto the UI's alert category enum.
+func alertCategory(ruleID, category string) string {
+	switch {
+	case strings.Contains(ruleID, "-IMM"):
+		return "immunization"
+	case strings.Contains(ruleID, "DRILLS"):
+		return "drill"
+	case strings.Contains(ruleID, "RATIOS"):
+		return "ratio"
+	case strings.Contains(ruleID, "POSTINGS"):
+		return "posting"
+	case strings.Contains(ruleID, "CPR"), strings.Contains(ruleID, "CREDENTIAL"),
+		strings.Contains(ruleID, "TRAINING"), strings.Contains(ruleID, "LICENSE"):
+		return "certification"
+	}
+	switch category {
+	case "child_files", "staff_files", "facility":
+		return "document"
+	}
+	return "other"
+}
+
+// alertHref points an alert at the page where it gets fixed.
+func alertHref(ruleID, category string) any {
+	switch {
+	case strings.Contains(ruleID, "DRILLS"):
+		return "/drill-roster"
+	case strings.Contains(ruleID, "RATIOS"), strings.Contains(ruleID, "POSTINGS"):
+		return "/operations"
+	}
+	switch category {
+	case "child_files":
+		return "/children"
+	case "staff_files":
+		return "/staff"
+	case "facility":
+		return "/documents"
+	}
+	return nil
 }
 
 func (h *DashboardHandler) loadFacts(r *http.Request, pid string) (*compliance.ProviderFacts, models.StateCode, error) {

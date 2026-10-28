@@ -248,3 +248,66 @@ func TestDashboard_TenantIsolation(t *testing.T) {
 		t.Fatalf("expected 200 or 500, got %d", resp.StatusCode)
 	}
 }
+
+// TestDashboard_MatchesFrontendContract guards the keys the SPA's zod
+// DashboardSchema requires (frontend/src/api/dashboard.ts). When these went
+// missing the dashboard page showed "We couldn't load your dashboard".
+func TestDashboard_MatchesFrontendContract(t *testing.T) {
+	h := NewHarness(t)
+	client, _, _ := h.AuthAs(t, "CA")
+
+	resp, err := client.Get(h.URL("/api/dashboard"))
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body=%s)", resp.StatusCode, readAll(t, resp))
+	}
+	var dash struct {
+		ComplianceScore *float64 `json:"complianceScore"`
+		ScoreDelta      *int     `json:"scoreDelta"`
+		UpdatedAt       *string  `json:"updatedAt"`
+		Counts          struct {
+			Children       *int `json:"children"`
+			Staff          *int `json:"staff"`
+			Documents      *int `json:"documents"`
+			CriticalAlerts *int `json:"criticalAlerts"`
+			WarningAlerts  *int `json:"warningAlerts"`
+		} `json:"counts"`
+		Alerts []struct {
+			ID       string  `json:"id"`
+			Severity string  `json:"severity"`
+			Category string  `json:"category"`
+			Href     *string `json:"href"`
+		} `json:"alerts"`
+		Timeline []map[string]any `json:"timeline"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&dash); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if dash.ComplianceScore == nil || *dash.ComplianceScore < 0 || *dash.ComplianceScore > 100 {
+		t.Fatalf("complianceScore missing or out of range: %v", dash.ComplianceScore)
+	}
+	if dash.ScoreDelta == nil || dash.UpdatedAt == nil {
+		t.Fatalf("scoreDelta/updatedAt missing")
+	}
+	c := dash.Counts
+	if c.Children == nil || c.Staff == nil || c.Documents == nil || c.CriticalAlerts == nil || c.WarningAlerts == nil {
+		t.Fatalf("counts incomplete: %+v", c)
+	}
+	if dash.Alerts == nil || dash.Timeline == nil {
+		t.Fatalf("alerts/timeline must be arrays, not null")
+	}
+	if len(dash.Alerts) == 0 {
+		t.Fatalf("fresh CA provider should have alerts")
+	}
+	sevOK := map[string]bool{"critical": true, "warning": true, "info": true}
+	catOK := map[string]bool{"document": true, "immunization": true, "certification": true,
+		"drill": true, "ratio": true, "posting": true, "other": true}
+	for _, a := range dash.Alerts {
+		if !sevOK[a.Severity] || !catOK[a.Category] {
+			t.Fatalf("alert %s has invalid severity/category %q/%q", a.ID, a.Severity, a.Category)
+		}
+	}
+}

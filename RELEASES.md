@@ -1,5 +1,14 @@
 # Releases
 
+## 2026-10-28 — Dashboard loads again (API matches the frontend contract)
+- **What deployed:** https://compliancekit.levelbrook.com (same single container).
+- **Changed:**
+  - `GET /api/dashboard` now returns the shape the SPA's zod `DashboardSchema` parses: `complianceScore` (same synthesized score as the score hero), `scoreDelta` (vs the newest snapshot at least 7 days old, 0 without history), `updatedAt`, `alerts` (one per violation, with UI severity/category/href), `timeline` (upcoming deadlines in 90 days) and `counts.documents/criticalAlerts/warningAlerts`. The raw engine keys stay for API clients. Before this the page showed "We couldn't load your dashboard" with a zod error list.
+  - Engine violations and deadlines carry their rule `category`.
+  - New integration test `TestDashboard_MatchesFrontendContract`.
+- **How:** `HOST=root@<demo-host> deploy/deploy-demo.sh`.
+- **Verified:** see below.
+
 ## 2026-10-15 — Demo login shown on sign-in, site-wide demo notice
 - **What deployed:** https://compliancekit.levelbrook.com (same single container, Go API + React build).
 - **Changed:**

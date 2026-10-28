@@ -103,6 +103,7 @@ type Violation struct {
 	Reference   string   `json:"reference,omitempty"`
 	FormRef     string   `json:"form_ref,omitempty"`
 	FixHint     string   `json:"fix_hint,omitempty"`
+	Category    string   `json:"category,omitempty"`
 }
 
 type UpcomingDeadline struct {
@@ -113,6 +114,7 @@ type UpcomingDeadline struct {
 	Severity Severity  `json:"severity"`
 	FormRef  string    `json:"form_ref,omitempty"`
 	FixHint  string    `json:"fix_hint,omitempty"`
+	Category string    `json:"category,omitempty"`
 }
 
 // Evaluate runs every rule for the state and returns a Report.
@@ -138,6 +140,7 @@ func EvaluateAt(state models.StateCode, facts *ProviderFacts, now time.Time) *Re
 			r.Violations = append(r.Violations, Violation{
 				RuleID: rule.ID, Title: rule.Title, Severity: rule.Severity,
 				Description: cr.Violation, Reference: rule.Reference, FormRef: rule.FormRef, FixHint: cr.FixHint,
+				Category: rule.Category,
 			})
 		}
 		if cr.UpcomingAt != nil {
@@ -146,6 +149,7 @@ func EvaluateAt(state models.StateCode, facts *ProviderFacts, now time.Time) *Re
 				r.UpcomingDeadlines90d = append(r.UpcomingDeadlines90d, UpcomingDeadline{
 					RuleID: rule.ID, Title: rule.Title, DueAt: *cr.UpcomingAt, DaysAway: days,
 					Severity: rule.Severity, FormRef: rule.FormRef, FixHint: cr.FixHint,
+					Category: rule.Category,
 				})
 			}
 		}
